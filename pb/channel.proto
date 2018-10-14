@@ -1,0 +1,8 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+message SetChannelRequest {}
+message SetChannelResponse {}
+message GetChannelRequest {}
+message GetChannelResponse {}

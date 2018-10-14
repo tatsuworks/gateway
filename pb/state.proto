@@ -1,0 +1,22 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+import "channel.proto";
+import "emoji.proto";
+import "guild.proto";
+import "member.proto";
+
+service State {
+	rpc SetChannel(SetChannelRequest) returns (SetChannelResponse) {}
+	rpc GetChannel(GetChannelRequest) returns (GetChannelResponse) {}
+
+	rpc SetEmoji(SetEmojiRequest) returns (SetEmojiResponse) {}
+	rpc GetEmoji(GetEmojiRequest) returns (GetEmojiResponse) {}
+
+	rpc SetGuild(SetGuildRequest) returns (SetGuildResponse) {}
+	rpc GetGuild(GetGuildRequest) returns (GetGuildResponse) {}
+
+	rpc SetMember(SetMemberRequest) returns (SetMemberResponse) {}
+	rpc GetMember(GetMemberRequest) returns (GetMemberResponse) {}
+}

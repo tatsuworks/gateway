@@ -2,7 +2,40 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
-message SetChannelRequest {}
+message Channel {
+	enum channel_type {
+		GUILD_TEXT = 0;
+		DM = 1;
+		GUILD_VOICE = 2;
+		GROUP_DM = 3;
+		GUILD_CATEGORY = 4;
+	}
+
+	message PermissionOverwrite {
+		string id = 1;
+		string type = 2;
+		int32 deny = 3;
+		int32 allow = 4;
+	}
+
+	string id = 1;
+	string guild_id = 2;
+	string name = 3;
+	string topic = 4;
+	bool nsfw = 5; 
+	int32 position = 6;
+	int32 bitrate = 7;
+	repeated PermissionOverwrite overwrites = 8;
+	string parent_id = 9;
+}
+
+message SetChannelRequest {
+	Channel channel = 1;
+}
 message SetChannelResponse {}
-message GetChannelRequest {}
-message GetChannelResponse {}
+message GetChannelRequest {
+	string id = 1;
+}
+message GetChannelResponse {
+	Channel channel = 1;
+}

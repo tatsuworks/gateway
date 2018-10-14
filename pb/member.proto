@@ -2,7 +2,24 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
-message SetMemberRequest {}
+message Member {
+	string user_id = 1;
+	string guild_id = 2;
+	string JoinedAt = 3;
+	string nick = 4;
+	bool deaf = 5;
+	bool mute = 6;
+	repeated string roles = 7;
+}
+
+message SetMemberRequest {
+	Member member = 1;
+}
 message SetMemberResponse {}
-message GetMemberRequest {}
-message GetMemberResponse {}
+message GetMemberRequest {
+	string user_id = 1;
+	string guild_id = 2;
+}
+message GetMemberResponse {
+	Member member = 1;
+}

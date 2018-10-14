@@ -1,0 +1,33 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+message Message {
+	message Attachment {
+		string id = 1;
+		string url = 2;
+		string proxy_url = 3;
+		string filename = 4;
+	}
+
+	string id = 1;
+	string channel_id = 2;
+	string content = 3;
+	string timestamp = 4;
+	string edited_timestamp = 5;
+	repeated Attachment attachments = 6;
+	repeated string mention_roles = 7;
+	bool tts = 8;
+	string author = 9;
+}
+
+message SetMessageRequest {
+	Message message = 1;
+}
+message SetMessageResponse {}
+message GetMessageRequest {
+	string id = 1;
+}
+message GetMessageResponse {
+	Message message = 1;
+}

@@ -20,14 +20,223 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
+type ChannelChannelType int32
+
+const (
+	Channel_GUILD_TEXT     ChannelChannelType = 0
+	Channel_DM             ChannelChannelType = 1
+	Channel_GUILD_VOICE    ChannelChannelType = 2
+	Channel_GROUP_DM       ChannelChannelType = 3
+	Channel_GUILD_CATEGORY ChannelChannelType = 4
+)
+
+var ChannelChannelType_name = map[int32]string{
+	0: "GUILD_TEXT",
+	1: "DM",
+	2: "GUILD_VOICE",
+	3: "GROUP_DM",
+	4: "GUILD_CATEGORY",
+}
+var ChannelChannelType_value = map[string]int32{
+	"GUILD_TEXT":     0,
+	"DM":             1,
+	"GUILD_VOICE":    2,
+	"GROUP_DM":       3,
+	"GUILD_CATEGORY": 4,
+}
+
+func (x ChannelChannelType) String() string {
+	return proto.EnumName(ChannelChannelType_name, int32(x))
+}
+func (ChannelChannelType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_channel_50a344f4ccae3665, []int{0, 0}
+}
+
+type Channel struct {
+	Id         string                         `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GuildId    string                         `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	Name       string                         `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Topic      string                         `protobuf:"bytes,4,opt,name=topic,proto3" json:"topic,omitempty"`
+	Nsfw       bool                           `protobuf:"varint,5,opt,name=nsfw,proto3" json:"nsfw,omitempty"`
+	Position   int32                          `protobuf:"varint,6,opt,name=position,proto3" json:"position,omitempty"`
+	Bitrate    int32                          `protobuf:"varint,7,opt,name=bitrate,proto3" json:"bitrate,omitempty"`
+	Overwrites []*Channel_PermissionOverwrite `protobuf:"bytes,8,rep,name=overwrites" json:"overwrites,omitempty"`
+	ParentId   string                         `protobuf:"bytes,9,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+}
+
+func (m *Channel) Reset()         { *m = Channel{} }
+func (m *Channel) String() string { return proto.CompactTextString(m) }
+func (*Channel) ProtoMessage()    {}
+func (*Channel) Descriptor() ([]byte, []int) {
+	return fileDescriptor_channel_50a344f4ccae3665, []int{0}
+}
+func (m *Channel) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Channel) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Channel.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *Channel) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Channel.Merge(dst, src)
+}
+func (m *Channel) XXX_Size() int {
+	return m.Size()
+}
+func (m *Channel) XXX_DiscardUnknown() {
+	xxx_messageInfo_Channel.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Channel proto.InternalMessageInfo
+
+func (m *Channel) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *Channel) GetGuildId() string {
+	if m != nil {
+		return m.GuildId
+	}
+	return ""
+}
+
+func (m *Channel) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *Channel) GetTopic() string {
+	if m != nil {
+		return m.Topic
+	}
+	return ""
+}
+
+func (m *Channel) GetNsfw() bool {
+	if m != nil {
+		return m.Nsfw
+	}
+	return false
+}
+
+func (m *Channel) GetPosition() int32 {
+	if m != nil {
+		return m.Position
+	}
+	return 0
+}
+
+func (m *Channel) GetBitrate() int32 {
+	if m != nil {
+		return m.Bitrate
+	}
+	return 0
+}
+
+func (m *Channel) GetOverwrites() []*Channel_PermissionOverwrite {
+	if m != nil {
+		return m.Overwrites
+	}
+	return nil
+}
+
+func (m *Channel) GetParentId() string {
+	if m != nil {
+		return m.ParentId
+	}
+	return ""
+}
+
+type Channel_PermissionOverwrite struct {
+	Id    string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type  string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Deny  int32  `protobuf:"varint,3,opt,name=deny,proto3" json:"deny,omitempty"`
+	Allow int32  `protobuf:"varint,4,opt,name=allow,proto3" json:"allow,omitempty"`
+}
+
+func (m *Channel_PermissionOverwrite) Reset()         { *m = Channel_PermissionOverwrite{} }
+func (m *Channel_PermissionOverwrite) String() string { return proto.CompactTextString(m) }
+func (*Channel_PermissionOverwrite) ProtoMessage()    {}
+func (*Channel_PermissionOverwrite) Descriptor() ([]byte, []int) {
+	return fileDescriptor_channel_50a344f4ccae3665, []int{0, 0}
+}
+func (m *Channel_PermissionOverwrite) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Channel_PermissionOverwrite) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Channel_PermissionOverwrite.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *Channel_PermissionOverwrite) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Channel_PermissionOverwrite.Merge(dst, src)
+}
+func (m *Channel_PermissionOverwrite) XXX_Size() int {
+	return m.Size()
+}
+func (m *Channel_PermissionOverwrite) XXX_DiscardUnknown() {
+	xxx_messageInfo_Channel_PermissionOverwrite.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Channel_PermissionOverwrite proto.InternalMessageInfo
+
+func (m *Channel_PermissionOverwrite) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *Channel_PermissionOverwrite) GetType() string {
+	if m != nil {
+		return m.Type
+	}
+	return ""
+}
+
+func (m *Channel_PermissionOverwrite) GetDeny() int32 {
+	if m != nil {
+		return m.Deny
+	}
+	return 0
+}
+
+func (m *Channel_PermissionOverwrite) GetAllow() int32 {
+	if m != nil {
+		return m.Allow
+	}
+	return 0
+}
+
 type SetChannelRequest struct {
+	Channel *Channel `protobuf:"bytes,1,opt,name=channel" json:"channel,omitempty"`
 }
 
 func (m *SetChannelRequest) Reset()         { *m = SetChannelRequest{} }
 func (m *SetChannelRequest) String() string { return proto.CompactTextString(m) }
 func (*SetChannelRequest) ProtoMessage()    {}
 func (*SetChannelRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_channel_ca5238ae9de34f8c, []int{0}
+	return fileDescriptor_channel_50a344f4ccae3665, []int{1}
 }
 func (m *SetChannelRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -56,6 +265,13 @@ func (m *SetChannelRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SetChannelRequest proto.InternalMessageInfo
 
+func (m *SetChannelRequest) GetChannel() *Channel {
+	if m != nil {
+		return m.Channel
+	}
+	return nil
+}
+
 type SetChannelResponse struct {
 }
 
@@ -63,7 +279,7 @@ func (m *SetChannelResponse) Reset()         { *m = SetChannelResponse{} }
 func (m *SetChannelResponse) String() string { return proto.CompactTextString(m) }
 func (*SetChannelResponse) ProtoMessage()    {}
 func (*SetChannelResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_channel_ca5238ae9de34f8c, []int{1}
+	return fileDescriptor_channel_50a344f4ccae3665, []int{2}
 }
 func (m *SetChannelResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -93,13 +309,14 @@ func (m *SetChannelResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_SetChannelResponse proto.InternalMessageInfo
 
 type GetChannelRequest struct {
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 }
 
 func (m *GetChannelRequest) Reset()         { *m = GetChannelRequest{} }
 func (m *GetChannelRequest) String() string { return proto.CompactTextString(m) }
 func (*GetChannelRequest) ProtoMessage()    {}
 func (*GetChannelRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_channel_ca5238ae9de34f8c, []int{2}
+	return fileDescriptor_channel_50a344f4ccae3665, []int{3}
 }
 func (m *GetChannelRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -128,14 +345,22 @@ func (m *GetChannelRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetChannelRequest proto.InternalMessageInfo
 
+func (m *GetChannelRequest) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
 type GetChannelResponse struct {
+	Channel *Channel `protobuf:"bytes,1,opt,name=channel" json:"channel,omitempty"`
 }
 
 func (m *GetChannelResponse) Reset()         { *m = GetChannelResponse{} }
 func (m *GetChannelResponse) String() string { return proto.CompactTextString(m) }
 func (*GetChannelResponse) ProtoMessage()    {}
 func (*GetChannelResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_channel_ca5238ae9de34f8c, []int{3}
+	return fileDescriptor_channel_50a344f4ccae3665, []int{4}
 }
 func (m *GetChannelResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -164,12 +389,142 @@ func (m *GetChannelResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetChannelResponse proto.InternalMessageInfo
 
+func (m *GetChannelResponse) GetChannel() *Channel {
+	if m != nil {
+		return m.Channel
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterType((*Channel)(nil), "state.Channel")
+	proto.RegisterType((*Channel_PermissionOverwrite)(nil), "state.Channel.PermissionOverwrite")
 	proto.RegisterType((*SetChannelRequest)(nil), "state.SetChannelRequest")
 	proto.RegisterType((*SetChannelResponse)(nil), "state.SetChannelResponse")
 	proto.RegisterType((*GetChannelRequest)(nil), "state.GetChannelRequest")
 	proto.RegisterType((*GetChannelResponse)(nil), "state.GetChannelResponse")
+	proto.RegisterEnum("state.ChannelChannelType", ChannelChannelType_name, ChannelChannelType_value)
 }
+func (m *Channel) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Channel) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if len(m.GuildId) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.GuildId)))
+		i += copy(dAtA[i:], m.GuildId)
+	}
+	if len(m.Name) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Name)))
+		i += copy(dAtA[i:], m.Name)
+	}
+	if len(m.Topic) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Topic)))
+		i += copy(dAtA[i:], m.Topic)
+	}
+	if m.Nsfw {
+		dAtA[i] = 0x28
+		i++
+		if m.Nsfw {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.Position != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Position))
+	}
+	if m.Bitrate != 0 {
+		dAtA[i] = 0x38
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Bitrate))
+	}
+	if len(m.Overwrites) > 0 {
+		for _, msg := range m.Overwrites {
+			dAtA[i] = 0x42
+			i++
+			i = encodeVarintChannel(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.ParentId) > 0 {
+		dAtA[i] = 0x4a
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.ParentId)))
+		i += copy(dAtA[i:], m.ParentId)
+	}
+	return i, nil
+}
+
+func (m *Channel_PermissionOverwrite) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Channel_PermissionOverwrite) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if len(m.Type) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Type)))
+		i += copy(dAtA[i:], m.Type)
+	}
+	if m.Deny != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Deny))
+	}
+	if m.Allow != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Allow))
+	}
+	return i, nil
+}
+
 func (m *SetChannelRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -185,6 +540,16 @@ func (m *SetChannelRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Channel != nil {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Channel.Size()))
+		n1, err := m.Channel.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
 	return i, nil
 }
 
@@ -221,6 +586,12 @@ func (m *GetChannelRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
 	return i, nil
 }
 
@@ -239,6 +610,16 @@ func (m *GetChannelResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Channel != nil {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintChannel(dAtA, i, uint64(m.Channel.Size()))
+		n2, err := m.Channel.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
 	return i, nil
 }
 
@@ -251,12 +632,83 @@ func encodeVarintChannel(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *Channel) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	l = len(m.GuildId)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	l = len(m.Topic)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	if m.Nsfw {
+		n += 2
+	}
+	if m.Position != 0 {
+		n += 1 + sovChannel(uint64(m.Position))
+	}
+	if m.Bitrate != 0 {
+		n += 1 + sovChannel(uint64(m.Bitrate))
+	}
+	if len(m.Overwrites) > 0 {
+		for _, e := range m.Overwrites {
+			l = e.Size()
+			n += 1 + l + sovChannel(uint64(l))
+		}
+	}
+	l = len(m.ParentId)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	return n
+}
+
+func (m *Channel_PermissionOverwrite) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	l = len(m.Type)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
+	if m.Deny != 0 {
+		n += 1 + sovChannel(uint64(m.Deny))
+	}
+	if m.Allow != 0 {
+		n += 1 + sovChannel(uint64(m.Allow))
+	}
+	return n
+}
+
 func (m *SetChannelRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
+	if m.Channel != nil {
+		l = m.Channel.Size()
+		n += 1 + l + sovChannel(uint64(l))
+	}
 	return n
 }
 
@@ -275,6 +727,10 @@ func (m *GetChannelRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovChannel(uint64(l))
+	}
 	return n
 }
 
@@ -284,6 +740,10 @@ func (m *GetChannelResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
+	if m.Channel != nil {
+		l = m.Channel.Size()
+		n += 1 + l + sovChannel(uint64(l))
+	}
 	return n
 }
 
@@ -299,6 +759,436 @@ func sovChannel(x uint64) (n int) {
 }
 func sozChannel(x uint64) (n int) {
 	return sovChannel(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *Channel) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowChannel
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Channel: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Channel: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GuildId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GuildId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Topic", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Topic = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nsfw", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Nsfw = bool(v != 0)
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			m.Position = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Position |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bitrate", wireType)
+			}
+			m.Bitrate = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Bitrate |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Overwrites", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Overwrites = append(m.Overwrites, &Channel_PermissionOverwrite{})
+			if err := m.Overwrites[len(m.Overwrites)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ParentId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ParentId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipChannel(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthChannel
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Channel_PermissionOverwrite) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowChannel
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PermissionOverwrite: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PermissionOverwrite: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Deny", wireType)
+			}
+			m.Deny = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Deny |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Allow", wireType)
+			}
+			m.Allow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Allow |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipChannel(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthChannel
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *SetChannelRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -329,6 +1219,39 @@ func (m *SetChannelRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: SetChannelRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Channel", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Channel == nil {
+				m.Channel = &Channel{}
+			}
+			if err := m.Channel.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipChannel(dAtA[iNdEx:])
@@ -429,6 +1352,35 @@ func (m *GetChannelRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: GetChannelRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipChannel(dAtA[iNdEx:])
@@ -479,6 +1431,39 @@ func (m *GetChannelResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: GetChannelResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Channel", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowChannel
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthChannel
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Channel == nil {
+				m.Channel = &Channel{}
+			}
+			if err := m.Channel.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipChannel(dAtA[iNdEx:])
@@ -605,16 +1590,36 @@ var (
 	ErrIntOverflowChannel   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("channel.proto", fileDescriptor_channel_ca5238ae9de34f8c) }
+func init() { proto.RegisterFile("channel.proto", fileDescriptor_channel_50a344f4ccae3665) }
 
-var fileDescriptor_channel_ca5238ae9de34f8c = []byte{
-	// 119 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4d, 0xce, 0x48, 0xcc,
-	0xcb, 0x4b, 0xcd, 0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2d, 0x2e, 0x49, 0x2c, 0x49,
-	0x55, 0x12, 0xe6, 0x12, 0x0c, 0x4e, 0x2d, 0x71, 0x86, 0x48, 0x05, 0xa5, 0x16, 0x96, 0xa6, 0x16,
-	0x97, 0x28, 0x89, 0x70, 0x09, 0x21, 0x0b, 0x16, 0x17, 0xe4, 0xe7, 0x15, 0x83, 0x95, 0xba, 0x63,
-	0x53, 0xea, 0x8e, 0xa1, 0xd4, 0x49, 0xe6, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f,
-	0x3c, 0x92, 0x63, 0x9c, 0xf0, 0x58, 0x8e, 0xe1, 0xc2, 0x63, 0x39, 0x86, 0x1b, 0x8f, 0xe5, 0x18,
-	0xa2, 0x98, 0x0a, 0x92, 0x92, 0xd8, 0xc0, 0x2e, 0x30, 0x06, 0x04, 0x00, 0x00, 0xff, 0xff, 0x06,
-	0xf9, 0xf7, 0x4e, 0x92, 0x00, 0x00, 0x00,
+var fileDescriptor_channel_50a344f4ccae3665 = []byte{
+	// 433 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x92, 0x41, 0x6f, 0xd3, 0x40,
+	0x10, 0x85, 0x63, 0x27, 0x8e, 0x9d, 0x49, 0x09, 0xee, 0xd0, 0xc3, 0x52, 0x90, 0x15, 0x99, 0x8b,
+	0x4f, 0x39, 0x94, 0x33, 0x48, 0x34, 0x89, 0xac, 0x48, 0x54, 0xa9, 0x96, 0x14, 0x51, 0x2e, 0x91,
+	0x13, 0x2f, 0xb0, 0x92, 0xeb, 0x35, 0xde, 0x2d, 0x51, 0xff, 0x05, 0x3f, 0x0b, 0x6e, 0x3d, 0x72,
+	0x44, 0xc9, 0x1f, 0x41, 0x19, 0x3b, 0x28, 0x10, 0x0e, 0xdc, 0xe6, 0xbd, 0xd9, 0xe7, 0xf5, 0xfb,
+	0x6c, 0x78, 0xb0, 0xfc, 0x94, 0xe4, 0xb9, 0xc8, 0x06, 0x45, 0xa9, 0x8c, 0x42, 0x47, 0x9b, 0xc4,
+	0x88, 0xf0, 0x7b, 0x13, 0xdc, 0x61, 0xb5, 0xc0, 0x1e, 0xd8, 0x32, 0x65, 0x56, 0xdf, 0x8a, 0x3a,
+	0xdc, 0x96, 0x29, 0x3e, 0x06, 0xef, 0xe3, 0xad, 0xcc, 0xd2, 0xb9, 0x4c, 0x99, 0x4d, 0xae, 0x4b,
+	0x7a, 0x92, 0x22, 0x42, 0x2b, 0x4f, 0x6e, 0x04, 0x6b, 0x92, 0x4d, 0x33, 0x9e, 0x80, 0x63, 0x54,
+	0x21, 0x97, 0xac, 0x45, 0x66, 0x25, 0xe8, 0xa4, 0xfe, 0xb0, 0x62, 0x4e, 0xdf, 0x8a, 0x3c, 0x4e,
+	0x33, 0x9e, 0x82, 0x57, 0x28, 0x2d, 0x8d, 0x54, 0x39, 0x6b, 0xf7, 0xad, 0xc8, 0xe1, 0xbf, 0x35,
+	0x32, 0x70, 0x17, 0xd2, 0x94, 0x89, 0x11, 0xcc, 0xa5, 0xd5, 0x4e, 0xe2, 0x39, 0x80, 0xfa, 0x22,
+	0xca, 0x55, 0x29, 0x8d, 0xd0, 0xcc, 0xeb, 0x37, 0xa3, 0xee, 0x59, 0x38, 0xa0, 0x1a, 0x83, 0xba,
+	0xc2, 0xe0, 0x52, 0x94, 0x37, 0x52, 0x6b, 0xa9, 0xf2, 0xe9, 0xee, 0x28, 0xdf, 0x4b, 0xe1, 0x13,
+	0xe8, 0x14, 0x49, 0x29, 0x72, 0xb3, 0xed, 0xd4, 0xa1, 0xf7, 0xf4, 0x2a, 0x63, 0x92, 0x9e, 0x2e,
+	0xe1, 0xd1, 0x3f, 0xf2, 0x07, 0x58, 0x10, 0x5a, 0xe6, 0xae, 0x10, 0x35, 0x12, 0x9a, 0xb7, 0x5e,
+	0x2a, 0xf2, 0x3b, 0xe2, 0xe1, 0x70, 0x9a, 0xb7, 0x3c, 0x92, 0x2c, 0x53, 0x2b, 0xe2, 0xe1, 0xf0,
+	0x4a, 0x84, 0xd7, 0x70, 0x54, 0x7f, 0x88, 0x39, 0x25, 0x7b, 0x00, 0xf1, 0xd5, 0xe4, 0xf5, 0x68,
+	0x3e, 0x1b, 0xbf, 0x9b, 0xf9, 0x0d, 0x6c, 0x83, 0x3d, 0xba, 0xf0, 0x2d, 0x7c, 0x08, 0xdd, 0xca,
+	0x7f, 0x3b, 0x9d, 0x0c, 0xc7, 0xbe, 0x8d, 0x47, 0xe0, 0xc5, 0x7c, 0x7a, 0x75, 0x39, 0x1f, 0x5d,
+	0xf8, 0x4d, 0x44, 0xe8, 0x55, 0xeb, 0xe1, 0xab, 0xd9, 0x38, 0x9e, 0xf2, 0x6b, 0xbf, 0x15, 0xbe,
+	0x80, 0xe3, 0x37, 0xc2, 0xd4, 0x28, 0xb8, 0xf8, 0x7c, 0x2b, 0xb4, 0xc1, 0x08, 0xdc, 0xfa, 0x3e,
+	0xaa, 0xd0, 0x3d, 0xeb, 0xfd, 0x89, 0x8c, 0xef, 0xd6, 0xe1, 0x09, 0xe0, 0x7e, 0x5c, 0x17, 0x2a,
+	0xd7, 0x22, 0x7c, 0x06, 0xc7, 0xf1, 0xc1, 0x43, 0xff, 0x42, 0x12, 0xbe, 0x04, 0x8c, 0x0f, 0xa2,
+	0xff, 0x7f, 0xf5, 0xf9, 0xd3, 0x6f, 0xeb, 0xc0, 0xba, 0x5f, 0x07, 0xd6, 0xcf, 0x75, 0x60, 0x7d,
+	0xdd, 0x04, 0x8d, 0xfb, 0x4d, 0xd0, 0xf8, 0xb1, 0x09, 0x1a, 0xef, 0xed, 0x62, 0xb1, 0x68, 0xd3,
+	0x1f, 0xfb, 0xfc, 0x57, 0x00, 0x00, 0x00, 0xff, 0xff, 0x91, 0xa6, 0xc1, 0xb8, 0xc2, 0x02, 0x00,
+	0x00,
 }

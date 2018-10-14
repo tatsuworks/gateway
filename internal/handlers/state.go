@@ -17,5 +17,16 @@ type Server struct {
 
 // NewServer creates a new state Server.
 func NewServer() *Server {
-	return &Server{}
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic("failed to create logger: " + err.Error())
+	}
+
+	fdb.MustAPIVersion(510)
+	db := fdb.MustOpenDefault()
+
+	return &Server{
+		log: logger,
+		DB:  db,
+	}
 }

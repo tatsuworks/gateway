@@ -1,0 +1,26 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+message User {
+	string id = 1;
+	string email = 2;
+	string username = 3;
+	string avatar = 4;
+	string discrim = 5;
+	string token = 6;
+	bool verified = 7;
+	bool mfa_enabled = 8;
+	bool bot = 9;
+}
+
+message SetUserRequest {
+	User user = 1;
+}
+message SetUserResponse {}
+message GetUserRequest {
+	string id = 1;
+}
+message GetUserResponse {
+	User user = 1;
+}

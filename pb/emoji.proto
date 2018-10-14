@@ -2,7 +2,22 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
-message SetEmojiRequest {}
+message Emoji {
+	string id = 1;
+	string name = 2;
+	repeated string roles = 3;
+	bool managed = 4;
+	bool require_colons = 5;
+	bool animated = 6;
+}
+
+message SetEmojiRequest {
+	Emoji emoji = 1;
+}
 message SetEmojiResponse {}
-message GetEmojiRequest {}
-message GetEmojiResponse {}
+message GetEmojiRequest {
+	string id = 1;
+}
+message GetEmojiResponse {
+	Emoji emoji = 1;
+}

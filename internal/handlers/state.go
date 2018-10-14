@@ -1,11 +1,13 @@
 package state
 
 import (
-	"git.friday.cafe/fndevs/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"git.friday.cafe/fndevs/state/pb"
 )
 
 var _ pb.StateServer = &Server{}
@@ -19,25 +21,20 @@ type Server struct {
 }
 
 // NewServer creates a new state Server.
-func NewServer() *Server {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic("failed to create logger: " + err.Error())
-	}
-
+func NewServer(logger *zap.Logger) (*Server, error) {
 	fdb.MustAPIVersion(510)
 	db := fdb.MustOpenDefault()
 
 	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
 	if err != nil {
-		panic("failed to create state directory:" + err.Error())
+		return nil, errors.Wrap(err, "failed to open directory")
 	}
 
 	return &Server{
 		log:  logger,
 		DB:   db,
 		Subs: NewSubspaces(dir),
-	}
+	}, nil
 }
 
 // Subspaces is a struct containing all of the different subspaces used.
@@ -50,13 +47,10 @@ type Subspaces struct {
 	Users    subspace.Subspace
 }
 
-// SubspaceName is an enum used to separate different subspaces.
-type SubspaceName int
-
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
 const (
 	// ChannelSubspaceName is the enum for the channel subspace.
-	ChannelSubspaceName SubspaceName = iota
+	ChannelSubspaceName = iota
 	// EmojiSubspaceName is the enum for the emoji subspace.
 	EmojiSubspaceName
 	// GuildSubspaceName is the enum for the guild subspace.

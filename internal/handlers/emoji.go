@@ -47,5 +47,4 @@ func (s *Server) GetEmoji(ctx context.Context, req *pb.GetEmojiRequest) (*pb.Get
 	return &pb.GetEmojiResponse{
 		Emoji: em,
 	}, nil
-
 }

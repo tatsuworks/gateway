@@ -31,7 +31,7 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb.GetChannelResponse, error) {
 	ch := new(pb.Channel)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 
 		err := ch.Unmarshal(raw)

@@ -44,6 +44,7 @@ func NewServer() *Server {
 type Subspaces struct {
 	Channels subspace.Subspace
 	Emojis   subspace.Subspace
+	Guilds   subspace.Subspace
 	Members  subspace.Subspace
 	Messages subspace.Subspace
 	Users    subspace.Subspace
@@ -52,11 +53,14 @@ type Subspaces struct {
 // SubspaceName is an enum used to separate different subspaces.
 type SubspaceName int
 
+// If new enums need to be added, always append. If you are deprecating an enum never delete it.
 const (
 	// ChannelSubspaceName is the enum for the channel subspace.
 	ChannelSubspaceName SubspaceName = iota
 	// EmojiSubspaceName is the enum for the emoji subspace.
 	EmojiSubspaceName
+	// GuildSubspaceName is the enum for the guild subspace.
+	GuildSubspaceName
 	// MemberSubspaceName is the enum for the member subspace.
 	MemberSubspaceName
 	// MessageSubspaceName is the enum for the message subspace.

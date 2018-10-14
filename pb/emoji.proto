@@ -4,11 +4,12 @@ option go_package = "pb";
 
 message Emoji {
 	string id = 1;
-	string name = 2;
-	repeated string roles = 3;
-	bool managed = 4;
-	bool require_colons = 5;
-	bool animated = 6;
+	string guild_id = 2;
+	string name = 3;
+	repeated string roles = 4;
+	bool managed = 5;
+	bool require_colons = 6;
+	bool animated = 7;
 }
 
 message SetEmojiRequest {
@@ -17,6 +18,7 @@ message SetEmojiRequest {
 message SetEmojiResponse {}
 message GetEmojiRequest {
 	string id = 1;
+	string guild_id = 2;
 }
 message GetEmojiResponse {
 	Emoji emoji = 1;

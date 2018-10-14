@@ -40,6 +40,7 @@ func NewServer() *Server {
 	}
 }
 
+// Subspaces is a struct containing all of the different subspaces used.
 type Subspaces struct {
 	Channels subspace.Subspace
 	Emojis   subspace.Subspace
@@ -48,13 +49,19 @@ type Subspaces struct {
 	Users    subspace.Subspace
 }
 
+// SubspaceName is an enum used to separate different subspaces.
 type SubspaceName int
 
 const (
+	// ChannelSubspaceName is the enum for the channel subspace.
 	ChannelSubspaceName SubspaceName = iota
+	// EmojiSubspaceName is the enum for the emoji subspace.
 	EmojiSubspaceName
+	// MemberSubspaceName is the enum for the member subspace.
 	MemberSubspaceName
+	// MessageSubspaceName is the enum for the message subspace.
 	MessageSubspaceName
+	// UserSubspaceName is the enum for the user subspace.
 	UserSubspaceName
 )
 

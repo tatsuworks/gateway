@@ -45,6 +45,7 @@ type Subspaces struct {
 	Members  subspace.Subspace
 	Messages subspace.Subspace
 	Users    subspace.Subspace
+	Roles    subspace.Subspace
 }
 
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
@@ -61,6 +62,8 @@ const (
 	MessageSubspaceName
 	// UserSubspaceName is the enum for the user subspace.
 	UserSubspaceName
+	// RoleSubspaceName is the enum for the role subspace.
+	RoleSubspaceName
 )
 
 // NewSubspaces returns an instantiated Subspaces with the correct subspaces.
@@ -71,5 +74,6 @@ func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 		Members:  dir.Sub(MemberSubspaceName),
 		Messages: dir.Sub(MessageSubspaceName),
 		Users:    dir.Sub(UserSubspaceName),
+		Roles:    dir.Sub(RoleSubspaceName),
 	}
 }

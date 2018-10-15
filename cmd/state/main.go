@@ -34,6 +34,6 @@ func main() {
 		panic(err)
 	}
 
-	logger.Info("listening...")
+	logger.Info("listening at " + os.Args[1])
 	srv.Serve(lis)
 }

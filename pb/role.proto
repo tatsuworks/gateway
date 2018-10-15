@@ -1,0 +1,27 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+message Role {
+    string id = 1;
+    string guild_id = 2;
+    string name = 3;
+    bool managed = 4;
+    bool mentionable = 5;
+    bool hoist = 6;
+    int32 color = 7;
+    int32 position = 8;
+    int32 permissions = 9;
+}
+
+message SetRoleRequest {
+    Role role = 1;
+}
+message SetRoleResponse {}
+message GetRoleRequest {
+    string id = 1;
+    string guild_id = 2;
+}
+message GetRoleResponse {
+    Role role = 1;
+}

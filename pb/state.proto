@@ -8,6 +8,7 @@ import "guild.proto";
 import "member.proto";
 import "user.proto";
 import "message.proto";
+import "role.proto";
 
 service State {
 	rpc SetChannel(SetChannelRequest) returns (SetChannelResponse) {}
@@ -27,4 +28,7 @@ service State {
 
 	rpc SetMessage(SetMessageRequest) returns (SetMessageResponse) {}
 	rpc GetMessage(GetMessageRequest) returns (GetMessageResponse) {}
+
+	rpc SetRole(SetRoleRequest) returns (SetRoleResponse) {}
+	rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}
 }

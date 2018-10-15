@@ -2,6 +2,8 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
+import "wrappers.proto";
+
 message Channel {
 	enum channel_type {
 		GUILD_TEXT = 0;
@@ -20,19 +22,15 @@ message Channel {
 
 	string id = 1;
 	string guild_id = 2;
-	string name = 3;
-	string topic = 4;
-	bool nsfw = 5; 
-	int32 position = 6;
-	int32 bitrate = 7;
+	BytesValue name = 3;
+	StringValue topic = 4;
+	BoolValue nsfw = 5;
+	Int32Value position = 6;
+	Int32Value bitrate = 7;
 	repeated PermissionOverwrite overwrites = 8;
-	string parent_id = 9;
+	StringValue parent_id = 9;
 }
 
-message SetChannelRequest {
-	Channel channel = 1;
-}
-message SetChannelResponse {}
 message GetChannelRequest {
 	string id = 1;
 	string guild_id = 2;
@@ -40,3 +38,13 @@ message GetChannelRequest {
 message GetChannelResponse {
 	Channel channel = 1;
 }
+message SetChannelRequest {
+	Channel channel = 1;
+}
+message SetChannelResponse {}
+message UpdateChannelRequest {
+	string id = 1;
+	string guild_id = 2;
+	Channel channel = 3;
+}
+message UpdateChannelResponse {}

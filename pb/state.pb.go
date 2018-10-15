@@ -35,20 +35,27 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type StateClient interface {
-	SetChannel(ctx context.Context, in *SetChannelRequest, opts ...grpc.CallOption) (*SetChannelResponse, error)
 	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*GetChannelResponse, error)
-	SetEmoji(ctx context.Context, in *SetEmojiRequest, opts ...grpc.CallOption) (*SetEmojiResponse, error)
+	SetChannel(ctx context.Context, in *SetChannelRequest, opts ...grpc.CallOption) (*SetChannelResponse, error)
+	UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*UpdateChannelResponse, error)
 	GetEmoji(ctx context.Context, in *GetEmojiRequest, opts ...grpc.CallOption) (*GetEmojiResponse, error)
-	SetGuild(ctx context.Context, in *SetGuildRequest, opts ...grpc.CallOption) (*SetGuildResponse, error)
+	SetEmoji(ctx context.Context, in *SetEmojiRequest, opts ...grpc.CallOption) (*SetEmojiResponse, error)
+	UpdateEmoji(ctx context.Context, in *UpdateEmojiRequest, opts ...grpc.CallOption) (*UpdateEmojiResponse, error)
 	GetGuild(ctx context.Context, in *GetGuildRequest, opts ...grpc.CallOption) (*GetGuildResponse, error)
-	SetMember(ctx context.Context, in *SetMemberRequest, opts ...grpc.CallOption) (*SetMemberResponse, error)
+	SetGuild(ctx context.Context, in *SetGuildRequest, opts ...grpc.CallOption) (*SetGuildResponse, error)
+	UpdateGuild(ctx context.Context, in *UpdateGuildRequest, opts ...grpc.CallOption) (*UpdateGuildResponse, error)
 	GetMember(ctx context.Context, in *GetMemberRequest, opts ...grpc.CallOption) (*GetMemberResponse, error)
-	SetUser(ctx context.Context, in *SetUserRequest, opts ...grpc.CallOption) (*SetUserResponse, error)
+	SetMember(ctx context.Context, in *SetMemberRequest, opts ...grpc.CallOption) (*SetMemberResponse, error)
+	UpdateMember(ctx context.Context, in *UpdateMemberRequest, opts ...grpc.CallOption) (*UpdateMemberResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
-	SetMessage(ctx context.Context, in *SetMessageRequest, opts ...grpc.CallOption) (*SetMessageResponse, error)
+	SetUser(ctx context.Context, in *SetUserRequest, opts ...grpc.CallOption) (*SetUserResponse, error)
+	UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error)
 	GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error)
-	SetRole(ctx context.Context, in *SetRoleRequest, opts ...grpc.CallOption) (*SetRoleResponse, error)
+	SetMessage(ctx context.Context, in *SetMessageRequest, opts ...grpc.CallOption) (*SetMessageResponse, error)
+	UpdateMessage(ctx context.Context, in *UpdateMessageRequest, opts ...grpc.CallOption) (*UpdateMessageResponse, error)
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error)
+	SetRole(ctx context.Context, in *SetRoleRequest, opts ...grpc.CallOption) (*SetRoleResponse, error)
+	UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*UpdateRoleResponse, error)
 }
 
 type stateClient struct {
@@ -57,15 +64,6 @@ type stateClient struct {
 
 func NewStateClient(cc *grpc.ClientConn) StateClient {
 	return &stateClient{cc}
-}
-
-func (c *stateClient) SetChannel(ctx context.Context, in *SetChannelRequest, opts ...grpc.CallOption) (*SetChannelResponse, error) {
-	out := new(SetChannelResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetChannel", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *stateClient) GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*GetChannelResponse, error) {
@@ -77,9 +75,18 @@ func (c *stateClient) GetChannel(ctx context.Context, in *GetChannelRequest, opt
 	return out, nil
 }
 
-func (c *stateClient) SetEmoji(ctx context.Context, in *SetEmojiRequest, opts ...grpc.CallOption) (*SetEmojiResponse, error) {
-	out := new(SetEmojiResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetEmoji", in, out, opts...)
+func (c *stateClient) SetChannel(ctx context.Context, in *SetChannelRequest, opts ...grpc.CallOption) (*SetChannelResponse, error) {
+	out := new(SetChannelResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetChannel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*UpdateChannelResponse, error) {
+	out := new(UpdateChannelResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateChannel", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +102,18 @@ func (c *stateClient) GetEmoji(ctx context.Context, in *GetEmojiRequest, opts ..
 	return out, nil
 }
 
-func (c *stateClient) SetGuild(ctx context.Context, in *SetGuildRequest, opts ...grpc.CallOption) (*SetGuildResponse, error) {
-	out := new(SetGuildResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetGuild", in, out, opts...)
+func (c *stateClient) SetEmoji(ctx context.Context, in *SetEmojiRequest, opts ...grpc.CallOption) (*SetEmojiResponse, error) {
+	out := new(SetEmojiResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetEmoji", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateEmoji(ctx context.Context, in *UpdateEmojiRequest, opts ...grpc.CallOption) (*UpdateEmojiResponse, error) {
+	out := new(UpdateEmojiResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateEmoji", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +129,18 @@ func (c *stateClient) GetGuild(ctx context.Context, in *GetGuildRequest, opts ..
 	return out, nil
 }
 
-func (c *stateClient) SetMember(ctx context.Context, in *SetMemberRequest, opts ...grpc.CallOption) (*SetMemberResponse, error) {
-	out := new(SetMemberResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetMember", in, out, opts...)
+func (c *stateClient) SetGuild(ctx context.Context, in *SetGuildRequest, opts ...grpc.CallOption) (*SetGuildResponse, error) {
+	out := new(SetGuildResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetGuild", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateGuild(ctx context.Context, in *UpdateGuildRequest, opts ...grpc.CallOption) (*UpdateGuildResponse, error) {
+	out := new(UpdateGuildResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateGuild", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,9 +156,18 @@ func (c *stateClient) GetMember(ctx context.Context, in *GetMemberRequest, opts 
 	return out, nil
 }
 
-func (c *stateClient) SetUser(ctx context.Context, in *SetUserRequest, opts ...grpc.CallOption) (*SetUserResponse, error) {
-	out := new(SetUserResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetUser", in, out, opts...)
+func (c *stateClient) SetMember(ctx context.Context, in *SetMemberRequest, opts ...grpc.CallOption) (*SetMemberResponse, error) {
+	out := new(SetMemberResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetMember", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateMember(ctx context.Context, in *UpdateMemberRequest, opts ...grpc.CallOption) (*UpdateMemberResponse, error) {
+	out := new(UpdateMemberResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateMember", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,9 +183,18 @@ func (c *stateClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...g
 	return out, nil
 }
 
-func (c *stateClient) SetMessage(ctx context.Context, in *SetMessageRequest, opts ...grpc.CallOption) (*SetMessageResponse, error) {
-	out := new(SetMessageResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetMessage", in, out, opts...)
+func (c *stateClient) SetUser(ctx context.Context, in *SetUserRequest, opts ...grpc.CallOption) (*SetUserResponse, error) {
+	out := new(SetUserResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetUser", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error) {
+	out := new(UpdateUserResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateUser", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +210,18 @@ func (c *stateClient) GetMessage(ctx context.Context, in *GetMessageRequest, opt
 	return out, nil
 }
 
-func (c *stateClient) SetRole(ctx context.Context, in *SetRoleRequest, opts ...grpc.CallOption) (*SetRoleResponse, error) {
-	out := new(SetRoleResponse)
-	err := c.cc.Invoke(ctx, "/state.State/SetRole", in, out, opts...)
+func (c *stateClient) SetMessage(ctx context.Context, in *SetMessageRequest, opts ...grpc.CallOption) (*SetMessageResponse, error) {
+	out := new(SetMessageResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetMessage", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateMessage(ctx context.Context, in *UpdateMessageRequest, opts ...grpc.CallOption) (*UpdateMessageResponse, error) {
+	out := new(UpdateMessageResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateMessage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,44 +237,51 @@ func (c *stateClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...g
 	return out, nil
 }
 
+func (c *stateClient) SetRole(ctx context.Context, in *SetRoleRequest, opts ...grpc.CallOption) (*SetRoleResponse, error) {
+	out := new(SetRoleResponse)
+	err := c.cc.Invoke(ctx, "/state.State/SetRole", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateClient) UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*UpdateRoleResponse, error) {
+	out := new(UpdateRoleResponse)
+	err := c.cc.Invoke(ctx, "/state.State/UpdateRole", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StateServer is the server API for State service.
 type StateServer interface {
-	SetChannel(context.Context, *SetChannelRequest) (*SetChannelResponse, error)
 	GetChannel(context.Context, *GetChannelRequest) (*GetChannelResponse, error)
-	SetEmoji(context.Context, *SetEmojiRequest) (*SetEmojiResponse, error)
+	SetChannel(context.Context, *SetChannelRequest) (*SetChannelResponse, error)
+	UpdateChannel(context.Context, *UpdateChannelRequest) (*UpdateChannelResponse, error)
 	GetEmoji(context.Context, *GetEmojiRequest) (*GetEmojiResponse, error)
-	SetGuild(context.Context, *SetGuildRequest) (*SetGuildResponse, error)
+	SetEmoji(context.Context, *SetEmojiRequest) (*SetEmojiResponse, error)
+	UpdateEmoji(context.Context, *UpdateEmojiRequest) (*UpdateEmojiResponse, error)
 	GetGuild(context.Context, *GetGuildRequest) (*GetGuildResponse, error)
-	SetMember(context.Context, *SetMemberRequest) (*SetMemberResponse, error)
+	SetGuild(context.Context, *SetGuildRequest) (*SetGuildResponse, error)
+	UpdateGuild(context.Context, *UpdateGuildRequest) (*UpdateGuildResponse, error)
 	GetMember(context.Context, *GetMemberRequest) (*GetMemberResponse, error)
-	SetUser(context.Context, *SetUserRequest) (*SetUserResponse, error)
+	SetMember(context.Context, *SetMemberRequest) (*SetMemberResponse, error)
+	UpdateMember(context.Context, *UpdateMemberRequest) (*UpdateMemberResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
-	SetMessage(context.Context, *SetMessageRequest) (*SetMessageResponse, error)
+	SetUser(context.Context, *SetUserRequest) (*SetUserResponse, error)
+	UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error)
 	GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error)
-	SetRole(context.Context, *SetRoleRequest) (*SetRoleResponse, error)
+	SetMessage(context.Context, *SetMessageRequest) (*SetMessageResponse, error)
+	UpdateMessage(context.Context, *UpdateMessageRequest) (*UpdateMessageResponse, error)
 	GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error)
+	SetRole(context.Context, *SetRoleRequest) (*SetRoleResponse, error)
+	UpdateRole(context.Context, *UpdateRoleRequest) (*UpdateRoleResponse, error)
 }
 
 func RegisterStateServer(s *grpc.Server, srv StateServer) {
 	s.RegisterService(&_State_serviceDesc, srv)
-}
-
-func _State_SetChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetChannelRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StateServer).SetChannel(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/state.State/SetChannel",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetChannel(ctx, req.(*SetChannelRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _State_GetChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -243,20 +302,38 @@ func _State_GetChannel_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetEmoji_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetEmojiRequest)
+func _State_SetChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetChannelRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetEmoji(ctx, in)
+		return srv.(StateServer).SetChannel(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetEmoji",
+		FullMethod: "/state.State/SetChannel",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetEmoji(ctx, req.(*SetEmojiRequest))
+		return srv.(StateServer).SetChannel(ctx, req.(*SetChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateChannel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateChannel(ctx, req.(*UpdateChannelRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -279,20 +356,38 @@ func _State_GetEmoji_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetGuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetGuildRequest)
+func _State_SetEmoji_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetEmojiRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetGuild(ctx, in)
+		return srv.(StateServer).SetEmoji(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetGuild",
+		FullMethod: "/state.State/SetEmoji",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetGuild(ctx, req.(*SetGuildRequest))
+		return srv.(StateServer).SetEmoji(ctx, req.(*SetEmojiRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateEmoji_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateEmojiRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateEmoji(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateEmoji",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateEmoji(ctx, req.(*UpdateEmojiRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -315,20 +410,38 @@ func _State_GetGuild_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetMemberRequest)
+func _State_SetGuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetGuildRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetMember(ctx, in)
+		return srv.(StateServer).SetGuild(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetMember",
+		FullMethod: "/state.State/SetGuild",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetMember(ctx, req.(*SetMemberRequest))
+		return srv.(StateServer).SetGuild(ctx, req.(*SetGuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateGuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateGuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateGuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateGuild",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateGuild(ctx, req.(*UpdateGuildRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -351,20 +464,38 @@ func _State_GetMember_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetUserRequest)
+func _State_SetMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetMemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetUser(ctx, in)
+		return srv.(StateServer).SetMember(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetUser",
+		FullMethod: "/state.State/SetMember",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetUser(ctx, req.(*SetUserRequest))
+		return srv.(StateServer).SetMember(ctx, req.(*SetMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateMember",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateMember(ctx, req.(*UpdateMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -387,20 +518,38 @@ func _State_GetUser_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetMessageRequest)
+func _State_SetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetUserRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetMessage(ctx, in)
+		return srv.(StateServer).SetUser(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetMessage",
+		FullMethod: "/state.State/SetUser",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetMessage(ctx, req.(*SetMessageRequest))
+		return srv.(StateServer).SetUser(ctx, req.(*SetUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateUser",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateUser(ctx, req.(*UpdateUserRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -423,20 +572,38 @@ func _State_GetMessage_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _State_SetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetRoleRequest)
+func _State_SetMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StateServer).SetRole(ctx, in)
+		return srv.(StateServer).SetMessage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/state.State/SetRole",
+		FullMethod: "/state.State/SetMessage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StateServer).SetRole(ctx, req.(*SetRoleRequest))
+		return srv.(StateServer).SetMessage(ctx, req.(*SetMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateMessage",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateMessage(ctx, req.(*UpdateMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -459,95 +626,165 @@ func _State_GetRole_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _State_SetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).SetRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/SetRole",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).SetRole(ctx, req.(*SetRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _State_UpdateRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateServer).UpdateRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/state.State/UpdateRole",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateServer).UpdateRole(ctx, req.(*UpdateRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _State_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "state.State",
 	HandlerType: (*StateServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SetChannel",
-			Handler:    _State_SetChannel_Handler,
-		},
-		{
 			MethodName: "GetChannel",
 			Handler:    _State_GetChannel_Handler,
 		},
 		{
-			MethodName: "SetEmoji",
-			Handler:    _State_SetEmoji_Handler,
+			MethodName: "SetChannel",
+			Handler:    _State_SetChannel_Handler,
+		},
+		{
+			MethodName: "UpdateChannel",
+			Handler:    _State_UpdateChannel_Handler,
 		},
 		{
 			MethodName: "GetEmoji",
 			Handler:    _State_GetEmoji_Handler,
 		},
 		{
-			MethodName: "SetGuild",
-			Handler:    _State_SetGuild_Handler,
+			MethodName: "SetEmoji",
+			Handler:    _State_SetEmoji_Handler,
+		},
+		{
+			MethodName: "UpdateEmoji",
+			Handler:    _State_UpdateEmoji_Handler,
 		},
 		{
 			MethodName: "GetGuild",
 			Handler:    _State_GetGuild_Handler,
 		},
 		{
-			MethodName: "SetMember",
-			Handler:    _State_SetMember_Handler,
+			MethodName: "SetGuild",
+			Handler:    _State_SetGuild_Handler,
+		},
+		{
+			MethodName: "UpdateGuild",
+			Handler:    _State_UpdateGuild_Handler,
 		},
 		{
 			MethodName: "GetMember",
 			Handler:    _State_GetMember_Handler,
 		},
 		{
-			MethodName: "SetUser",
-			Handler:    _State_SetUser_Handler,
+			MethodName: "SetMember",
+			Handler:    _State_SetMember_Handler,
+		},
+		{
+			MethodName: "UpdateMember",
+			Handler:    _State_UpdateMember_Handler,
 		},
 		{
 			MethodName: "GetUser",
 			Handler:    _State_GetUser_Handler,
 		},
 		{
-			MethodName: "SetMessage",
-			Handler:    _State_SetMessage_Handler,
+			MethodName: "SetUser",
+			Handler:    _State_SetUser_Handler,
+		},
+		{
+			MethodName: "UpdateUser",
+			Handler:    _State_UpdateUser_Handler,
 		},
 		{
 			MethodName: "GetMessage",
 			Handler:    _State_GetMessage_Handler,
 		},
 		{
-			MethodName: "SetRole",
-			Handler:    _State_SetRole_Handler,
+			MethodName: "SetMessage",
+			Handler:    _State_SetMessage_Handler,
+		},
+		{
+			MethodName: "UpdateMessage",
+			Handler:    _State_UpdateMessage_Handler,
 		},
 		{
 			MethodName: "GetRole",
 			Handler:    _State_GetRole_Handler,
+		},
+		{
+			MethodName: "SetRole",
+			Handler:    _State_SetRole_Handler,
+		},
+		{
+			MethodName: "UpdateRole",
+			Handler:    _State_UpdateRole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "state.proto",
 }
 
-func init() { proto.RegisterFile("state.proto", fileDescriptor_state_42f6695253f6e029) }
+func init() { proto.RegisterFile("state.proto", fileDescriptor_state_2d50ecc5ae3a9dd4) }
 
-var fileDescriptor_state_42f6695253f6e029 = []byte{
-	// 349 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x93, 0xb1, 0x4e, 0xc3, 0x30,
-	0x10, 0x86, 0x53, 0xa4, 0x52, 0x70, 0xe9, 0x62, 0x89, 0x52, 0x2a, 0xe4, 0x81, 0x07, 0xe8, 0x00,
-	0x1b, 0x12, 0x12, 0xa2, 0x42, 0x37, 0x75, 0xa9, 0xc5, 0xc2, 0xd6, 0xc2, 0xa9, 0x14, 0x25, 0x75,
-	0x89, 0xdd, 0xa7, 0x60, 0xe1, 0xb1, 0x18, 0x3b, 0x32, 0xa2, 0xf6, 0x45, 0x90, 0xed, 0xa4, 0x71,
-	0x6c, 0x67, 0xf3, 0xfd, 0xa7, 0xef, 0xff, 0xe3, 0xcb, 0x99, 0x74, 0xa5, 0x9a, 0x29, 0x1c, 0xad,
-	0x73, 0xa1, 0x04, 0x6d, 0x9b, 0x62, 0xd8, 0x7b, 0x7d, 0x9f, 0xad, 0x56, 0x98, 0x5a, 0x75, 0xd8,
-	0xc5, 0x4c, 0x7c, 0x2c, 0xcb, 0x62, 0xb1, 0x59, 0xa6, 0x6f, 0x45, 0x71, 0x96, 0x61, 0x36, 0xc7,
-	0xbc, 0xa8, 0xc8, 0x46, 0x1e, 0xce, 0xbd, 0x0c, 0xa5, 0x9c, 0x2d, 0xb0, 0x6c, 0xe5, 0x22, 0x2d,
-	0xce, 0x37, 0x5f, 0x1d, 0xd2, 0xe6, 0x3a, 0x87, 0x8e, 0x09, 0xe1, 0xa8, 0xc6, 0x36, 0x8c, 0x0e,
-	0x46, 0xf6, 0x53, 0x2a, 0x69, 0x8a, 0x9f, 0x1b, 0x94, 0x6a, 0x78, 0x19, 0xe9, 0xc8, 0xb5, 0x58,
-	0x49, 0xbc, 0x4e, 0xb4, 0x09, 0x84, 0x26, 0xd0, 0x68, 0x02, 0x31, 0x93, 0x7b, 0x72, 0xc2, 0x51,
-	0x3d, 0xe9, 0x7b, 0xd2, 0x7e, 0x95, 0x66, 0x84, 0xd2, 0xe0, 0x22, 0xd0, 0x5d, 0x1c, 0x7c, 0x1c,
-	0x1a, 0x70, 0x88, 0xe2, 0x1c, 0x15, 0xe8, 0xc1, 0xba, 0xe9, 0x46, 0x88, 0xa4, 0x17, 0xba, 0x97,
-	0x5e, 0xc7, 0xa1, 0x01, 0x87, 0x10, 0x7f, 0x20, 0xa7, 0x1c, 0xd5, 0xc4, 0xfc, 0x49, 0xea, 0xc4,
-	0x58, 0xa5, 0x34, 0x18, 0x84, 0x0d, 0xd7, 0x01, 0x02, 0x07, 0x68, 0x72, 0x80, 0x88, 0xc3, 0x1d,
-	0xe9, 0x70, 0x54, 0xcf, 0x12, 0x73, 0x7a, 0x5e, 0x05, 0xe9, 0xba, 0xa4, 0xfb, 0xbe, 0xec, 0xb2,
-	0xe0, 0xb1, 0x10, 0x67, 0x21, 0x60, 0xed, 0x06, 0x4e, 0xec, 0xae, 0xd2, 0xda, 0x1d, 0x8d, 0x14,
-	0xd9, 0xc0, 0x43, 0xc7, 0xdb, 0x40, 0xdf, 0x04, 0x1a, 0x4d, 0x20, 0x66, 0x62, 0x27, 0x30, 0x15,
-	0x29, 0xba, 0x13, 0xd0, 0x75, 0x64, 0x02, 0x56, 0xf6, 0x26, 0x50, 0x63, 0x21, 0xce, 0x82, 0xcf,
-	0x3e, 0x5e, 0xfd, 0xec, 0x58, 0x6b, 0xbb, 0x63, 0xad, 0xbf, 0x1d, 0x6b, 0x7d, 0xef, 0x59, 0xb2,
-	0xdd, 0xb3, 0xe4, 0x77, 0xcf, 0x92, 0x97, 0xa3, 0xf5, 0x7c, 0x7e, 0x6c, 0x9e, 0xec, 0xed, 0x7f,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0x24, 0x3e, 0x21, 0xf2, 0x26, 0x04, 0x00, 0x00,
+var fileDescriptor_state_2d50ecc5ae3a9dd4 = []byte{
+	// 448 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x94, 0xbd, 0xae, 0xd3, 0x40,
+	0x10, 0x85, 0x1d, 0xa4, 0xcb, 0xcf, 0xfa, 0xa6, 0xb1, 0xc4, 0x25, 0x76, 0x22, 0x17, 0x3c, 0x40,
+	0x0a, 0xe8, 0x90, 0x90, 0x10, 0x11, 0x58, 0x48, 0xd0, 0x64, 0x94, 0x86, 0xce, 0x21, 0xa3, 0x10,
+	0x64, 0xc7, 0xc6, 0xbb, 0x79, 0x0b, 0x0a, 0x1e, 0x8b, 0x32, 0x25, 0x25, 0x4a, 0x5e, 0x04, 0x79,
+	0xd7, 0xbb, 0xd9, 0x9f, 0x71, 0xe7, 0x39, 0x27, 0xe7, 0xf3, 0xcc, 0x4e, 0xd6, 0x2c, 0xe6, 0xa2,
+	0x14, 0xb8, 0x6c, 0xbb, 0x46, 0x34, 0xc9, 0x9d, 0x2c, 0xb2, 0xe9, 0xb7, 0xef, 0xe5, 0xf1, 0x88,
+	0x95, 0x52, 0xb3, 0x18, 0xeb, 0xe6, 0xc7, 0x41, 0x17, 0xfb, 0xd3, 0xa1, 0xda, 0x0d, 0xc5, 0x7d,
+	0x8d, 0xf5, 0x16, 0xbb, 0xa1, 0x62, 0x27, 0x6e, 0x9e, 0xa7, 0x35, 0x72, 0x5e, 0xee, 0x51, 0x5b,
+	0x5d, 0x53, 0x0d, 0xcf, 0xaf, 0x7e, 0xc5, 0xec, 0x0e, 0xfa, 0xf7, 0x24, 0x2b, 0xc6, 0x0a, 0x14,
+	0x2b, 0xf5, 0xb2, 0x64, 0xb6, 0x54, 0xad, 0xdc, 0xa4, 0x35, 0xfe, 0x3c, 0x21, 0x17, 0x59, 0x4a,
+	0x38, 0xbc, 0x6d, 0x8e, 0x1c, 0x5f, 0x46, 0x3d, 0x04, 0x42, 0x08, 0x8c, 0x42, 0x80, 0x82, 0x7c,
+	0x66, 0xd3, 0x4d, 0xbb, 0x2b, 0x05, 0x6a, 0xce, 0x7c, 0xf8, 0xb5, 0xa3, 0x6a, 0xd4, 0x82, 0x36,
+	0x0d, 0xed, 0x2d, 0x7b, 0x5a, 0xa0, 0xf8, 0xd0, 0x9f, 0x5a, 0xf2, 0x70, 0xeb, 0x5d, 0x0a, 0x9a,
+	0xf1, 0x22, 0xd0, 0xed, 0x38, 0xf8, 0x71, 0x18, 0x89, 0x43, 0x18, 0xff, 0xc8, 0x62, 0xd5, 0x98,
+	0x22, 0xa4, 0x4e, 0xb3, 0x0e, 0x24, 0xa3, 0x2c, 0x6f, 0x8a, 0xa2, 0x5f, 0xb7, 0x3d, 0x85, 0x14,
+	0x88, 0x29, 0x06, 0xdd, 0x9b, 0xc2, 0x8d, 0xc3, 0x48, 0x1c, 0xc2, 0xb8, 0x99, 0x42, 0x11, 0xdc,
+	0x29, 0x1c, 0x48, 0x46, 0x59, 0x86, 0xf3, 0x8e, 0x3d, 0x2b, 0x50, 0x7c, 0x91, 0xff, 0xd3, 0xc4,
+	0x6a, 0x57, 0x29, 0x9a, 0x31, 0x0b, 0x0d, 0x9b, 0x00, 0x01, 0x01, 0xc6, 0x08, 0x40, 0x10, 0x3e,
+	0xb1, 0x7b, 0xd5, 0xdc, 0x00, 0x71, 0x3b, 0x76, 0x39, 0x73, 0xd2, 0x33, 0xa8, 0x37, 0xec, 0x49,
+	0x81, 0x62, 0xc3, 0xb1, 0x4b, 0x9e, 0xdf, 0x7a, 0xee, 0x6b, 0x0d, 0x78, 0xf0, 0x65, 0x3b, 0x0b,
+	0x5e, 0x16, 0xe8, 0x2c, 0x04, 0xd9, 0x15, 0x63, 0xaa, 0x23, 0x19, 0x9f, 0x39, 0x4d, 0xda, 0x84,
+	0x94, 0x70, 0x6c, 0x88, 0x3c, 0x60, 0xf9, 0x65, 0x48, 0x9c, 0x33, 0x97, 0x12, 0x71, 0xdf, 0x8d,
+	0xe3, 0xdd, 0x77, 0x1f, 0x02, 0xa3, 0x10, 0xa0, 0x20, 0xe6, 0xbe, 0x6b, 0x8e, 0x7f, 0xec, 0x0e,
+	0x6a, 0x41, 0x9b, 0xde, 0x52, 0xd6, 0x4d, 0x85, 0xf6, 0x52, 0xfa, 0x9a, 0x58, 0x8a, 0x92, 0xbd,
+	0xa5, 0x38, 0x59, 0xa0, 0xb3, 0x10, 0x64, 0xcd, 0x52, 0x64, 0xdc, 0x5d, 0x8a, 0x4d, 0x48, 0x09,
+	0x47, 0x43, 0xde, 0x2f, 0xfe, 0x5c, 0xf2, 0xc9, 0xf9, 0x92, 0x4f, 0xfe, 0x5d, 0xf2, 0xc9, 0xef,
+	0x6b, 0x1e, 0x9d, 0xaf, 0x79, 0xf4, 0xf7, 0x9a, 0x47, 0x5f, 0x1f, 0xb5, 0xdb, 0xed, 0x63, 0xf9,
+	0xcd, 0x7e, 0xfd, 0x3f, 0x00, 0x00, 0xff, 0xff, 0x6b, 0xcc, 0x48, 0x6a, 0x27, 0x06, 0x00, 0x00,
 }

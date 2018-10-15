@@ -2,25 +2,32 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
+import "wrappers.proto";
+
 message User {
 	string id = 1;
-	string email = 2;
-	string username = 3;
-	string avatar = 4;
-	string discrim = 5;
-	string token = 6;
-	bool verified = 7;
-	bool mfa_enabled = 8;
-	bool bot = 9;
+	BytesValue email = 2;
+	BytesValue username = 3;
+	BytesValue avatar = 4;
+	BytesValue discriminator = 5;
+	BytesValue token = 6;
+	BoolValue verified = 7;
+	BoolValue mfa_enabled = 8;
+	BoolValue bot = 9;
 }
 
-message SetUserRequest {
-	User user = 1;
-}
-message SetUserResponse {}
 message GetUserRequest {
 	string id = 1;
 }
 message GetUserResponse {
 	User user = 1;
 }
+message SetUserRequest {
+	User user = 1;
+}
+message SetUserResponse {}
+message UpdateUserRequest {
+	string id = 1;
+	User user = 2;
+}
+message UpdateUserResponse {}

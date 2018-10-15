@@ -2,6 +2,8 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
+import "wrappers.proto";
+
 message Message {
 	message Attachment {
 		string id = 1;
@@ -12,19 +14,15 @@ message Message {
 
 	string id = 1;
 	string channel_id = 2;
-	string content = 3;
-	string timestamp = 4;
-	string edited_timestamp = 5;
+	BytesValue content = 3;
+	BytesValue timestamp = 4;
+	BytesValue edited_timestamp = 5;
 	repeated Attachment attachments = 6;
 	repeated string mention_roles = 7;
-	bool tts = 8;
-	string author = 9;
+	BoolValue tts = 8;
+	BytesValue author_id = 9;
 }
 
-message SetMessageRequest {
-	Message message = 1;
-}
-message SetMessageResponse {}
 message GetMessageRequest {
 	string id = 1;
 	string channel_id = 2;
@@ -32,3 +30,12 @@ message GetMessageRequest {
 message GetMessageResponse {
 	Message message = 1;
 }
+message SetMessageRequest {
+	Message message = 1;
+}
+message SetMessageResponse {}
+message UpdateMessageRequest {
+	string id = 1;
+	Message message = 2;
+}
+message UpdateMessageResponse {}

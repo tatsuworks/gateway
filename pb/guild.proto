@@ -2,6 +2,8 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
+import "wrappers.proto";
+
 message Guild {
 	enum VerificationLevel {
 		NONE = 0;
@@ -9,31 +11,36 @@ message Guild {
 		MEDIUM = 2;
 		HIGH = 3;
 	}
-	
+
 	string id = 1;
-	string name = 2;
-	string icon = 3;
-	string region = 4;
-	string afk_channel_id = 5;
-	string embed_channel_id = 6;
-	string owner_id = 7;
-	string joined_at = 8;
-	string splash = 9;
-	int32 afk_timeout = 10;
-	int32 member_count = 11;
+	BytesValue name = 2;
+	BytesValue icon = 3;
+	BytesValue region = 4;
+	BytesValue afk_channel_id = 5;
+	BytesValue embed_channel_id = 6;
+	BytesValue owner_id = 7;
+	BytesValue joined_at = 8;
+	BytesValue splash = 9;
+	Int32Value afk_timeout = 10;
+	Int32Value member_count = 11;
 	VerificationLevel verification_level = 12;
-	bool embed_enabled = 13;
-	bool large = 14;
-	int32 default_message_notifications = 15;
+	BoolValue embed_enabled = 13;
+	BoolValue large = 14;
+	Int32Value default_message_notifications = 15;
 }
 
-message SetGuildRequest {
-	Guild guild = 1;
-}
-message SetGuildResponse {}
 message GetGuildRequest {
 	string id = 1;
 }
 message GetGuildResponse {
 	Guild guild = 1;
 }
+message SetGuildRequest {
+	Guild guild = 1;
+}
+message SetGuildResponse {}
+message UpdateGuildRequest {
+	string id = 1;
+	Guild guild = 2;
+}
+message UpdateGuildResponse {}

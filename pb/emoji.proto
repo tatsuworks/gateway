@@ -2,20 +2,18 @@ syntax = "proto3";
 package state;
 option go_package = "pb";
 
+import "wrappers.proto";
+
 message Emoji {
 	string id = 1;
 	string guild_id = 2;
-	string name = 3;
+	StringValue name = 3;
 	repeated string roles = 4;
-	bool managed = 5;
-	bool require_colons = 6;
-	bool animated = 7;
+	BoolValue managed = 5;
+	BoolValue require_colons = 6;
+	BoolValue animated = 7;
 }
 
-message SetEmojiRequest {
-	Emoji emoji = 1;
-}
-message SetEmojiResponse {}
 message GetEmojiRequest {
 	string id = 1;
 	string guild_id = 2;
@@ -23,3 +21,12 @@ message GetEmojiRequest {
 message GetEmojiResponse {
 	Emoji emoji = 1;
 }
+message SetEmojiRequest {
+	Emoji emoji = 1;
+}
+message SetEmojiResponse {}
+message UpdateEmojiRequest {
+	string id = 1;
+	Emoji emoji = 2;
+}
+message UpdateEmojiResponse {}

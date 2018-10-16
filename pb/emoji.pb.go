@@ -34,7 +34,7 @@ func (m *Emoji) Reset()         { *m = Emoji{} }
 func (m *Emoji) String() string { return proto.CompactTextString(m) }
 func (*Emoji) ProtoMessage()    {}
 func (*Emoji) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{0}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{0}
 }
 func (m *Emoji) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -112,6 +112,217 @@ func (m *Emoji) GetAnimated() *BoolValue {
 	return nil
 }
 
+type EmojiUpdate struct {
+	Name          *StringValue                   `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Roles         []*EmojiUpdate_EmojiRoleUpdate `protobuf:"bytes,2,rep,name=roles" json:"roles,omitempty"`
+	Managed       *BoolValue                     `protobuf:"bytes,3,opt,name=managed" json:"managed,omitempty"`
+	RequireColons *BoolValue                     `protobuf:"bytes,4,opt,name=require_colons,json=requireColons" json:"require_colons,omitempty"`
+}
+
+func (m *EmojiUpdate) Reset()         { *m = EmojiUpdate{} }
+func (m *EmojiUpdate) String() string { return proto.CompactTextString(m) }
+func (*EmojiUpdate) ProtoMessage()    {}
+func (*EmojiUpdate) Descriptor() ([]byte, []int) {
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{1}
+}
+func (m *EmojiUpdate) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *EmojiUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_EmojiUpdate.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *EmojiUpdate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EmojiUpdate.Merge(dst, src)
+}
+func (m *EmojiUpdate) XXX_Size() int {
+	return m.Size()
+}
+func (m *EmojiUpdate) XXX_DiscardUnknown() {
+	xxx_messageInfo_EmojiUpdate.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EmojiUpdate proto.InternalMessageInfo
+
+func (m *EmojiUpdate) GetName() *StringValue {
+	if m != nil {
+		return m.Name
+	}
+	return nil
+}
+
+func (m *EmojiUpdate) GetRoles() []*EmojiUpdate_EmojiRoleUpdate {
+	if m != nil {
+		return m.Roles
+	}
+	return nil
+}
+
+func (m *EmojiUpdate) GetManaged() *BoolValue {
+	if m != nil {
+		return m.Managed
+	}
+	return nil
+}
+
+func (m *EmojiUpdate) GetRequireColons() *BoolValue {
+	if m != nil {
+		return m.RequireColons
+	}
+	return nil
+}
+
+type EmojiUpdate_EmojiRoleUpdate struct {
+	// Types that are valid to be assigned to Modification:
+	//	*EmojiUpdate_EmojiRoleUpdate_AddRole
+	//	*EmojiUpdate_EmojiRoleUpdate_DelRole
+	Modification isEmojiUpdate_EmojiRoleUpdate_Modification `protobuf_oneof:"Modification"`
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) Reset()         { *m = EmojiUpdate_EmojiRoleUpdate{} }
+func (m *EmojiUpdate_EmojiRoleUpdate) String() string { return proto.CompactTextString(m) }
+func (*EmojiUpdate_EmojiRoleUpdate) ProtoMessage()    {}
+func (*EmojiUpdate_EmojiRoleUpdate) Descriptor() ([]byte, []int) {
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{1, 0}
+}
+func (m *EmojiUpdate_EmojiRoleUpdate) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *EmojiUpdate_EmojiRoleUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_EmojiUpdate_EmojiRoleUpdate.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *EmojiUpdate_EmojiRoleUpdate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EmojiUpdate_EmojiRoleUpdate.Merge(dst, src)
+}
+func (m *EmojiUpdate_EmojiRoleUpdate) XXX_Size() int {
+	return m.Size()
+}
+func (m *EmojiUpdate_EmojiRoleUpdate) XXX_DiscardUnknown() {
+	xxx_messageInfo_EmojiUpdate_EmojiRoleUpdate.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EmojiUpdate_EmojiRoleUpdate proto.InternalMessageInfo
+
+type isEmojiUpdate_EmojiRoleUpdate_Modification interface {
+	isEmojiUpdate_EmojiRoleUpdate_Modification()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type EmojiUpdate_EmojiRoleUpdate_AddRole struct {
+	AddRole string `protobuf:"bytes,1,opt,name=add_role,json=addRole,proto3,oneof"`
+}
+type EmojiUpdate_EmojiRoleUpdate_DelRole struct {
+	DelRole string `protobuf:"bytes,2,opt,name=del_role,json=delRole,proto3,oneof"`
+}
+
+func (*EmojiUpdate_EmojiRoleUpdate_AddRole) isEmojiUpdate_EmojiRoleUpdate_Modification() {}
+func (*EmojiUpdate_EmojiRoleUpdate_DelRole) isEmojiUpdate_EmojiRoleUpdate_Modification() {}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) GetModification() isEmojiUpdate_EmojiRoleUpdate_Modification {
+	if m != nil {
+		return m.Modification
+	}
+	return nil
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) GetAddRole() string {
+	if x, ok := m.GetModification().(*EmojiUpdate_EmojiRoleUpdate_AddRole); ok {
+		return x.AddRole
+	}
+	return ""
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) GetDelRole() string {
+	if x, ok := m.GetModification().(*EmojiUpdate_EmojiRoleUpdate_DelRole); ok {
+		return x.DelRole
+	}
+	return ""
+}
+
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*EmojiUpdate_EmojiRoleUpdate) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _EmojiUpdate_EmojiRoleUpdate_OneofMarshaler, _EmojiUpdate_EmojiRoleUpdate_OneofUnmarshaler, _EmojiUpdate_EmojiRoleUpdate_OneofSizer, []interface{}{
+		(*EmojiUpdate_EmojiRoleUpdate_AddRole)(nil),
+		(*EmojiUpdate_EmojiRoleUpdate_DelRole)(nil),
+	}
+}
+
+func _EmojiUpdate_EmojiRoleUpdate_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*EmojiUpdate_EmojiRoleUpdate)
+	// Modification
+	switch x := m.Modification.(type) {
+	case *EmojiUpdate_EmojiRoleUpdate_AddRole:
+		_ = b.EncodeVarint(1<<3 | proto.WireBytes)
+		_ = b.EncodeStringBytes(x.AddRole)
+	case *EmojiUpdate_EmojiRoleUpdate_DelRole:
+		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
+		_ = b.EncodeStringBytes(x.DelRole)
+	case nil:
+	default:
+		return fmt.Errorf("EmojiUpdate_EmojiRoleUpdate.Modification has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _EmojiUpdate_EmojiRoleUpdate_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*EmojiUpdate_EmojiRoleUpdate)
+	switch tag {
+	case 1: // Modification.add_role
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeStringBytes()
+		m.Modification = &EmojiUpdate_EmojiRoleUpdate_AddRole{x}
+		return true, err
+	case 2: // Modification.del_role
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeStringBytes()
+		m.Modification = &EmojiUpdate_EmojiRoleUpdate_DelRole{x}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _EmojiUpdate_EmojiRoleUpdate_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*EmojiUpdate_EmojiRoleUpdate)
+	// Modification
+	switch x := m.Modification.(type) {
+	case *EmojiUpdate_EmojiRoleUpdate_AddRole:
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(len(x.AddRole)))
+		n += len(x.AddRole)
+	case *EmojiUpdate_EmojiRoleUpdate_DelRole:
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(len(x.DelRole)))
+		n += len(x.DelRole)
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 type GetEmojiRequest struct {
 	Id      string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	GuildId string `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
@@ -121,7 +332,7 @@ func (m *GetEmojiRequest) Reset()         { *m = GetEmojiRequest{} }
 func (m *GetEmojiRequest) String() string { return proto.CompactTextString(m) }
 func (*GetEmojiRequest) ProtoMessage()    {}
 func (*GetEmojiRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{1}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{2}
 }
 func (m *GetEmojiRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -172,7 +383,7 @@ func (m *GetEmojiResponse) Reset()         { *m = GetEmojiResponse{} }
 func (m *GetEmojiResponse) String() string { return proto.CompactTextString(m) }
 func (*GetEmojiResponse) ProtoMessage()    {}
 func (*GetEmojiResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{2}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{3}
 }
 func (m *GetEmojiResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -216,7 +427,7 @@ func (m *SetEmojiRequest) Reset()         { *m = SetEmojiRequest{} }
 func (m *SetEmojiRequest) String() string { return proto.CompactTextString(m) }
 func (*SetEmojiRequest) ProtoMessage()    {}
 func (*SetEmojiRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{3}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{4}
 }
 func (m *SetEmojiRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -259,7 +470,7 @@ func (m *SetEmojiResponse) Reset()         { *m = SetEmojiResponse{} }
 func (m *SetEmojiResponse) String() string { return proto.CompactTextString(m) }
 func (*SetEmojiResponse) ProtoMessage()    {}
 func (*SetEmojiResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{4}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{5}
 }
 func (m *SetEmojiResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -289,15 +500,16 @@ func (m *SetEmojiResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_SetEmojiResponse proto.InternalMessageInfo
 
 type UpdateEmojiRequest struct {
-	Id    string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Emoji *Emoji `protobuf:"bytes,2,opt,name=emoji" json:"emoji,omitempty"`
+	Id      string       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GuildId string       `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	Emoji   *EmojiUpdate `protobuf:"bytes,3,opt,name=emoji" json:"emoji,omitempty"`
 }
 
 func (m *UpdateEmojiRequest) Reset()         { *m = UpdateEmojiRequest{} }
 func (m *UpdateEmojiRequest) String() string { return proto.CompactTextString(m) }
 func (*UpdateEmojiRequest) ProtoMessage()    {}
 func (*UpdateEmojiRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{5}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{6}
 }
 func (m *UpdateEmojiRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -333,7 +545,14 @@ func (m *UpdateEmojiRequest) GetId() string {
 	return ""
 }
 
-func (m *UpdateEmojiRequest) GetEmoji() *Emoji {
+func (m *UpdateEmojiRequest) GetGuildId() string {
+	if m != nil {
+		return m.GuildId
+	}
+	return ""
+}
+
+func (m *UpdateEmojiRequest) GetEmoji() *EmojiUpdate {
 	if m != nil {
 		return m.Emoji
 	}
@@ -347,7 +566,7 @@ func (m *UpdateEmojiResponse) Reset()         { *m = UpdateEmojiResponse{} }
 func (m *UpdateEmojiResponse) String() string { return proto.CompactTextString(m) }
 func (*UpdateEmojiResponse) ProtoMessage()    {}
 func (*UpdateEmojiResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_emoji_61d0906d18760ab0, []int{6}
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{7}
 }
 func (m *UpdateEmojiResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -376,14 +595,106 @@ func (m *UpdateEmojiResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_UpdateEmojiResponse proto.InternalMessageInfo
 
+type DeleteEmojiRequest struct {
+	Id      string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GuildId string `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+}
+
+func (m *DeleteEmojiRequest) Reset()         { *m = DeleteEmojiRequest{} }
+func (m *DeleteEmojiRequest) String() string { return proto.CompactTextString(m) }
+func (*DeleteEmojiRequest) ProtoMessage()    {}
+func (*DeleteEmojiRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{8}
+}
+func (m *DeleteEmojiRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeleteEmojiRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeleteEmojiRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *DeleteEmojiRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteEmojiRequest.Merge(dst, src)
+}
+func (m *DeleteEmojiRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeleteEmojiRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteEmojiRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteEmojiRequest proto.InternalMessageInfo
+
+func (m *DeleteEmojiRequest) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *DeleteEmojiRequest) GetGuildId() string {
+	if m != nil {
+		return m.GuildId
+	}
+	return ""
+}
+
+type DeleteEmojiResponse struct {
+}
+
+func (m *DeleteEmojiResponse) Reset()         { *m = DeleteEmojiResponse{} }
+func (m *DeleteEmojiResponse) String() string { return proto.CompactTextString(m) }
+func (*DeleteEmojiResponse) ProtoMessage()    {}
+func (*DeleteEmojiResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_emoji_83d598ed6f30d6d2, []int{9}
+}
+func (m *DeleteEmojiResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeleteEmojiResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeleteEmojiResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *DeleteEmojiResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteEmojiResponse.Merge(dst, src)
+}
+func (m *DeleteEmojiResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeleteEmojiResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteEmojiResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteEmojiResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*Emoji)(nil), "state.Emoji")
+	proto.RegisterType((*EmojiUpdate)(nil), "state.EmojiUpdate")
+	proto.RegisterType((*EmojiUpdate_EmojiRoleUpdate)(nil), "state.EmojiUpdate.EmojiRoleUpdate")
 	proto.RegisterType((*GetEmojiRequest)(nil), "state.GetEmojiRequest")
 	proto.RegisterType((*GetEmojiResponse)(nil), "state.GetEmojiResponse")
 	proto.RegisterType((*SetEmojiRequest)(nil), "state.SetEmojiRequest")
 	proto.RegisterType((*SetEmojiResponse)(nil), "state.SetEmojiResponse")
 	proto.RegisterType((*UpdateEmojiRequest)(nil), "state.UpdateEmojiRequest")
 	proto.RegisterType((*UpdateEmojiResponse)(nil), "state.UpdateEmojiResponse")
+	proto.RegisterType((*DeleteEmojiRequest)(nil), "state.DeleteEmojiRequest")
+	proto.RegisterType((*DeleteEmojiResponse)(nil), "state.DeleteEmojiResponse")
 }
 func (m *Emoji) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -470,6 +781,107 @@ func (m *Emoji) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *EmojiUpdate) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *EmojiUpdate) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Name != nil {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(m.Name.Size()))
+		n5, err := m.Name.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	if len(m.Roles) > 0 {
+		for _, msg := range m.Roles {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintEmoji(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Managed != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(m.Managed.Size()))
+		n6, err := m.Managed.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	if m.RequireColons != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(m.RequireColons.Size()))
+		n7, err := m.RequireColons.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
+	return i, nil
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Modification != nil {
+		nn8, err := m.Modification.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += nn8
+	}
+	return i, nil
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate_AddRole) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintEmoji(dAtA, i, uint64(len(m.AddRole)))
+	i += copy(dAtA[i:], m.AddRole)
+	return i, nil
+}
+func (m *EmojiUpdate_EmojiRoleUpdate_DelRole) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintEmoji(dAtA, i, uint64(len(m.DelRole)))
+	i += copy(dAtA[i:], m.DelRole)
+	return i, nil
+}
 func (m *GetEmojiRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -519,11 +931,11 @@ func (m *GetEmojiResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintEmoji(dAtA, i, uint64(m.Emoji.Size()))
-		n5, err := m.Emoji.MarshalTo(dAtA[i:])
+		n9, err := m.Emoji.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n9
 	}
 	return i, nil
 }
@@ -547,11 +959,11 @@ func (m *SetEmojiRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintEmoji(dAtA, i, uint64(m.Emoji.Size()))
-		n6, err := m.Emoji.MarshalTo(dAtA[i:])
+		n10, err := m.Emoji.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n10
 	}
 	return i, nil
 }
@@ -595,15 +1007,21 @@ func (m *UpdateEmojiRequest) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintEmoji(dAtA, i, uint64(len(m.Id)))
 		i += copy(dAtA[i:], m.Id)
 	}
-	if m.Emoji != nil {
+	if len(m.GuildId) > 0 {
 		dAtA[i] = 0x12
 		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(len(m.GuildId)))
+		i += copy(dAtA[i:], m.GuildId)
+	}
+	if m.Emoji != nil {
+		dAtA[i] = 0x1a
+		i++
 		i = encodeVarintEmoji(dAtA, i, uint64(m.Emoji.Size()))
-		n7, err := m.Emoji.MarshalTo(dAtA[i:])
+		n11, err := m.Emoji.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n11
 	}
 	return i, nil
 }
@@ -619,6 +1037,54 @@ func (m *UpdateEmojiResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *UpdateEmojiResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
+func (m *DeleteEmojiRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteEmojiRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if len(m.GuildId) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintEmoji(dAtA, i, uint64(len(m.GuildId)))
+		i += copy(dAtA[i:], m.GuildId)
+	}
+	return i, nil
+}
+
+func (m *DeleteEmojiResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteEmojiResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -674,6 +1140,65 @@ func (m *Emoji) Size() (n int) {
 	return n
 }
 
+func (m *EmojiUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Name != nil {
+		l = m.Name.Size()
+		n += 1 + l + sovEmoji(uint64(l))
+	}
+	if len(m.Roles) > 0 {
+		for _, e := range m.Roles {
+			l = e.Size()
+			n += 1 + l + sovEmoji(uint64(l))
+		}
+	}
+	if m.Managed != nil {
+		l = m.Managed.Size()
+		n += 1 + l + sovEmoji(uint64(l))
+	}
+	if m.RequireColons != nil {
+		l = m.RequireColons.Size()
+		n += 1 + l + sovEmoji(uint64(l))
+	}
+	return n
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Modification != nil {
+		n += m.Modification.Size()
+	}
+	return n
+}
+
+func (m *EmojiUpdate_EmojiRoleUpdate_AddRole) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.AddRole)
+	n += 1 + l + sovEmoji(uint64(l))
+	return n
+}
+func (m *EmojiUpdate_EmojiRoleUpdate_DelRole) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.DelRole)
+	n += 1 + l + sovEmoji(uint64(l))
+	return n
+}
 func (m *GetEmojiRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -736,6 +1261,10 @@ func (m *UpdateEmojiRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovEmoji(uint64(l))
 	}
+	l = len(m.GuildId)
+	if l > 0 {
+		n += 1 + l + sovEmoji(uint64(l))
+	}
 	if m.Emoji != nil {
 		l = m.Emoji.Size()
 		n += 1 + l + sovEmoji(uint64(l))
@@ -744,6 +1273,32 @@ func (m *UpdateEmojiRequest) Size() (n int) {
 }
 
 func (m *UpdateEmojiResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *DeleteEmojiRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovEmoji(uint64(l))
+	}
+	l = len(m.GuildId)
+	if l > 0 {
+		n += 1 + l + sovEmoji(uint64(l))
+	}
+	return n
+}
+
+func (m *DeleteEmojiResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1012,6 +1567,294 @@ func (m *Emoji) Unmarshal(dAtA []byte) error {
 			if err := m.Animated.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEmoji(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *EmojiUpdate) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEmoji
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: EmojiUpdate: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: EmojiUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Name == nil {
+				m.Name = &StringValue{}
+			}
+			if err := m.Name.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Roles", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Roles = append(m.Roles, &EmojiUpdate_EmojiRoleUpdate{})
+			if err := m.Roles[len(m.Roles)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Managed", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Managed == nil {
+				m.Managed = &BoolValue{}
+			}
+			if err := m.Managed.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequireColons", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.RequireColons == nil {
+				m.RequireColons = &BoolValue{}
+			}
+			if err := m.RequireColons.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEmoji(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *EmojiUpdate_EmojiRoleUpdate) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEmoji
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: EmojiRoleUpdate: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: EmojiRoleUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AddRole", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Modification = &EmojiUpdate_EmojiRoleUpdate_AddRole{string(dAtA[iNdEx:postIndex])}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DelRole", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Modification = &EmojiUpdate_EmojiRoleUpdate_DelRole{string(dAtA[iNdEx:postIndex])}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1418,6 +2261,35 @@ func (m *UpdateEmojiRequest) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GuildId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GuildId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Emoji", wireType)
 			}
 			var msglen int
@@ -1443,7 +2315,7 @@ func (m *UpdateEmojiRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Emoji == nil {
-				m.Emoji = &Emoji{}
+				m.Emoji = &EmojiUpdate{}
 			}
 			if err := m.Emoji.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -1497,6 +2369,164 @@ func (m *UpdateEmojiResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: UpdateEmojiResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEmoji(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteEmojiRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEmoji
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteEmojiRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteEmojiRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GuildId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEmoji
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GuildId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEmoji(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthEmoji
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteEmojiResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEmoji
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteEmojiResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteEmojiResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -1625,30 +2655,37 @@ var (
 	ErrIntOverflowEmoji   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("emoji.proto", fileDescriptor_emoji_61d0906d18760ab0) }
+func init() { proto.RegisterFile("emoji.proto", fileDescriptor_emoji_83d598ed6f30d6d2) }
 
-var fileDescriptor_emoji_61d0906d18760ab0 = []byte{
-	// 342 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x92, 0xcd, 0x4a, 0xc3, 0x40,
-	0x14, 0x85, 0x9b, 0xb4, 0xe9, 0xcf, 0xad, 0xb6, 0x65, 0x54, 0x18, 0x45, 0x42, 0xc9, 0x42, 0x8a,
-	0x48, 0x17, 0x15, 0x75, 0xe3, 0xaa, 0x22, 0xea, 0x36, 0x45, 0x17, 0x6e, 0xca, 0xd4, 0xb9, 0x94,
-	0x91, 0x24, 0x93, 0xce, 0x4c, 0xf0, 0x01, 0x7c, 0x01, 0x1f, 0xcb, 0x65, 0x97, 0x2e, 0xa5, 0x7d,
-	0x11, 0x71, 0x52, 0x2b, 0x16, 0x2a, 0xba, 0xbc, 0xf7, 0x9e, 0xf3, 0x1d, 0xe6, 0x30, 0x50, 0xc7,
-	0x58, 0x3e, 0x8a, 0x6e, 0xaa, 0xa4, 0x91, 0xc4, 0xd3, 0x86, 0x19, 0xdc, 0x6b, 0x3c, 0x29, 0x96,
-	0xa6, 0xa8, 0x74, 0xbe, 0x0e, 0x9e, 0x5d, 0xf0, 0x2e, 0x3f, 0x65, 0xa4, 0x01, 0xae, 0xe0, 0xd4,
-	0x69, 0x3b, 0x9d, 0x5a, 0xe8, 0x0a, 0x4e, 0x76, 0xa1, 0x3a, 0xce, 0x44, 0xc4, 0x87, 0x82, 0x53,
-	0xd7, 0x6e, 0x2b, 0x76, 0xbe, 0xe1, 0xe4, 0x00, 0x4a, 0x09, 0x8b, 0x91, 0x16, 0xdb, 0x4e, 0xa7,
-	0xde, 0x23, 0x5d, 0x8b, 0xee, 0x0e, 0x8c, 0x12, 0xc9, 0xf8, 0x8e, 0x45, 0x19, 0x86, 0xf6, 0x4e,
-	0xb6, 0xc1, 0x53, 0x32, 0x42, 0x4d, 0x4b, 0xed, 0x62, 0xa7, 0x16, 0xe6, 0x03, 0x39, 0x84, 0x4a,
-	0xcc, 0x12, 0x36, 0x46, 0x4e, 0x3d, 0x0b, 0x68, 0x2d, 0x00, 0x7d, 0x29, 0xa3, 0xdc, 0xfe, 0x25,
-	0x20, 0x67, 0xd0, 0x50, 0x38, 0xc9, 0x84, 0xc2, 0xe1, 0x83, 0x8c, 0x64, 0xa2, 0x69, 0x79, 0x8d,
-	0x65, 0x73, 0xa1, 0xbb, 0xb0, 0x32, 0x72, 0x04, 0x55, 0x96, 0x88, 0x98, 0x19, 0xe4, 0xb4, 0xb2,
-	0xc6, 0xb2, 0x54, 0x04, 0xe7, 0xd0, 0xbc, 0x42, 0x63, 0x7b, 0x08, 0x71, 0x92, 0xa1, 0x36, 0xff,
-	0xa8, 0x23, 0x38, 0x85, 0xd6, 0xb7, 0x5b, 0xa7, 0x32, 0xd1, 0x48, 0x02, 0xf0, 0x6c, 0xfb, 0x96,
-	0x50, 0xef, 0x6d, 0x2c, 0xc2, 0x73, 0x51, 0x7e, 0x0a, 0x4e, 0xa0, 0x39, 0x58, 0x49, 0xfd, 0x8b,
-	0x8d, 0x40, 0x6b, 0xb0, 0x12, 0x17, 0x5c, 0x03, 0xb9, 0x4d, 0x39, 0x33, 0xf8, 0xeb, 0x1b, 0x96,
-	0x74, 0x77, 0x3d, 0x7d, 0x07, 0xb6, 0x7e, 0x90, 0xf2, 0x80, 0xfe, 0xfe, 0xeb, 0xcc, 0x77, 0xa6,
-	0x33, 0xdf, 0x79, 0x9f, 0xf9, 0xce, 0xcb, 0xdc, 0x2f, 0x4c, 0xe7, 0x7e, 0xe1, 0x6d, 0xee, 0x17,
-	0xee, 0xdd, 0x74, 0x34, 0x2a, 0xdb, 0xcf, 0x74, 0xfc, 0x11, 0x00, 0x00, 0xff, 0xff, 0x0f, 0x99,
-	0x6b, 0x13, 0x72, 0x02, 0x00, 0x00,
+var fileDescriptor_emoji_83d598ed6f30d6d2 = []byte{
+	// 459 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x53, 0xcd, 0x6e, 0xd3, 0x40,
+	0x10, 0x8e, 0x37, 0x71, 0x93, 0x4e, 0x4a, 0x12, 0x2d, 0x20, 0x99, 0x82, 0xac, 0x68, 0x0f, 0xc8,
+	0x42, 0x28, 0x87, 0x22, 0x7e, 0x0e, 0x48, 0x48, 0x01, 0x04, 0x1c, 0xb8, 0x38, 0x82, 0x03, 0x1c,
+	0xa2, 0x6d, 0x77, 0x88, 0x16, 0xad, 0xbd, 0xae, 0xbd, 0x16, 0x0f, 0xc0, 0x0b, 0xf0, 0x2a, 0xbc,
+	0x05, 0xc7, 0x1e, 0x39, 0xa2, 0xe4, 0x45, 0x90, 0x77, 0xed, 0x92, 0x44, 0x54, 0x6d, 0x73, 0xf3,
+	0xf8, 0xfb, 0xe6, 0xfb, 0x66, 0xbe, 0xdd, 0x85, 0x3e, 0x26, 0xfa, 0xab, 0x9c, 0x64, 0xb9, 0x36,
+	0x9a, 0xfa, 0x85, 0xe1, 0x06, 0x0f, 0x07, 0xdf, 0x72, 0x9e, 0x65, 0x98, 0x17, 0xee, 0x37, 0xfb,
+	0x4e, 0xc0, 0x7f, 0x5d, 0xd1, 0xe8, 0x00, 0x88, 0x14, 0x81, 0x37, 0xf6, 0xa2, 0xfd, 0x98, 0x48,
+	0x41, 0xef, 0x40, 0x6f, 0x51, 0x4a, 0x25, 0xe6, 0x52, 0x04, 0xc4, 0xfe, 0xed, 0xda, 0xfa, 0x9d,
+	0xa0, 0xf7, 0xa1, 0x93, 0xf2, 0x04, 0x83, 0xf6, 0xd8, 0x8b, 0xfa, 0x47, 0x74, 0x62, 0xa5, 0x27,
+	0x33, 0x93, 0xcb, 0x74, 0xf1, 0x91, 0xab, 0x12, 0x63, 0x8b, 0xd3, 0x5b, 0xe0, 0xe7, 0x5a, 0x61,
+	0x11, 0x74, 0xc6, 0xed, 0x68, 0x3f, 0x76, 0x05, 0x7d, 0x00, 0xdd, 0x84, 0xa7, 0x7c, 0x81, 0x22,
+	0xf0, 0xad, 0xc0, 0xa8, 0x16, 0x98, 0x6a, 0xad, 0x5c, 0x7b, 0x43, 0xa0, 0x4f, 0x61, 0x90, 0xe3,
+	0x69, 0x29, 0x73, 0x9c, 0x9f, 0x68, 0xa5, 0xd3, 0x22, 0xd8, 0xbb, 0xa0, 0xe5, 0x46, 0xcd, 0x7b,
+	0x69, 0x69, 0xf4, 0x21, 0xf4, 0x78, 0x2a, 0x13, 0x6e, 0x50, 0x04, 0xdd, 0x0b, 0x5a, 0xce, 0x19,
+	0xec, 0x27, 0x81, 0xbe, 0x4d, 0xe1, 0x43, 0x26, 0xb8, 0xc1, 0xf3, 0x05, 0xbd, 0x4b, 0x16, 0x7c,
+	0xd6, 0x2c, 0x48, 0xc6, 0xed, 0xa8, 0x7f, 0xc4, 0x6a, 0xe2, 0x9a, 0x94, 0xfb, 0x8e, 0xb5, 0x42,
+	0x57, 0xff, 0x27, 0x84, 0xf6, 0xf5, 0x43, 0xe8, 0x5c, 0x29, 0x84, 0xc3, 0xcf, 0x30, 0xdc, 0xb2,
+	0xa7, 0x77, 0xa1, 0xc7, 0x85, 0x98, 0x57, 0x43, 0xb8, 0xb3, 0x7e, 0xdb, 0x8a, 0xbb, 0x5c, 0x88,
+	0x8a, 0x52, 0x81, 0x02, 0x95, 0x03, 0x49, 0x03, 0x0a, 0x54, 0x15, 0x38, 0x1d, 0xc0, 0xc1, 0x7b,
+	0x2d, 0xe4, 0x17, 0x79, 0xc2, 0x8d, 0xd4, 0x29, 0x7b, 0x0e, 0xc3, 0x37, 0x68, 0x9c, 0x3e, 0x9e,
+	0x96, 0x58, 0x98, 0x6b, 0x5c, 0x21, 0xf6, 0x04, 0x46, 0xff, 0xba, 0x8b, 0x4c, 0xa7, 0x05, 0x52,
+	0x06, 0xbe, 0xbd, 0xb1, 0x75, 0xec, 0x07, 0xeb, 0x69, 0xc6, 0x0e, 0x62, 0x8f, 0x61, 0x38, 0xdb,
+	0x72, 0xbd, 0x4a, 0x1b, 0x85, 0xd1, 0x6c, 0xcb, 0x8e, 0x49, 0xa0, 0x2e, 0x94, 0x1d, 0x77, 0xa0,
+	0x51, 0x63, 0xbc, 0xf9, 0x0e, 0xd6, 0x4e, 0xbf, 0xb1, 0xbf, 0x0d, 0x37, 0x37, 0xac, 0xea, 0x09,
+	0x5e, 0x00, 0x7d, 0x85, 0x0a, 0x77, 0x9e, 0xa0, 0xd2, 0xdd, 0x10, 0x70, 0xba, 0xd3, 0x7b, 0xbf,
+	0x96, 0xa1, 0x77, 0xb6, 0x0c, 0xbd, 0x3f, 0xcb, 0xd0, 0xfb, 0xb1, 0x0a, 0x5b, 0x67, 0xab, 0xb0,
+	0xf5, 0x7b, 0x15, 0xb6, 0x3e, 0x91, 0xec, 0xf8, 0x78, 0xcf, 0xbe, 0xfc, 0x47, 0x7f, 0x03, 0x00,
+	0x00, 0xff, 0xff, 0x65, 0x53, 0x6c, 0x76, 0x1f, 0x04, 0x00, 0x00,
 }

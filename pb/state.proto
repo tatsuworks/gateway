@@ -14,28 +14,35 @@ service State {
 	rpc GetChannel(GetChannelRequest) returns (GetChannelResponse) {}
 	rpc SetChannel(SetChannelRequest) returns (SetChannelResponse) {}
 	rpc UpdateChannel(UpdateChannelRequest) returns (UpdateChannelResponse) {}
+	rpc DeleteChannel(DeleteChannelRequest) returns (DeleteChannelResponse) {}
 
 	rpc GetEmoji(GetEmojiRequest) returns (GetEmojiResponse) {}
 	rpc SetEmoji(SetEmojiRequest) returns (SetEmojiResponse) {}
 	rpc UpdateEmoji(UpdateEmojiRequest) returns (UpdateEmojiResponse) {}
+	rpc DeleteEmoji(DeleteEmojiRequest) returns (DeleteEmojiResponse) {}
 
 	rpc GetGuild(GetGuildRequest) returns (GetGuildResponse) {}
 	rpc SetGuild(SetGuildRequest) returns (SetGuildResponse) {}
 	rpc UpdateGuild(UpdateGuildRequest) returns (UpdateGuildResponse) {}
+	rpc DeleteGuild(DeleteGuildRequest) returns (DeleteGuildResponse) {}
 
 	rpc GetMember(GetMemberRequest) returns (GetMemberResponse) {}
 	rpc SetMember(SetMemberRequest) returns (SetMemberResponse) {}
 	rpc UpdateMember(UpdateMemberRequest) returns (UpdateMemberResponse) {}
+	rpc DeleteMember(DeleteMemberRequest) returns (DeleteMemberResponse) {}
 
 	rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
 	rpc SetUser(SetUserRequest) returns (SetUserResponse) {}
 	rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
+	rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {}
 
 	rpc GetMessage(GetMessageRequest) returns (GetMessageResponse) {}
 	rpc SetMessage(SetMessageRequest) returns (SetMessageResponse) {}
 	rpc UpdateMessage(UpdateMessageRequest) returns (UpdateMessageResponse) {}
+	rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse) {}
 
 	rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}
 	rpc SetRole(SetRoleRequest) returns (SetRoleResponse) {}
 	rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse) {}
+	rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {}
 }

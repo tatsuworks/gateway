@@ -14,13 +14,19 @@ message Message {
 
 	string id = 1;
 	string channel_id = 2;
-	BytesValue content = 3;
-	BytesValue timestamp = 4;
-	BytesValue edited_timestamp = 5;
+	string content = 3;
+	string timestamp = 4;
+	string edited_timestamp = 5;
 	repeated Attachment attachments = 6;
 	repeated string mention_roles = 7;
-	BoolValue tts = 8;
-	BytesValue author_id = 9;
+	bool tts = 8;
+	string author_id = 9;
+}
+
+message MessageUpdate {
+	BytesValue content = 1;
+	BytesValue edited_timestamp = 2;
+	repeated string mention_roles = 3;
 }
 
 message GetMessageRequest {
@@ -36,6 +42,12 @@ message SetMessageRequest {
 message SetMessageResponse {}
 message UpdateMessageRequest {
 	string id = 1;
-	Message message = 2;
+	string channel_id = 2;
+	MessageUpdate message = 3;
 }
 message UpdateMessageResponse {}
+message DeleteMessageRequest {
+	string id = 1;
+	string channel_id = 2;
+}
+message DeleteMessageResponse {}

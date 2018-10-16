@@ -21,22 +21,22 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 type Role struct {
-	Id          string       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	GuildId     string       `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
-	Name        *StringValue `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Managed     *BoolValue   `protobuf:"bytes,4,opt,name=managed" json:"managed,omitempty"`
-	Mentionable *BoolValue   `protobuf:"bytes,5,opt,name=mentionable" json:"mentionable,omitempty"`
-	Hoist       *BoolValue   `protobuf:"bytes,6,opt,name=hoist" json:"hoist,omitempty"`
-	Color       *Int32Value  `protobuf:"bytes,7,opt,name=color" json:"color,omitempty"`
-	Position    *Int32Value  `protobuf:"bytes,8,opt,name=position" json:"position,omitempty"`
-	Permissions *Int32Value  `protobuf:"bytes,9,opt,name=permissions" json:"permissions,omitempty"`
+	Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GuildId     string `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	Name        string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Managed     bool   `protobuf:"varint,4,opt,name=managed,proto3" json:"managed,omitempty"`
+	Mentionable bool   `protobuf:"varint,5,opt,name=mentionable,proto3" json:"mentionable,omitempty"`
+	Hoist       bool   `protobuf:"varint,6,opt,name=hoist,proto3" json:"hoist,omitempty"`
+	Color       int32  `protobuf:"varint,7,opt,name=color,proto3" json:"color,omitempty"`
+	Position    int32  `protobuf:"varint,8,opt,name=position,proto3" json:"position,omitempty"`
+	Permissions int32  `protobuf:"varint,9,opt,name=permissions,proto3" json:"permissions,omitempty"`
 }
 
 func (m *Role) Reset()         { *m = Role{} }
 func (m *Role) String() string { return proto.CompactTextString(m) }
 func (*Role) ProtoMessage()    {}
 func (*Role) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{0}
+	return fileDescriptor_role_431534329fed7a68, []int{0}
 }
 func (m *Role) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -79,49 +79,141 @@ func (m *Role) GetGuildId() string {
 	return ""
 }
 
-func (m *Role) GetName() *StringValue {
+func (m *Role) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *Role) GetManaged() bool {
+	if m != nil {
+		return m.Managed
+	}
+	return false
+}
+
+func (m *Role) GetMentionable() bool {
+	if m != nil {
+		return m.Mentionable
+	}
+	return false
+}
+
+func (m *Role) GetHoist() bool {
+	if m != nil {
+		return m.Hoist
+	}
+	return false
+}
+
+func (m *Role) GetColor() int32 {
+	if m != nil {
+		return m.Color
+	}
+	return 0
+}
+
+func (m *Role) GetPosition() int32 {
+	if m != nil {
+		return m.Position
+	}
+	return 0
+}
+
+func (m *Role) GetPermissions() int32 {
+	if m != nil {
+		return m.Permissions
+	}
+	return 0
+}
+
+type RoleUpdate struct {
+	Name        *BytesValue `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Managed     *BoolValue  `protobuf:"bytes,4,opt,name=managed" json:"managed,omitempty"`
+	Mentionable *BoolValue  `protobuf:"bytes,5,opt,name=mentionable" json:"mentionable,omitempty"`
+	Hoist       *BoolValue  `protobuf:"bytes,6,opt,name=hoist" json:"hoist,omitempty"`
+	Color       *Int32Value `protobuf:"bytes,7,opt,name=color" json:"color,omitempty"`
+	Position    *Int32Value `protobuf:"bytes,8,opt,name=position" json:"position,omitempty"`
+	Permissions *Int32Value `protobuf:"bytes,9,opt,name=permissions" json:"permissions,omitempty"`
+}
+
+func (m *RoleUpdate) Reset()         { *m = RoleUpdate{} }
+func (m *RoleUpdate) String() string { return proto.CompactTextString(m) }
+func (*RoleUpdate) ProtoMessage()    {}
+func (*RoleUpdate) Descriptor() ([]byte, []int) {
+	return fileDescriptor_role_431534329fed7a68, []int{1}
+}
+func (m *RoleUpdate) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *RoleUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_RoleUpdate.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *RoleUpdate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RoleUpdate.Merge(dst, src)
+}
+func (m *RoleUpdate) XXX_Size() int {
+	return m.Size()
+}
+func (m *RoleUpdate) XXX_DiscardUnknown() {
+	xxx_messageInfo_RoleUpdate.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RoleUpdate proto.InternalMessageInfo
+
+func (m *RoleUpdate) GetName() *BytesValue {
 	if m != nil {
 		return m.Name
 	}
 	return nil
 }
 
-func (m *Role) GetManaged() *BoolValue {
+func (m *RoleUpdate) GetManaged() *BoolValue {
 	if m != nil {
 		return m.Managed
 	}
 	return nil
 }
 
-func (m *Role) GetMentionable() *BoolValue {
+func (m *RoleUpdate) GetMentionable() *BoolValue {
 	if m != nil {
 		return m.Mentionable
 	}
 	return nil
 }
 
-func (m *Role) GetHoist() *BoolValue {
+func (m *RoleUpdate) GetHoist() *BoolValue {
 	if m != nil {
 		return m.Hoist
 	}
 	return nil
 }
 
-func (m *Role) GetColor() *Int32Value {
+func (m *RoleUpdate) GetColor() *Int32Value {
 	if m != nil {
 		return m.Color
 	}
 	return nil
 }
 
-func (m *Role) GetPosition() *Int32Value {
+func (m *RoleUpdate) GetPosition() *Int32Value {
 	if m != nil {
 		return m.Position
 	}
 	return nil
 }
 
-func (m *Role) GetPermissions() *Int32Value {
+func (m *RoleUpdate) GetPermissions() *Int32Value {
 	if m != nil {
 		return m.Permissions
 	}
@@ -137,7 +229,7 @@ func (m *GetRoleRequest) Reset()         { *m = GetRoleRequest{} }
 func (m *GetRoleRequest) String() string { return proto.CompactTextString(m) }
 func (*GetRoleRequest) ProtoMessage()    {}
 func (*GetRoleRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{1}
+	return fileDescriptor_role_431534329fed7a68, []int{2}
 }
 func (m *GetRoleRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -188,7 +280,7 @@ func (m *GetRoleResponse) Reset()         { *m = GetRoleResponse{} }
 func (m *GetRoleResponse) String() string { return proto.CompactTextString(m) }
 func (*GetRoleResponse) ProtoMessage()    {}
 func (*GetRoleResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{2}
+	return fileDescriptor_role_431534329fed7a68, []int{3}
 }
 func (m *GetRoleResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -232,7 +324,7 @@ func (m *SetRoleRequest) Reset()         { *m = SetRoleRequest{} }
 func (m *SetRoleRequest) String() string { return proto.CompactTextString(m) }
 func (*SetRoleRequest) ProtoMessage()    {}
 func (*SetRoleRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{3}
+	return fileDescriptor_role_431534329fed7a68, []int{4}
 }
 func (m *SetRoleRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -275,7 +367,7 @@ func (m *SetRoleResponse) Reset()         { *m = SetRoleResponse{} }
 func (m *SetRoleResponse) String() string { return proto.CompactTextString(m) }
 func (*SetRoleResponse) ProtoMessage()    {}
 func (*SetRoleResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{4}
+	return fileDescriptor_role_431534329fed7a68, []int{5}
 }
 func (m *SetRoleResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -305,15 +397,15 @@ func (m *SetRoleResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_SetRoleResponse proto.InternalMessageInfo
 
 type UpdateRoleRequest struct {
-	Id   string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Role *Role  `protobuf:"bytes,2,opt,name=role" json:"role,omitempty"`
+	Id   string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Role *RoleUpdate `protobuf:"bytes,2,opt,name=role" json:"role,omitempty"`
 }
 
 func (m *UpdateRoleRequest) Reset()         { *m = UpdateRoleRequest{} }
 func (m *UpdateRoleRequest) String() string { return proto.CompactTextString(m) }
 func (*UpdateRoleRequest) ProtoMessage()    {}
 func (*UpdateRoleRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{5}
+	return fileDescriptor_role_431534329fed7a68, []int{6}
 }
 func (m *UpdateRoleRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -349,7 +441,7 @@ func (m *UpdateRoleRequest) GetId() string {
 	return ""
 }
 
-func (m *UpdateRoleRequest) GetRole() *Role {
+func (m *UpdateRoleRequest) GetRole() *RoleUpdate {
 	if m != nil {
 		return m.Role
 	}
@@ -363,7 +455,7 @@ func (m *UpdateRoleResponse) Reset()         { *m = UpdateRoleResponse{} }
 func (m *UpdateRoleResponse) String() string { return proto.CompactTextString(m) }
 func (*UpdateRoleResponse) ProtoMessage()    {}
 func (*UpdateRoleResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_role_c1d9a9163390fc31, []int{6}
+	return fileDescriptor_role_431534329fed7a68, []int{7}
 }
 func (m *UpdateRoleResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -392,14 +484,105 @@ func (m *UpdateRoleResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_UpdateRoleResponse proto.InternalMessageInfo
 
+type DeleteRoleRequest struct {
+	Id      string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GuildId string `protobuf:"bytes,2,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+}
+
+func (m *DeleteRoleRequest) Reset()         { *m = DeleteRoleRequest{} }
+func (m *DeleteRoleRequest) String() string { return proto.CompactTextString(m) }
+func (*DeleteRoleRequest) ProtoMessage()    {}
+func (*DeleteRoleRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_role_431534329fed7a68, []int{8}
+}
+func (m *DeleteRoleRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeleteRoleRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeleteRoleRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *DeleteRoleRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteRoleRequest.Merge(dst, src)
+}
+func (m *DeleteRoleRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeleteRoleRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteRoleRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteRoleRequest proto.InternalMessageInfo
+
+func (m *DeleteRoleRequest) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *DeleteRoleRequest) GetGuildId() string {
+	if m != nil {
+		return m.GuildId
+	}
+	return ""
+}
+
+type DeleteRoleResponse struct {
+}
+
+func (m *DeleteRoleResponse) Reset()         { *m = DeleteRoleResponse{} }
+func (m *DeleteRoleResponse) String() string { return proto.CompactTextString(m) }
+func (*DeleteRoleResponse) ProtoMessage()    {}
+func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_role_431534329fed7a68, []int{9}
+}
+func (m *DeleteRoleResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeleteRoleResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeleteRoleResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *DeleteRoleResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteRoleResponse.Merge(dst, src)
+}
+func (m *DeleteRoleResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeleteRoleResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteRoleResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteRoleResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*Role)(nil), "state.Role")
+	proto.RegisterType((*RoleUpdate)(nil), "state.RoleUpdate")
 	proto.RegisterType((*GetRoleRequest)(nil), "state.GetRoleRequest")
 	proto.RegisterType((*GetRoleResponse)(nil), "state.GetRoleResponse")
 	proto.RegisterType((*SetRoleRequest)(nil), "state.SetRoleRequest")
 	proto.RegisterType((*SetRoleResponse)(nil), "state.SetRoleResponse")
 	proto.RegisterType((*UpdateRoleRequest)(nil), "state.UpdateRoleRequest")
 	proto.RegisterType((*UpdateRoleResponse)(nil), "state.UpdateRoleResponse")
+	proto.RegisterType((*DeleteRoleRequest)(nil), "state.DeleteRoleRequest")
+	proto.RegisterType((*DeleteRoleResponse)(nil), "state.DeleteRoleResponse")
 }
 func (m *Role) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -428,6 +611,75 @@ func (m *Role) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintRole(dAtA, i, uint64(len(m.GuildId)))
 		i += copy(dAtA[i:], m.GuildId)
 	}
+	if len(m.Name) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(len(m.Name)))
+		i += copy(dAtA[i:], m.Name)
+	}
+	if m.Managed {
+		dAtA[i] = 0x20
+		i++
+		if m.Managed {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.Mentionable {
+		dAtA[i] = 0x28
+		i++
+		if m.Mentionable {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.Hoist {
+		dAtA[i] = 0x30
+		i++
+		if m.Hoist {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.Color != 0 {
+		dAtA[i] = 0x38
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(m.Color))
+	}
+	if m.Position != 0 {
+		dAtA[i] = 0x40
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(m.Position))
+	}
+	if m.Permissions != 0 {
+		dAtA[i] = 0x48
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(m.Permissions))
+	}
+	return i, nil
+}
+
+func (m *RoleUpdate) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RoleUpdate) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
 	if m.Name != nil {
 		dAtA[i] = 0x1a
 		i++
@@ -657,6 +909,54 @@ func (m *UpdateRoleResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *DeleteRoleRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteRoleRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if len(m.GuildId) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintRole(dAtA, i, uint64(len(m.GuildId)))
+		i += copy(dAtA[i:], m.GuildId)
+	}
+	return i, nil
+}
+
+func (m *DeleteRoleResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteRoleResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
 func encodeVarintRole(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -680,6 +980,37 @@ func (m *Role) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovRole(uint64(l))
 	}
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRole(uint64(l))
+	}
+	if m.Managed {
+		n += 2
+	}
+	if m.Mentionable {
+		n += 2
+	}
+	if m.Hoist {
+		n += 2
+	}
+	if m.Color != 0 {
+		n += 1 + sovRole(uint64(m.Color))
+	}
+	if m.Position != 0 {
+		n += 1 + sovRole(uint64(m.Position))
+	}
+	if m.Permissions != 0 {
+		n += 1 + sovRole(uint64(m.Permissions))
+	}
+	return n
+}
+
+func (m *RoleUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	if m.Name != nil {
 		l = m.Name.Size()
 		n += 1 + l + sovRole(uint64(l))
@@ -781,6 +1112,32 @@ func (m *UpdateRoleRequest) Size() (n int) {
 }
 
 func (m *UpdateRoleResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *DeleteRoleRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovRole(uint64(l))
+	}
+	l = len(m.GuildId)
+	if l > 0 {
+		n += 1 + l + sovRole(uint64(l))
+	}
+	return n
+}
+
+func (m *DeleteRoleResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -893,6 +1250,202 @@ func (m *Role) Unmarshal(dAtA []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
 			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRole
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Managed", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Managed = bool(v != 0)
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mentionable", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Mentionable = bool(v != 0)
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hoist", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Hoist = bool(v != 0)
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Color", wireType)
+			}
+			m.Color = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Color |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Position", wireType)
+			}
+			m.Position = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Position |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Permissions", wireType)
+			}
+			m.Permissions = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Permissions |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRole(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRole
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RoleUpdate) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRole
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RoleUpdate: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RoleUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
@@ -916,7 +1469,7 @@ func (m *Role) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Name == nil {
-				m.Name = &StringValue{}
+				m.Name = &BytesValue{}
 			}
 			if err := m.Name.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -1550,7 +2103,7 @@ func (m *UpdateRoleRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Role == nil {
-				m.Role = &Role{}
+				m.Role = &RoleUpdate{}
 			}
 			if err := m.Role.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -1604,6 +2157,164 @@ func (m *UpdateRoleResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: UpdateRoleResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRole(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRole
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteRoleRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRole
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteRoleRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteRoleRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRole
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GuildId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRole
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRole
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GuildId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRole(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRole
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteRoleResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRole
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteRoleResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteRoleResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -1732,31 +2443,36 @@ var (
 	ErrIntOverflowRole   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("role.proto", fileDescriptor_role_c1d9a9163390fc31) }
+func init() { proto.RegisterFile("role.proto", fileDescriptor_role_431534329fed7a68) }
 
-var fileDescriptor_role_c1d9a9163390fc31 = []byte{
-	// 367 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x92, 0x4f, 0x6b, 0xdb, 0x30,
-	0x18, 0xc6, 0x63, 0xcf, 0xce, 0x9f, 0xd7, 0xe0, 0x2c, 0x62, 0x07, 0x6d, 0x0c, 0x2f, 0xf8, 0x90,
-	0x85, 0xc1, 0x02, 0x73, 0x8e, 0xbb, 0x85, 0xc1, 0xc8, 0xd5, 0xa1, 0x3d, 0xf4, 0x52, 0x94, 0xfa,
-	0x25, 0x15, 0xd8, 0x92, 0x6a, 0x29, 0xf4, 0x6b, 0xf4, 0x63, 0xf5, 0x98, 0x63, 0x8f, 0x25, 0xb9,
-	0xf7, 0x33, 0x94, 0xc8, 0x4e, 0x48, 0x0e, 0x6e, 0xe9, 0x51, 0xef, 0xf3, 0x7b, 0x9e, 0x47, 0xbc,
-	0x12, 0x40, 0x29, 0x73, 0x9c, 0xa8, 0x52, 0x1a, 0x49, 0x7c, 0x6d, 0x98, 0xc1, 0x6f, 0xe1, 0x7d,
-	0xc9, 0x94, 0xc2, 0x52, 0x57, 0xe3, 0xf8, 0xc5, 0x05, 0x2f, 0x95, 0x39, 0x92, 0x10, 0x5c, 0x9e,
-	0x51, 0x67, 0xe8, 0x8c, 0x7b, 0xa9, 0xcb, 0x33, 0xf2, 0x15, 0xba, 0xab, 0x35, 0xcf, 0xb3, 0x6b,
-	0x9e, 0x51, 0xd7, 0x4e, 0x3b, 0xf6, 0x3c, 0xcf, 0xc8, 0x08, 0x3c, 0xc1, 0x0a, 0xa4, 0x9f, 0x86,
-	0xce, 0x38, 0x48, 0xc8, 0xc4, 0x26, 0x4f, 0x16, 0xa6, 0xe4, 0x62, 0x75, 0xc9, 0xf2, 0x35, 0xa6,
-	0x56, 0x27, 0xbf, 0xa0, 0x53, 0x30, 0xc1, 0x56, 0x98, 0x51, 0xcf, 0xa2, 0x9f, 0x6b, 0x74, 0x26,
-	0x65, 0x5e, 0x81, 0x07, 0x80, 0x24, 0x10, 0x14, 0x28, 0x0c, 0x97, 0x82, 0x2d, 0x73, 0xa4, 0x7e,
-	0x03, 0x7f, 0x0a, 0x91, 0x11, 0xf8, 0xb7, 0x92, 0x6b, 0x43, 0xdb, 0x0d, 0x74, 0x25, 0x93, 0x9f,
-	0xe0, 0xdf, 0xc8, 0x5c, 0x96, 0xb4, 0x63, 0xb9, 0x41, 0xcd, 0xcd, 0x85, 0x99, 0x26, 0x35, 0x68,
-	0x75, 0xf2, 0x1b, 0xba, 0x4a, 0x6a, 0xbe, 0x2f, 0xa0, 0xdd, 0x26, 0xf6, 0x88, 0x90, 0x29, 0x04,
-	0x0a, 0xcb, 0x82, 0x6b, 0xcd, 0xa5, 0xd0, 0xb4, 0xd7, 0xe4, 0x38, 0xa5, 0xe2, 0xbf, 0x10, 0xfe,
-	0x47, 0xb3, 0x5f, 0x79, 0x8a, 0x77, 0x6b, 0xd4, 0xe6, 0x03, 0x9b, 0x8f, 0x13, 0xe8, 0x1f, 0xcd,
-	0x5a, 0x49, 0xa1, 0x91, 0xfc, 0x00, 0x6f, 0xff, 0xca, 0xd6, 0x1f, 0x24, 0x41, 0xdd, 0x6e, 0x11,
-	0x2b, 0xc4, 0x7f, 0x20, 0x5c, 0x9c, 0x17, 0xbe, 0x6b, 0x19, 0x40, 0x7f, 0x71, 0x5e, 0x13, 0xff,
-	0x83, 0xc1, 0x85, 0xca, 0x98, 0xc1, 0xb7, 0x6e, 0x7e, 0x08, 0x76, 0x9b, 0x82, 0xbf, 0x00, 0x39,
-	0x4d, 0xa9, 0xb2, 0x67, 0xdf, 0x1f, 0xb7, 0x91, 0xb3, 0xd9, 0x46, 0xce, 0xf3, 0x36, 0x72, 0x1e,
-	0x76, 0x51, 0x6b, 0xb3, 0x8b, 0x5a, 0x4f, 0xbb, 0xa8, 0x75, 0xe5, 0xaa, 0xe5, 0xb2, 0x6d, 0x3f,
-	0xea, 0xf4, 0x35, 0x00, 0x00, 0xff, 0xff, 0x82, 0xf2, 0xfc, 0x37, 0xcd, 0x02, 0x00, 0x00,
+var fileDescriptor_role_431534329fed7a68 = []byte{
+	// 444 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x53, 0x41, 0x8b, 0xd3, 0x40,
+	0x14, 0xee, 0xc4, 0x76, 0xdb, 0x7d, 0x81, 0xae, 0x19, 0x7a, 0x18, 0x17, 0x89, 0x21, 0xb0, 0x5a,
+	0x04, 0x0b, 0xa6, 0x47, 0xc1, 0xc3, 0x22, 0xc8, 0x7a, 0xcc, 0xa2, 0x07, 0x2f, 0x32, 0x35, 0x8f,
+	0x75, 0x60, 0x92, 0x19, 0x33, 0x53, 0xc4, 0x7f, 0xe1, 0xcf, 0xda, 0xe3, 0x1e, 0x3d, 0x4a, 0x7b,
+	0xf4, 0x4f, 0x48, 0x26, 0xd9, 0x36, 0xb1, 0xa1, 0xe2, 0xad, 0xef, 0xbd, 0xef, 0x7b, 0xdf, 0x7c,
+	0x5f, 0x5f, 0x00, 0x4a, 0x25, 0x71, 0xa1, 0x4b, 0x65, 0x15, 0x1d, 0x19, 0xcb, 0x2d, 0x9e, 0x4f,
+	0xbf, 0x95, 0x5c, 0x6b, 0x2c, 0x4d, 0xdd, 0x8e, 0x7f, 0x13, 0x18, 0xa6, 0x4a, 0x22, 0x9d, 0x82,
+	0x27, 0x32, 0x46, 0x22, 0x32, 0x3f, 0x4d, 0x3d, 0x91, 0xd1, 0x47, 0x30, 0xb9, 0x59, 0x0b, 0x99,
+	0x7d, 0x12, 0x19, 0xf3, 0x5c, 0x77, 0xec, 0xea, 0xab, 0x8c, 0x52, 0x18, 0x16, 0x3c, 0x47, 0xf6,
+	0xc0, 0xb5, 0xdd, 0x6f, 0xca, 0x60, 0x9c, 0xf3, 0x82, 0xdf, 0x60, 0xc6, 0x86, 0x11, 0x99, 0x4f,
+	0xd2, 0xfb, 0x92, 0x46, 0xe0, 0xe7, 0x58, 0x58, 0xa1, 0x0a, 0xbe, 0x92, 0xc8, 0x46, 0x6e, 0xda,
+	0x6e, 0xd1, 0x19, 0x8c, 0xbe, 0x28, 0x61, 0x2c, 0x3b, 0x71, 0xb3, 0xba, 0xa8, 0xba, 0x9f, 0x95,
+	0x54, 0x25, 0x1b, 0x47, 0x64, 0x3e, 0x4a, 0xeb, 0x82, 0x9e, 0xc3, 0x44, 0x2b, 0x23, 0x2a, 0x2e,
+	0x9b, 0xb8, 0xc1, 0xae, 0xae, 0x94, 0x34, 0x96, 0xb9, 0x30, 0x46, 0xa8, 0xc2, 0xb0, 0x53, 0x37,
+	0x6e, 0xb7, 0xe2, 0x5b, 0x0f, 0xa0, 0x72, 0xfb, 0x5e, 0x67, 0xdc, 0x22, 0xbd, 0x68, 0x19, 0xf1,
+	0x93, 0x60, 0xe1, 0x22, 0x5a, 0x5c, 0x7e, 0xb7, 0x68, 0x3e, 0x70, 0xb9, 0xc6, 0xc6, 0xdb, 0xf3,
+	0xae, 0x37, 0x3f, 0x79, 0x78, 0x8f, 0x54, 0x4a, 0xd6, 0xc0, 0x9d, 0xdb, 0xe4, 0xd0, 0x6d, 0x1f,
+	0xbe, 0xe3, 0xff, 0x69, 0xdb, 0x7f, 0x1f, 0xba, 0x49, 0xe4, 0x59, 0x3b, 0x91, 0xfd, 0x7b, 0xaf,
+	0x0a, 0xbb, 0x4c, 0x1a, 0x60, 0x1d, 0xd2, 0x8b, 0xbf, 0x42, 0xea, 0xc5, 0xee, 0x73, 0x5b, 0x1e,
+	0xe6, 0xd6, 0xcb, 0xe8, 0x44, 0xf9, 0x0a, 0xa6, 0x6f, 0xd1, 0x56, 0x61, 0xa6, 0xf8, 0x75, 0x8d,
+	0xc6, 0xfe, 0xc7, 0x05, 0xc5, 0x09, 0x9c, 0xed, 0xc8, 0x46, 0xab, 0xc2, 0x20, 0x7d, 0x02, 0xc3,
+	0xea, 0x5a, 0x1d, 0xdf, 0x4f, 0xfc, 0x46, 0xdd, 0x41, 0xdc, 0x20, 0x7e, 0x09, 0xd3, 0xeb, 0xae,
+	0xe0, 0x3f, 0x29, 0x01, 0x9c, 0x5d, 0x77, 0x65, 0xe2, 0x77, 0x10, 0xd4, 0x7f, 0xfe, 0xb1, 0x97,
+	0x5f, 0x34, 0x8b, 0xbd, 0x4e, 0x12, 0xfb, 0xc3, 0x69, 0xd6, 0xcf, 0x80, 0xb6, 0x77, 0x35, 0x0a,
+	0xaf, 0x21, 0x78, 0x83, 0x12, 0x8f, 0x2b, 0x1c, 0xc9, 0x66, 0x06, 0xb4, 0xcd, 0xaf, 0xb7, 0x5e,
+	0x3e, 0xbe, 0xdd, 0x84, 0xe4, 0x6e, 0x13, 0x92, 0x5f, 0x9b, 0x90, 0xfc, 0xd8, 0x86, 0x83, 0xbb,
+	0x6d, 0x38, 0xf8, 0xb9, 0x0d, 0x07, 0x1f, 0x3d, 0xbd, 0x5a, 0x9d, 0xb8, 0x8f, 0x79, 0xf9, 0x27,
+	0x00, 0x00, 0xff, 0xff, 0x0f, 0x41, 0x11, 0xad, 0xf1, 0x03, 0x00, 0x00,
 }

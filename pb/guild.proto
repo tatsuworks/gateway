@@ -13,20 +13,41 @@ message Guild {
 	}
 
 	string id = 1;
-	BytesValue name = 2;
-	BytesValue icon = 3;
-	BytesValue region = 4;
-	BytesValue afk_channel_id = 5;
-	BytesValue embed_channel_id = 6;
-	BytesValue owner_id = 7;
-	BytesValue joined_at = 8;
-	BytesValue splash = 9;
-	Int32Value afk_timeout = 10;
-	Int32Value member_count = 11;
+	string name = 2;
+	string icon = 3;
+	string region = 4;
+	string afk_channel_id = 5;
+	string embed_channel_id = 6;
+	string owner_id = 7;
+	string joined_at = 8;
+	string splash = 9;
+	int32 afk_timeout = 10;
+	int32 member_count = 11;
 	VerificationLevel verification_level = 12;
-	BoolValue embed_enabled = 13;
-	BoolValue large = 14;
-	Int32Value default_message_notifications = 15;
+	bool embed_enabled = 13;
+	bool large = 14;
+	int32 default_message_notifications = 15;
+}
+
+message GuildUpdate {
+	message VerificationModification {
+		Guild.VerificationLevel level = 1;
+	}
+
+	StringValue name = 1;
+	StringValue icon = 2;
+	StringValue region = 3;
+	StringValue afk_channel_id = 4;
+	StringValue embed_channel_id = 5;
+	StringValue owner_id = 6;
+	StringValue joined_at = 7;
+	StringValue splash = 8;
+	Int32Value afk_timeout = 9;
+	Int32Value member_count = 10;
+	VerificationModification verification_level = 11;
+	BoolValue embed_enabled = 12;
+	BoolValue large = 13;
+	Int32Value default_message_notifications = 14;
 }
 
 message GetGuildRequest {
@@ -41,6 +62,10 @@ message SetGuildRequest {
 message SetGuildResponse {}
 message UpdateGuildRequest {
 	string id = 1;
-	Guild guild = 2;
+	GuildUpdate guild = 2;
 }
 message UpdateGuildResponse {}
+message DeleteGuildRequest {
+	string id = 1;
+}
+message DeleteGuildResponse {}

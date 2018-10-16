@@ -6,14 +6,25 @@ import "wrappers.proto";
 
 message User {
 	string id = 1;
-	BytesValue email = 2;
-	BytesValue username = 3;
-	BytesValue avatar = 4;
-	BytesValue discriminator = 5;
-	BytesValue token = 6;
-	BoolValue verified = 7;
-	BoolValue mfa_enabled = 8;
-	BoolValue bot = 9;
+	string email = 2;
+	string username = 3;
+	string avatar = 4;
+	string discriminator = 5;
+	string token = 6;
+	string verified = 7;
+	bool mfa_enabled = 8;
+	bool bot = 9;
+}
+
+message UserUpdate {
+	BytesValue email = 1;
+	BytesValue username = 2;
+	BytesValue avatar = 3;
+	BytesValue discriminator = 4;
+	BytesValue token = 5;
+	BoolValue verified = 6;
+	BoolValue mfa_enabled = 7;
+	BoolValue bot = 8;
 }
 
 message GetUserRequest {
@@ -28,6 +39,10 @@ message SetUserRequest {
 message SetUserResponse {}
 message UpdateUserRequest {
 	string id = 1;
-	User user = 2;
+	UserUpdate user = 2;
 }
 message UpdateUserResponse {}
+message DeleteUserRequest {
+	string id = 1;
+}
+message DeleteUserResponse {}

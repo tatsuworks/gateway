@@ -7,11 +7,25 @@ import "wrappers.proto";
 message Member {
 	string user_id = 1;
 	string guild_id = 2;
-	BytesValue JoinedAt = 3;
-	BytesValue nick = 4;
-	BoolValue deaf = 5;
-	BoolValue mute = 6;
+	string JoinedAt = 3;
+	string nick = 4;
+	bool deaf = 5;
+	bool mute = 6;
 	repeated string roles = 7;
+}
+
+message MemberUpdate {
+	message RoleModification {
+		oneof Modification {
+			string role_add = 1;
+			string role_remove = 2;
+		}
+	}
+
+	BytesValue nick = 1;
+	BoolValue deaf = 2;
+	BoolValue mute = 3;
+	repeated RoleModification roles = 4;
 }
 
 message GetMemberRequest {
@@ -27,6 +41,12 @@ message SetMemberRequest {
 message SetMemberResponse {}
 message UpdateMemberRequest {
 	string user_id = 1;
-	Member member = 2;
+	string guild_id = 2;
+	MemberUpdate member = 3;
 }
 message UpdateMemberResponse {}
+message DeleteMemberRequest {
+	string user_id = 1;
+	string guild_id = 2;
+}
+message DeleteMemberResponse {}

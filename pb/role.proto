@@ -7,6 +7,16 @@ import "wrappers.proto";
 message Role {
     string id = 1;
     string guild_id = 2;
+    string name = 3;
+    bool managed = 4;
+    bool mentionable = 5;
+    bool hoist = 6;
+    int32 color = 7;
+    int32 position = 8;
+    int32 permissions = 9;
+}
+
+message RoleUpdate {
     BytesValue name = 3;
     BoolValue managed = 4;
     BoolValue mentionable = 5;
@@ -29,6 +39,11 @@ message SetRoleRequest {
 message SetRoleResponse {}
 message UpdateRoleRequest {
     string id = 1;
-    Role role = 2;
+    RoleUpdate role = 2;
 }
 message UpdateRoleResponse {}
+message DeleteRoleRequest {
+    string id = 1;
+    string guild_id = 2;
+}
+message DeleteRoleResponse {}

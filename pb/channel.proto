@@ -5,7 +5,7 @@ option go_package = "pb";
 import "wrappers.proto";
 
 message Channel {
-	enum channel_type {
+	enum Type {
 		GUILD_TEXT = 0;
 		DM = 1;
 		GUILD_VOICE = 2;
@@ -24,11 +24,44 @@ message Channel {
 	string guild_id = 2;
 	BytesValue name = 3;
 	StringValue topic = 4;
-	BoolValue nsfw = 5;
-	Int32Value position = 6;
-	Int32Value bitrate = 7;
-	repeated PermissionOverwrite overwrites = 8;
-	StringValue parent_id = 9;
+	Type type = 5;
+	BoolValue nsfw = 6;
+	Int32Value position = 7;
+	Int32Value bitrate = 8;
+	repeated PermissionOverwrite overwrites = 9;
+	StringValue parent_id = 10;
+}
+
+message ChannelUpdate {
+	message PermissionOverwriteUpdate {
+		message Set {
+			StringValue id = 1;
+			StringValue type = 2;
+			Int32Value deny = 3;
+			Int32Value allow = 4;
+		}
+		message Delete {
+			string id = 1;
+		}
+
+		oneof op {
+			Set set = 1;
+			Delete del = 2;
+		}
+	}
+
+	message TypeModification {
+		Channel.Type type = 1;
+	}
+
+	BytesValue name = 1;
+	StringValue topic = 2;
+	Channel.Type type = 3;
+	BoolValue nsfw = 4;
+	Int32Value position = 5;
+	Int32Value bitrate = 6;
+	repeated PermissionOverwriteUpdate overwrites = 7;
+	StringValue parent_id = 8;
 }
 
 message GetChannelRequest {
@@ -45,6 +78,11 @@ message SetChannelResponse {}
 message UpdateChannelRequest {
 	string id = 1;
 	string guild_id = 2;
-	Channel channel = 3;
+	ChannelUpdate channel = 3;
 }
 message UpdateChannelResponse {}
+message DeleteChannelRequest {
+	string id = 1;
+	string guild_id = 2;
+}
+message DeleteChannelResponse {}

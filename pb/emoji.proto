@@ -14,6 +14,20 @@ message Emoji {
 	BoolValue animated = 7;
 }
 
+message EmojiUpdate {
+	message EmojiRoleUpdate {
+		oneof Modification {
+			string add_role = 1;
+			string del_role = 2;
+		}
+	}
+
+	StringValue name = 1;
+	repeated EmojiRoleUpdate roles = 2;
+	BoolValue managed = 3;
+	BoolValue require_colons = 4;
+}
+
 message GetEmojiRequest {
 	string id = 1;
 	string guild_id = 2;
@@ -27,6 +41,12 @@ message SetEmojiRequest {
 message SetEmojiResponse {}
 message UpdateEmojiRequest {
 	string id = 1;
-	Emoji emoji = 2;
+	string guild_id = 2;
+	EmojiUpdate emoji = 3;
 }
 message UpdateEmojiResponse {}
+message DeleteEmojiRequest {
+	string id = 1;
+	string guild_id = 2;
+}
+message DeleteEmojiResponse {}

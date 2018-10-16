@@ -4,6 +4,12 @@ option go_package = "pb";
 
 import "wrappers.proto";
 
+message ChannelPermissionOverwrite {
+	string id = 1;
+	string type = 2;
+	int32 deny = 3;
+	int32 allow = 4;
+}
 message Channel {
 	enum Type {
 		GUILD_TEXT = 0;
@@ -11,13 +17,6 @@ message Channel {
 		GUILD_VOICE = 2;
 		GROUP_DM = 3;
 		GUILD_CATEGORY = 4;
-	}
-
-	message PermissionOverwrite {
-		string id = 1;
-		string type = 2;
-		int32 deny = 3;
-		int32 allow = 4;
 	}
 
 	string id = 1;
@@ -28,40 +27,18 @@ message Channel {
 	bool nsfw = 6;
 	int32 position = 7;
 	int32 bitrate = 8;
-	repeated PermissionOverwrite overwrites = 9;
-	int32 parent_id = 10;
+	repeated ChannelPermissionOverwrite overwrites = 9;
+	string parent_id = 10;
 }
 
 message ChannelUpdate {
-	message PermissionOverwriteUpdate {
-		message Set {
-			string id = 1;
-			StringValue type = 2;
-			Int32Value deny = 3;
-			Int32Value allow = 4;
-		}
-		message Delete {
-			string id = 1;
-		}
-
-		oneof op {
-			Set set = 1;
-			Delete del = 2;
-		}
-	}
-
-	message TypeModification {
-		Channel.Type type = 1;
-	}
-
-	BytesValue name = 1;
+	StringValue name = 1;
 	StringValue topic = 2;
-	Channel.Type type = 3;
-	BoolValue nsfw = 4;
-	Int32Value position = 5;
-	Int32Value bitrate = 6;
-	repeated PermissionOverwriteUpdate overwrites = 7;
-	StringValue parent_id = 8;
+	BoolValue nsfw = 3;
+	Int32Value position = 4;
+	Int32Value bitrate = 5;
+	repeated ChannelPermissionOverwrite overwrites = 6;
+	StringValue parent_id = 7;
 }
 
 message GetChannelRequest {

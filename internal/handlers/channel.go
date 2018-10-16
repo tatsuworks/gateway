@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 
 	"git.friday.cafe/fndevs/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -42,10 +43,13 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 		return nil, err
 	}
 
-	s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtChannelKey(req.Channel.GuildId, req.Channel.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
@@ -54,7 +58,7 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest) (*pb.UpdateChannelResponse, error) {
 	ch := new(pb.Channel)
 
-	s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 
 		err := ch.Unmarshal(raw)
@@ -62,7 +66,28 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 			return nil, err
 		}
 
-		// TODO unmarshal req.Channel into ch
+		if req.Channel.Name != nil {
+			ch.Name = req.Channel.Name.Value
+		}
+		if req.Channel.Topic != nil {
+			ch.Topic = req.Channel.Topic.Value
+		}
+		if req.Channel.Nsfw != nil {
+			ch.Nsfw = req.Channel.Nsfw.Value
+		}
+		if req.Channel.Position != nil {
+			ch.Position = req.Channel.Position.Value
+		}
+		if req.Channel.Bitrate != nil {
+			ch.Bitrate = req.Channel.Bitrate.Value
+		}
+		fmt.Println(req.Channel.Overwrites)
+		if req.Channel.Overwrites != nil { // TODO is this nilable
+			ch.Overwrites = req.Channel.Overwrites
+		}
+		if req.Channel.ParentId != nil {
+			ch.ParentId = req.Channel.ParentId.Value
+		}
 
 		raw, err = ch.Marshal()
 		if err != nil {
@@ -72,6 +97,23 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 		tx.Set(s.fmtChannelKey(ch.GuildId, ch.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+// DeleteChannel is the handler for deleting a channel from the state.
+func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest) (*pb.DeleteChannelResponse, error) {
+
+	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+		tx.Clear(s.fmtChannelKey(req.GuildId, req.Id))
+		return nil, nil
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }

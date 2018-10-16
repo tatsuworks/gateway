@@ -22,14 +22,14 @@ message Channel {
 
 	string id = 1;
 	string guild_id = 2;
-	BytesValue name = 3;
-	StringValue topic = 4;
+	string name = 3;
+	string topic = 4;
 	Type type = 5;
-	BoolValue nsfw = 6;
-	Int32Value position = 7;
-	Int32Value bitrate = 8;
+	bool nsfw = 6;
+	int32 position = 7;
+	int32 bitrate = 8;
 	repeated PermissionOverwrite overwrites = 9;
-	StringValue parent_id = 10;
+	int32 parent_id = 10;
 }
 
 message ChannelUpdate {

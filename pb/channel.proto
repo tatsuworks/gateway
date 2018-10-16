@@ -35,7 +35,7 @@ message Channel {
 message ChannelUpdate {
 	message PermissionOverwriteUpdate {
 		message Set {
-			StringValue id = 1;
+			string id = 1;
 			StringValue type = 2;
 			Int32Value deny = 3;
 			Int32Value allow = 4;

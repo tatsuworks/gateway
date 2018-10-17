@@ -49,5 +49,6 @@ message UpdateMessageResponse {}
 message DeleteMessageRequest {
 	string id = 1;
 	string channel_id = 2;
+	string guild_id = 3;
 }
 message DeleteMessageResponse {}

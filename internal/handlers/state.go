@@ -1,11 +1,17 @@
 package state
 
 import (
+	"context"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"git.friday.cafe/fndevs/state/pb"
 )
@@ -75,5 +81,29 @@ func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 		Messages: dir.Sub(MessageSubspaceName),
 		Users:    dir.Sub(UserSubspaceName),
 		Roles:    dir.Sub(RoleSubspaceName),
+	}
+}
+
+func RequiredFieldsInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if t, ok := req.(interface{ GetId() string }); ok {
+			if t.GetId() == "" {
+				return nil, status.Error(codes.InvalidArgument, "id must not be empty")
+			}
+		}
+
+		if t, ok := req.(interface{ GetGuildId() string }); ok {
+			if t.GetGuildId() == "" {
+				return nil, status.Error(codes.InvalidArgument, "guild_id must not be empty")
+			}
+		}
+
+		if t, ok := req.(interface{ GetChannelId() string }); ok {
+			if t.GetChannelId() == "" {
+				return nil, status.Error(codes.InvalidArgument, "channel_id must not be empty")
+			}
+		}
+
+		return handler(ctx, req)
 	}
 }

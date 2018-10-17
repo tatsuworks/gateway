@@ -15,12 +15,8 @@ message Emoji {
 }
 
 message EmojiUpdate {
-	message EmojiRolesUpdate {
-		repeated string value = 1;
-	}
-
 	StringValue name = 1;
-	EmojiRolesUpdate roles = 2;
+	repeated string roles = 2;
 	BoolValue managed = 3;
 	BoolValue require_colons = 4;
 }

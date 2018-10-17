@@ -15,15 +15,11 @@ message Member {
 }
 
 message MemberUpdate {
-	message RolesUpdate {
-		repeated string value = 1;
-	}
-
 	StringValue joined_at = 1;
 	StringValue nick = 2;
 	BoolValue deaf = 3;
 	BoolValue mute = 4;
-	RolesUpdate roles = 5;
+	repeated string roles = 5;
 }
 
 message GetMemberRequest {

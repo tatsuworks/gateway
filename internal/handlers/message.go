@@ -50,9 +50,43 @@ func (s *Server) SetMessage(ctx context.Context, req *pb.SetMessageRequest) (*pb
 }
 
 func (s *Server) UpdateMessage(ctx context.Context, req *pb.UpdateMessageRequest) (*pb.UpdateMessageResponse, error) {
-	return nil, nil
+	msg := new(pb.Message)
+
+	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+		raw := tx.Get(s.fmtMessageKey(req.ChannelId, req.Id)).MustGet()
+
+		err := msg.Unmarshal(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		if req.Message.Content != nil {
+			msg.Content = req.Message.Content.Value
+		}
+		if req.Message.EditedTimestamp != nil {
+			msg.EditedTimestamp = req.Message.EditedTimestamp.Value
+		}
+		if req.Message.MentionRoles != nil {
+			msg.MentionRoles = req.Message.MentionRoles
+		}
+
+		raw, err = req.Message.Marshal()
+		if err != nil {
+			return nil, err
+		}
+
+		tx.Set(s.fmtMessageKey(req.ChannelId, req.Id), raw)
+		return nil, nil
+	})
+
+	return nil, err
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *pb.DeleteMessageRequest) (*pb.DeleteMessageResponse, error) {
-	return nil, nil
+	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+		tx.Clear(s.fmtMessageKey(req.ChannelId, req.Id))
+		return nil, nil
+	})
+
+	return nil, err
 }

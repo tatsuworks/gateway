@@ -41,12 +41,12 @@ func (s *Server) SetMember(ctx context.Context, req *pb.SetMemberRequest) (*pb.S
 		return nil, err
 	}
 
-	s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtMemberKey(req.Member.GuildId, req.Member.Id), raw)
 		return nil, nil
 	})
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) (*pb.UpdateMemberResponse, error) {
@@ -73,7 +73,7 @@ func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) 
 			m.Mute = req.Member.Mute.Value
 		}
 		if req.Member.Roles != nil {
-			m.Roles = req.Member.Roles.Value
+			m.Roles = req.Member.Roles
 		}
 
 		raw, err = req.Member.Marshal()
@@ -84,11 +84,8 @@ func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) 
 		tx.Set(s.fmtMemberKey(req.GuildId, req.Id), raw)
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) (*pb.DeleteMemberResponse, error) {
@@ -96,9 +93,6 @@ func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) 
 		tx.Clear(s.fmtMemberKey(req.GuildId, req.Id))
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }

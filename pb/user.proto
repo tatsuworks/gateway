@@ -11,17 +11,17 @@ message User {
 	string avatar = 4;
 	string discriminator = 5;
 	string token = 6;
-	string verified = 7;
+	bool verified = 7;
 	bool mfa_enabled = 8;
 	bool bot = 9;
 }
 
 message UserUpdate {
-	BytesValue email = 1;
-	BytesValue username = 2;
-	BytesValue avatar = 3;
-	BytesValue discriminator = 4;
-	BytesValue token = 5;
+	StringValue email = 1;
+	StringValue username = 2;
+	StringValue avatar = 3;
+	StringValue discriminator = 4;
+	StringValue token = 5;
 	BoolValue verified = 6;
 	BoolValue mfa_enabled = 7;
 	BoolValue bot = 8;

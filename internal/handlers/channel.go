@@ -45,11 +45,8 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 		tx.Set(s.fmtChannelKey(req.Channel.GuildId, req.Channel.Id), raw)
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest) (*pb.UpdateChannelResponse, error) {
@@ -79,7 +76,7 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 			ch.Bitrate = req.Channel.Bitrate.Value
 		}
 		if req.Channel.Overwrites != nil {
-			ch.Overwrites = req.Channel.Overwrites.Value
+			ch.Overwrites = req.Channel.Overwrites
 		}
 		if req.Channel.ParentId != nil {
 			ch.ParentId = req.Channel.ParentId.Value
@@ -93,11 +90,8 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 		tx.Set(s.fmtChannelKey(ch.GuildId, ch.Id), raw)
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest) (*pb.DeleteChannelResponse, error) {
@@ -105,9 +99,6 @@ func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest
 		tx.Clear(s.fmtChannelKey(req.GuildId, req.Id))
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }

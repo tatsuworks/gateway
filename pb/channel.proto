@@ -32,16 +32,12 @@ message Channel {
 }
 
 message ChannelUpdate {
-  message PermissionOverwritesUpdate {
-  	repeated Channel.PermissionOverwrite value = 1;
-  }
-
 	StringValue name = 1;
 	StringValue topic = 2;
 	BoolValue nsfw = 3;
 	Int32Value position = 4;
 	Int32Value bitrate = 5;
-	PermissionOverwritesUpdate overwrites = 6;
+	repeated Channel.PermissionOverwrite overwrites = 6;
 	StringValue parent_id = 7;
 }
 

@@ -41,12 +41,12 @@ func (s *Server) SetGuild(ctx context.Context, req *pb.SetGuildRequest) (*pb.Set
 		return nil, err
 	}
 
-	s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtGuildKey(req.Guild.Id), raw)
 		return nil, nil
 	})
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*pb.UpdateGuildResponse, error) {
@@ -111,11 +111,8 @@ func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*
 		tx.Set(s.fmtGuildKey(req.Id), raw)
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*pb.DeleteGuildResponse, error) {
@@ -123,9 +120,6 @@ func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*
 		tx.Clear(s.fmtGuildKey(req.Id))
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }

@@ -24,8 +24,8 @@ message Message {
 }
 
 message MessageUpdate {
-	BytesValue content = 1;
-	BytesValue edited_timestamp = 2;
+	StringValue content = 1;
+	StringValue edited_timestamp = 2;
 	repeated string mention_roles = 3;
 }
 

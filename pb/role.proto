@@ -17,7 +17,7 @@ message Role {
 }
 
 message RoleUpdate {
-    BytesValue name = 3;
+    StringValue name = 3;
     BoolValue managed = 4;
     BoolValue mentionable = 5;
     BoolValue hoist = 6;
@@ -39,7 +39,8 @@ message SetRoleRequest {
 message SetRoleResponse {}
 message UpdateRoleRequest {
     string id = 1;
-    RoleUpdate role = 2;
+    string guild_id = 2;
+    RoleUpdate role = 3;
 }
 message UpdateRoleResponse {}
 message DeleteRoleRequest {

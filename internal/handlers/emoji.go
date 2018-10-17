@@ -46,7 +46,7 @@ func (s *Server) SetEmoji(ctx context.Context, req *pb.SetEmojiRequest) (*pb.Set
 		return nil, nil
 	})
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) UpdateEmoji(ctx context.Context, req *pb.UpdateEmojiRequest) (*pb.UpdateEmojiResponse, error) {
@@ -64,7 +64,7 @@ func (s *Server) UpdateEmoji(ctx context.Context, req *pb.UpdateEmojiRequest) (*
 			em.Name = req.Emoji.Name.Value
 		}
 		if req.Emoji.Roles != nil {
-			em.Roles = req.Emoji.Roles.Value
+			em.Roles = req.Emoji.Roles
 		}
 		if req.Emoji.Managed != nil {
 			em.Managed = req.Emoji.Managed.Value
@@ -81,11 +81,8 @@ func (s *Server) UpdateEmoji(ctx context.Context, req *pb.UpdateEmojiRequest) (*
 		tx.Set(s.fmtEmojiKey(req.GuildId, req.Id), raw)
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }
 
 func (s *Server) DeleteEmoji(ctx context.Context, req *pb.DeleteEmojiRequest) (*pb.DeleteEmojiResponse, error) {
@@ -93,9 +90,6 @@ func (s *Server) DeleteEmoji(ctx context.Context, req *pb.DeleteEmojiRequest) (*
 		tx.Clear(s.fmtEmojiKey(req.GuildId, req.Id))
 		return nil, nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return nil, nil
+	return nil, err
 }

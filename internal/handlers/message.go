@@ -13,20 +13,6 @@ func (s *Server) fmtMessageKey(channel, message string) fdb.Key {
 	return s.Subs.Messages.Pack(tuple.Tuple{channel, message})
 }
 
-func (s *Server) SetMessage(ctx context.Context, req *pb.SetMessageRequest) (*pb.SetMessageResponse, error) {
-	raw, err := req.Message.Marshal()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
-		tx.Set(s.fmtMessageKey(req.Message.ChannelId, req.Message.Id), raw)
-		return nil, nil
-	})
-
-	return nil, err
-}
-
 func (s *Server) GetMessage(ctx context.Context, req *pb.GetMessageRequest) (*pb.GetMessageResponse, error) {
 	msg := new(pb.Message)
 
@@ -47,4 +33,26 @@ func (s *Server) GetMessage(ctx context.Context, req *pb.GetMessageRequest) (*pb
 	return &pb.GetMessageResponse{
 		Message: msg,
 	}, nil
+}
+
+func (s *Server) SetMessage(ctx context.Context, req *pb.SetMessageRequest) (*pb.SetMessageResponse, error) {
+	raw, err := req.Message.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+		tx.Set(s.fmtMessageKey(req.Message.ChannelId, req.Message.Id), raw)
+		return nil, nil
+	})
+
+	return nil, err
+}
+
+func (s *Server) UpdateMessage(ctx context.Context, req *pb.UpdateMessageRequest) (*pb.UpdateMessageResponse, error) {
+	return nil, nil
+}
+
+func (s *Server) DeleteMessage(ctx context.Context, req *pb.DeleteMessageRequest) (*pb.DeleteMessageResponse, error) {
+	return nil, nil
 }

@@ -13,6 +13,19 @@ func (s *Server) fmtRoleKey(guild, id string) fdb.Key {
 	return s.Subs.Roles.Pack(tuple.Tuple{guild, id})
 }
 
+func (s *Server) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.GetRoleResponse, error) {
+	r := new(pb.Role)
+
+	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
+		return nil, r.Unmarshal(raw)
+	})
+
+	return &pb.GetRoleResponse{
+		Role: r,
+	}, err
+}
+
 func (s *Server) SetRole(ctx context.Context, req *pb.SetRoleRequest) (*pb.SetRoleResponse, error) {
 	raw, err := req.Role.Marshal()
 	if err != nil {
@@ -27,15 +40,10 @@ func (s *Server) SetRole(ctx context.Context, req *pb.SetRoleRequest) (*pb.SetRo
 	return nil, err
 }
 
-func (s *Server) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.GetRoleResponse, error) {
-	r := new(pb.Role)
+func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
+	return nil, nil
+}
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
-		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
-		return nil, r.Unmarshal(raw)
-	})
-
-	return &pb.GetRoleResponse{
-		Role: r,
-	}, err
+func (s *Server) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
+	return nil, nil
 }

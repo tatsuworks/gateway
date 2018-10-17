@@ -13,7 +13,6 @@ func (s *Server) fmtChannelKey(guild, channel string) fdb.Key {
 	return s.Subs.Channels.Pack(tuple.Tuple{guild, channel})
 }
 
-// GetChannel is the handler for retrieving a channel from the state.
 func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb.GetChannelResponse, error) {
 	ch := new(pb.Channel)
 
@@ -36,7 +35,6 @@ func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb
 	}, nil
 }
 
-// SetChannel is the handler for setting a channel's state.
 func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb.SetChannelResponse, error) {
 	raw, err := req.Channel.Marshal()
 	if err != nil {
@@ -54,7 +52,6 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 	return nil, nil
 }
 
-// UpdateChannel is the handler for updating a channel's state.
 func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest) (*pb.UpdateChannelResponse, error) {
 	ch := new(pb.Channel)
 
@@ -104,9 +101,7 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 	return nil, nil
 }
 
-// DeleteChannel is the handler for deleting a channel from the state.
 func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest) (*pb.DeleteChannelResponse, error) {
-
 	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtChannelKey(req.GuildId, req.Id))
 		return nil, nil

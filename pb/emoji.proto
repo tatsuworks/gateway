@@ -9,21 +9,14 @@ message Emoji {
 	string guild_id = 2;
 	StringValue name = 3;
 	repeated string roles = 4;
-	BoolValue managed = 5;
-	BoolValue require_colons = 6;
-	BoolValue animated = 7;
+	bool managed = 5;
+	bool require_colons = 6;
+	bool animated = 7;
 }
 
 message EmojiUpdate {
-	message EmojiRoleUpdate {
-		oneof Modification {
-			string add_role = 1;
-			string del_role = 2;
-		}
-	}
-
 	StringValue name = 1;
-	repeated EmojiRoleUpdate roles = 2;
+	repeated string roles = 2;
 	BoolValue managed = 3;
 	BoolValue require_colons = 4;
 }

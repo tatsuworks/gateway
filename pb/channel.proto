@@ -21,9 +21,9 @@ message Channel {
 
 	string id = 1;
 	string guild_id = 2;
-	string name = 3;
-	string topic = 4;
-	Type type = 5;
+	Type type = 3;
+	string name = 4;
+	string topic = 5;
 	bool nsfw = 6;
 	int32 position = 7;
 	int32 bitrate = 8;

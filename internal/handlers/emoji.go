@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 
 	"git.friday.cafe/fndevs/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -63,9 +62,8 @@ func (s *Server) UpdateEmoji(ctx context.Context, req *pb.UpdateEmojiRequest) (*
 		if req.Emoji.Name != nil {
 			em.Name = req.Emoji.Name
 		}
-		fmt.Println(req.Emoji.Roles)
 		if req.Emoji.Roles != nil { // TODO is this nilable
-			em.Roles = req.Emoji.Roles
+			em.Roles = req.Emoji.Roles.Value
 		}
 		if req.Emoji.Managed != nil {
 			em.Managed = req.Emoji.Managed.Value

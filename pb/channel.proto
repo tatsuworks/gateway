@@ -4,13 +4,13 @@ option go_package = "pb";
 
 import "wrappers.proto";
 
-message ChannelPermissionOverwrite {
-	string id = 1;
-	string type = 2;
-	int32 deny = 3;
-	int32 allow = 4;
-}
 message Channel {
+	message PermissionOverwrite {
+		string id = 1;
+		string type = 2;
+		int32 deny = 3;
+		int32 allow = 4;
+	}
 	enum Type {
 		GUILD_TEXT = 0;
 		DM = 1;
@@ -27,17 +27,21 @@ message Channel {
 	bool nsfw = 6;
 	int32 position = 7;
 	int32 bitrate = 8;
-	repeated ChannelPermissionOverwrite overwrites = 9;
+	repeated PermissionOverwrite overwrites = 9;
 	string parent_id = 10;
 }
 
 message ChannelUpdate {
+  message PermissionOverwritesUpdate {
+  	repeated Channel.PermissionOverwrite value = 1;
+  }
+
 	StringValue name = 1;
 	StringValue topic = 2;
 	BoolValue nsfw = 3;
 	Int32Value position = 4;
 	Int32Value bitrate = 5;
-	repeated ChannelPermissionOverwrite overwrites = 6;
+	PermissionOverwritesUpdate overwrites = 6;
 	StringValue parent_id = 7;
 }
 

@@ -30,8 +30,8 @@ message Guild {
 }
 
 message GuildUpdate {
-	message VerificationModification {
-		Guild.VerificationLevel level = 1;
+	message VerificationLevelUpdate {
+		Guild.VerificationLevel value = 1;
 	}
 
 	StringValue name = 1;
@@ -44,7 +44,7 @@ message GuildUpdate {
 	StringValue splash = 8;
 	Int32Value afk_timeout = 9;
 	Int32Value member_count = 10;
-	VerificationModification verification_level = 11;
+	VerificationLevelUpdate verification_level = 11;
 	BoolValue embed_enabled = 12;
 	BoolValue large = 13;
 	Int32Value default_message_notifications = 14;

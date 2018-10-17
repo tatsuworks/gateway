@@ -3,9 +3,10 @@ package state
 import (
 	"context"
 
-	"git.friday.cafe/fndevs/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+
+	"git.friday.cafe/fndevs/state/pb"
 )
 
 func (s *Server) fmtEmojiKey(guild, id string) fdb.Key {
@@ -60,9 +61,9 @@ func (s *Server) UpdateEmoji(ctx context.Context, req *pb.UpdateEmojiRequest) (*
 		}
 
 		if req.Emoji.Name != nil {
-			em.Name = req.Emoji.Name
+			em.Name = req.Emoji.Name.Value
 		}
-		if req.Emoji.Roles != nil { // TODO is this nilable
+		if req.Emoji.Roles != nil {
 			em.Roles = req.Emoji.Roles.Value
 		}
 		if req.Emoji.Managed != nil {

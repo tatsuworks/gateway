@@ -3,9 +3,10 @@ package state
 import (
 	"context"
 
-	"git.friday.cafe/fndevs/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+
+	"git.friday.cafe/fndevs/state/pb"
 )
 
 func (s *Server) fmtChannelKey(guild, channel string) fdb.Key {
@@ -77,7 +78,7 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 		if req.Channel.Bitrate != nil {
 			ch.Bitrate = req.Channel.Bitrate.Value
 		}
-		if req.Channel.Overwrites != nil { // TODO is this nilable
+		if req.Channel.Overwrites != nil {
 			ch.Overwrites = req.Channel.Overwrites.Value
 		}
 		if req.Channel.ParentId != nil {

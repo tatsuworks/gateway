@@ -5,9 +5,9 @@ option go_package = "pb";
 import "wrappers.proto";
 
 message Member {
-	string user_id = 1;
+	string id = 1;
 	string guild_id = 2;
-	string JoinedAt = 3;
+	string joined_at = 3;
 	string nick = 4;
 	bool deaf = 5;
 	bool mute = 6;
@@ -15,21 +15,19 @@ message Member {
 }
 
 message MemberUpdate {
-	message RoleModification {
-		oneof Modification {
-			string role_add = 1;
-			string role_remove = 2;
-		}
+	message RolesUpdate {
+		repeated string value = 1;
 	}
 
-	BytesValue nick = 1;
-	BoolValue deaf = 2;
-	BoolValue mute = 3;
-	repeated RoleModification roles = 4;
+	StringValue joined_at = 1;
+	StringValue nick = 2;
+	BoolValue deaf = 3;
+	BoolValue mute = 4;
+	RolesUpdate roles = 5;
 }
 
 message GetMemberRequest {
-	string user_id = 1;
+	string id = 1;
 	string guild_id = 2;
 }
 message GetMemberResponse {
@@ -40,13 +38,13 @@ message SetMemberRequest {
 }
 message SetMemberResponse {}
 message UpdateMemberRequest {
-	string user_id = 1;
+	string id = 1;
 	string guild_id = 2;
 	MemberUpdate member = 3;
 }
 message UpdateMemberResponse {}
 message DeleteMemberRequest {
-	string user_id = 1;
+	string id = 1;
 	string guild_id = 2;
 }
 message DeleteMemberResponse {}

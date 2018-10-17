@@ -7,7 +7,7 @@ import "wrappers.proto";
 message Emoji {
 	string id = 1;
 	string guild_id = 2;
-	StringValue name = 3;
+	string name = 3;
 	repeated string roles = 4;
 	bool managed = 5;
 	bool require_colons = 6;

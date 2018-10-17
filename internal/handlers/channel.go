@@ -18,13 +18,12 @@ func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb
 
 	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
-
-		err := ch.Unmarshal(raw)
-		if err != nil {
-			return nil, err
+		if raw == nil {
+			// abal wants this to be idempotent i guess
+			return nil, nil
 		}
 
-		return nil, nil
+		return nil, ch.Unmarshal(raw)
 	})
 	if err != nil {
 		return nil, err

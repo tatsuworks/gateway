@@ -18,13 +18,12 @@ func (s *Server) GetMessage(ctx context.Context, req *pb.GetMessageRequest) (*pb
 
 	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtMessageKey(req.ChannelId, req.Id)).MustGet()
-
-		err := msg.Unmarshal(raw)
-		if err != nil {
-			return nil, err
+		if raw == nil {
+			// abal wants this to be idempotent i guess
+			return nil, nil
 		}
 
-		return nil, nil
+		return nil, msg.Unmarshal(raw)
 	})
 	if err != nil {
 		return nil, err

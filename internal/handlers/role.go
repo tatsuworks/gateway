@@ -18,6 +18,11 @@ func (s *Server) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.GetRo
 
 	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
+		if raw == nil {
+			// abal wants this to be idempotent i guess
+			return nil, nil
+		}
+
 		return nil, r.Unmarshal(raw)
 	})
 	if err != nil {

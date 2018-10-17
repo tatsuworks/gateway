@@ -18,13 +18,12 @@ func (s *Server) GetGuild(ctx context.Context, req *pb.GetGuildRequest) (*pb.Get
 
 	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtGuildKey(req.Id)).MustGet()
-
-		err := g.Unmarshal(raw)
-		if err != nil {
-			return nil, err
+		if raw == nil {
+			// abal wants this to be idempotent i guess
+			return nil, nil
 		}
 
-		return nil, nil
+		return nil, g.Unmarshal(raw)
 	})
 	if err != nil {
 		return nil, err

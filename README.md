@@ -1,5 +1,5 @@
 # state
 
-shared state backed by fdb, elasticsearch, and maybe postgres
+shared state backed by fdb, elasticsearch, and postgres
 
-god bless
+god bless discord api

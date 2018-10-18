@@ -16,7 +16,7 @@ func (s *Server) fmtMemberKey(guild, user string) fdb.Key {
 func (s *Server) GetMember(ctx context.Context, req *pb.GetMemberRequest) (*pb.GetMemberResponse, error) {
 	m := new(pb.Member)
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtMemberKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
 			// abal wants this to be idempotent i guess
@@ -40,7 +40,7 @@ func (s *Server) SetMember(ctx context.Context, req *pb.SetMemberRequest) (*pb.S
 		return nil, err
 	}
 
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtMemberKey(req.Member.GuildId, req.Member.Id), raw)
 		return nil, nil
 	})
@@ -51,7 +51,7 @@ func (s *Server) SetMember(ctx context.Context, req *pb.SetMemberRequest) (*pb.S
 func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) (*pb.UpdateMemberResponse, error) {
 	m := new(pb.Member)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtMemberKey(req.GuildId, req.Id)).MustGet()
 
 		err := m.Unmarshal(raw)
@@ -88,7 +88,7 @@ func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) 
 }
 
 func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) (*pb.DeleteMemberResponse, error) {
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtMemberKey(req.GuildId, req.Id))
 		return nil, nil
 	})

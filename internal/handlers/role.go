@@ -5,6 +5,8 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"git.friday.cafe/fndevs/state/pb"
 )
@@ -16,7 +18,7 @@ func (s *Server) fmtRoleKey(guild, id string) fdb.Key {
 func (s *Server) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.GetRoleResponse, error) {
 	r := new(pb.Role)
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
 			// abal wants this to be idempotent i guess
@@ -40,7 +42,7 @@ func (s *Server) SetRole(ctx context.Context, req *pb.SetRoleRequest) (*pb.SetRo
 		return nil, err
 	}
 
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtRoleKey(req.Role.GuildId, req.Role.Id), raw)
 		return nil, nil
 	})
@@ -51,7 +53,7 @@ func (s *Server) SetRole(ctx context.Context, req *pb.SetRoleRequest) (*pb.SetRo
 func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
 	r := new(pb.Role)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
 
 		err := r.Unmarshal(raw)
@@ -94,10 +96,76 @@ func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb
 }
 
 func (s *Server) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.deleteRoleFromID(ctx, req.Id)
+	if err != nil {
+		return nil, liftPDB(err, "failed to delete role by id")
+	}
+
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtRoleKey(req.GuildId, req.Id))
 		return nil, nil
 	})
 
 	return nil, err
+}
+
+func (s *Server) guildForRole(ctx context.Context, role, guild string) error {
+	const sqlstr = `
+		INSERT INTO public.roles (
+			"id", "guild"
+		) VALUES (
+			$1, $2
+		) ON CONFLICT ("id") DO NOTHING
+	`
+
+	_, err := s.PDB.ExecContext(ctx, sqlstr, role, guild)
+	return errors.Wrap(err, "failed to set guild for role")
+}
+
+func (s *Server) guildFromRole(role string) (g string, err error) {
+	const sqlstr = `
+		SELECT "guild" FROM public.roles WHERE "id" = $1
+	`
+
+	err = errors.Wrap(
+		s.PDB.QueryRow(sqlstr, role).Scan(&g),
+		"failed to query guild from role",
+	)
+	return
+}
+
+func (s *Server) deleteRoleFromID(ctx context.Context, id string) (int64, error) {
+	const sqlstr = `
+		DELETE FROM public.roles where "id" = $1
+	`
+
+	q, err := s.PDB.ExecContext(ctx, sqlstr, id)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to delete role from id")
+	}
+
+	aff, err := q.RowsAffected()
+	if err != nil {
+		s.log.Error("failed to get rows affected", zap.Error(err))
+	}
+
+	return aff, nil
+}
+
+func (s *Server) deleteRolesFromGuild(ctx context.Context, guild string) (int64, error) {
+	const sqlstr = `
+		DELETE FROM public.roles where "guild" = $1
+	`
+
+	q, err := s.PDB.ExecContext(ctx, sqlstr, guild)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to delete roles from guild")
+	}
+
+	aff, err := q.RowsAffected()
+	if err != nil {
+		s.log.Error("failed to get rows affected", zap.Error(err))
+	}
+
+	return aff, nil
 }

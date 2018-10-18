@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"net"
 	"os"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -25,7 +27,12 @@ func main() {
 		panic(err)
 	}
 
-	ss, err := state.NewServer(logger)
+	psql, err := sql.Open("postgres", "host=localhost user=state dbname=state sslmode=disable")
+	if err != nil {
+		logger.Fatal("failed to connect to postgres", zap.Error(err))
+	}
+
+	ss, err := state.NewServer(logger, psql)
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,7 @@ func (s *Server) fmtGuildKey(guild string) fdb.Key {
 func (s *Server) GetGuild(ctx context.Context, req *pb.GetGuildRequest) (*pb.GetGuildResponse, error) {
 	g := new(pb.Guild)
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtGuildKey(req.Id)).MustGet()
 		if raw == nil {
 			// abal wants this to be idempotent i guess
@@ -40,7 +40,7 @@ func (s *Server) SetGuild(ctx context.Context, req *pb.SetGuildRequest) (*pb.Set
 		return nil, err
 	}
 
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtGuildKey(req.Guild.Id), raw)
 		return nil, nil
 	})
@@ -51,7 +51,7 @@ func (s *Server) SetGuild(ctx context.Context, req *pb.SetGuildRequest) (*pb.Set
 func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*pb.UpdateGuildResponse, error) {
 	g := new(pb.Guild)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtGuildKey(req.Id)).MustGet()
 
 		err := g.Unmarshal(raw)
@@ -115,10 +115,29 @@ func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*
 }
 
 func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*pb.DeleteGuildResponse, error) {
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtGuildKey(req.Id))
+
+		// clear channels
+		preChan, _ := fdb.PrefixRange(s.fmtChannelKey(req.Id, ""))
+		tx.ClearRange(preChan)
+
+		// clear emojis
+		preEm, _ := fdb.PrefixRange(s.fmtEmojiKey(req.Id, ""))
+		tx.ClearRange(preEm)
+
+		// clear members
+		preMem, _ := fdb.PrefixRange(s.fmtMemberKey(req.Id, ""))
+		tx.ClearRange(preMem)
+
+		// TODO: clear messages
+
+		// clear roles
+		preRole, _ := fdb.PrefixRange(s.fmtRoleKey(req.Id, ""))
+		tx.ClearRange(preRole)
+
 		return nil, nil
 	})
 
-	return nil, err
+	return &pb.DeleteGuildResponse{}, err
 }

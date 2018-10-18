@@ -16,7 +16,7 @@ func (s *Server) fmtUserKey(user string) fdb.Key {
 func (s *Server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	u := new(pb.User)
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtUserKey(req.Id)).MustGet()
 		if raw == nil {
 			// abal wants this to be idempotent i guess
@@ -40,7 +40,7 @@ func (s *Server) SetUser(ctx context.Context, req *pb.SetUserRequest) (*pb.SetUs
 		return nil, err
 	}
 
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtUserKey(req.User.Id), raw)
 		return nil, nil
 	})
@@ -51,7 +51,7 @@ func (s *Server) SetUser(ctx context.Context, req *pb.SetUserRequest) (*pb.SetUs
 func (s *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	u := new(pb.User)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtUserKey(req.Id)).MustGet()
 
 		err := u.Unmarshal(raw)
@@ -97,7 +97,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb
 }
 
 func (s *Server) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtUserKey(req.Id))
 		return nil, nil
 	})

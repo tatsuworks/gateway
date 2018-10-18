@@ -3,6 +3,10 @@ package state
 import (
 	"context"
 
+	"go.uber.org/zap"
+
+	"github.com/pkg/errors"
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 
@@ -16,7 +20,7 @@ func (s *Server) fmtChannelKey(guild, channel string) fdb.Key {
 func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb.GetChannelResponse, error) {
 	ch := new(pb.Channel)
 
-	_, err := s.DB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
+	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
 			// abal wants this to be idempotent i guess
@@ -40,7 +44,7 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 		return nil, err
 	}
 
-	_, err = s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Set(s.fmtChannelKey(req.Channel.GuildId, req.Channel.Id), raw)
 		return nil, nil
 	})
@@ -51,7 +55,7 @@ func (s *Server) SetChannel(ctx context.Context, req *pb.SetChannelRequest) (*pb
 func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest) (*pb.UpdateChannelResponse, error) {
 	ch := new(pb.Channel)
 
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 
 		err := ch.Unmarshal(raw)
@@ -94,10 +98,101 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 }
 
 func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest) (*pb.DeleteChannelResponse, error) {
-	_, err := s.DB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtChannelKey(req.GuildId, req.Id))
+
+		// clear messages
+		pre, _ := fdb.PrefixRange(s.fmtMessageKey(req.Id, "").FDBKey())
+		tx.ClearRange(pre)
+
 		return nil, nil
 	})
 
 	return nil, err
+}
+
+func (s *Server) guildForChannel(ctx context.Context, channel, guild string) error {
+	const sqlstr = `
+		INSERT INTO public.channels (
+			"id", "guild"
+		) VALUES (
+			$1, $2
+		) ON CONFLICT ("id") DO NOTHING
+	`
+
+	_, err := s.PDB.ExecContext(ctx, sqlstr, channel, guild)
+	return errors.Wrap(err, "failed to set guild for channel")
+}
+
+func (s *Server) guildFromChannel(channel string) (g string, err error) {
+	const sqlstr = `
+		SELECT "guild" FROM public.channels WHERE "id" = $1
+	`
+
+	err = errors.Wrap(
+		s.PDB.QueryRow(sqlstr, channel).Scan(&g),
+		"failed to query guild from channel",
+	)
+	return
+}
+
+func (s *Server) channelsFromGuild(ctx context.Context, guild string) (channels []string, err error) {
+	const sqlstr = `
+		SELECT "id" FROM public.channels WHERE "guild" = $1
+	`
+
+	q, err := s.PDB.QueryContext(ctx, sqlstr, guild)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query channels from guild")
+	}
+
+	res := []string{}
+	for q.Next() {
+		var c string
+
+		err := q.Scan(&c)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan channel from guild")
+		}
+
+		res = append(res, c)
+	}
+
+	return res, nil
+}
+
+func (s *Server) deleteChannelFromID(ctx context.Context, id string) (int64, error) {
+	const sqlstr = `
+		DELETE FROM public.channels where "id" = $1
+	`
+
+	q, err := s.PDB.ExecContext(ctx, sqlstr, id)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to delete channel from id")
+	}
+
+	aff, err := q.RowsAffected()
+	if err != nil {
+		s.log.Error("failed to get rows affected", zap.Error(err))
+	}
+
+	return aff, nil
+}
+
+func (s *Server) deleteChannelsFromGuild(ctx context.Context, guild string) (int64, error) {
+	const sqlstr = `
+		DELETE FROM public.channels where "guild" = $1
+	`
+
+	q, err := s.PDB.ExecContext(ctx, sqlstr, guild)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to delete channels from guild")
+	}
+
+	aff, err := q.RowsAffected()
+	if err != nil {
+		s.log.Error("failed to get rows affected", zap.Error(err))
+	}
+
+	return aff, nil
 }

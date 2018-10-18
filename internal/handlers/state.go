@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"database/sql"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,12 +23,13 @@ var _ pb.StateServer = &Server{}
 type Server struct {
 	log *zap.Logger
 
-	DB   fdb.Database
+	PDB  *sql.DB
+	FDB  fdb.Database
 	Subs *Subspaces
 }
 
 // NewServer creates a new state Server.
-func NewServer(logger *zap.Logger) (*Server, error) {
+func NewServer(logger *zap.Logger, psql *sql.DB) (*Server, error) {
 	fdb.MustAPIVersion(510)
 	db := fdb.MustOpenDefault()
 
@@ -38,7 +40,7 @@ func NewServer(logger *zap.Logger) (*Server, error) {
 
 	return &Server{
 		log:  logger,
-		DB:   db,
+		FDB:  db,
 		Subs: NewSubspaces(dir),
 	}, nil
 }
@@ -106,4 +108,16 @@ func RequiredFieldsInterceptor() grpc.UnaryServerInterceptor {
 
 		return handler(ctx, req)
 	}
+}
+
+func liftPDB(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Cause(err) == sql.ErrNoRows {
+		return status.Error(codes.NotFound, errors.Wrap(err, msg).Error())
+	}
+
+	return status.Error(codes.Internal, errors.Wrap(err, msg).Error())
 }

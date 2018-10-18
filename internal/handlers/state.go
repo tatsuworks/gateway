@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
@@ -75,7 +74,7 @@ const (
 func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 	return &Subspaces{
 		Channels: dir.Sub(ChannelSubspaceName),
-		Guilds:  dir.Sub(GuildSubspaceName),
+		Guilds:   dir.Sub(GuildSubspaceName),
 		Members:  dir.Sub(MemberSubspaceName),
 		Messages: dir.Sub(MessageSubspaceName),
 		Users:    dir.Sub(UserSubspaceName),

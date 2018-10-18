@@ -3,7 +3,6 @@ package state;
 option go_package = "pb";
 
 import "channel.proto";
-import "emoji.proto";
 import "guild.proto";
 import "member.proto";
 import "user.proto";
@@ -15,11 +14,6 @@ service State {
 	rpc SetChannel(SetChannelRequest) returns (SetChannelResponse) {}
 	rpc UpdateChannel(UpdateChannelRequest) returns (UpdateChannelResponse) {}
 	rpc DeleteChannel(DeleteChannelRequest) returns (DeleteChannelResponse) {}
-
-	rpc GetEmoji(GetEmojiRequest) returns (GetEmojiResponse) {}
-	rpc SetEmoji(SetEmojiRequest) returns (SetEmojiResponse) {}
-	rpc UpdateEmoji(UpdateEmojiRequest) returns (UpdateEmojiResponse) {}
-	rpc DeleteEmoji(DeleteEmojiRequest) returns (DeleteEmojiResponse) {}
 
 	rpc GetGuild(GetGuildRequest) returns (GetGuildResponse) {}
 	rpc SetGuild(SetGuildRequest) returns (SetGuildResponse) {}

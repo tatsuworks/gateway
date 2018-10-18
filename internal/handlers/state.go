@@ -48,7 +48,6 @@ func NewServer(logger *zap.Logger, psql *sql.DB) (*Server, error) {
 // Subspaces is a struct containing all of the different subspaces used.
 type Subspaces struct {
 	Channels subspace.Subspace
-	Emojis   subspace.Subspace
 	Guilds   subspace.Subspace
 	Members  subspace.Subspace
 	Messages subspace.Subspace
@@ -60,8 +59,6 @@ type Subspaces struct {
 const (
 	// ChannelSubspaceName is the enum for the channel subspace.
 	ChannelSubspaceName = iota
-	// EmojiSubspaceName is the enum for the emoji subspace.
-	EmojiSubspaceName
 	// GuildSubspaceName is the enum for the guild subspace.
 	GuildSubspaceName
 	// MemberSubspaceName is the enum for the member subspace.
@@ -78,7 +75,7 @@ const (
 func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 	return &Subspaces{
 		Channels: dir.Sub(ChannelSubspaceName),
-		Emojis:   dir.Sub(EmojiSubspaceName),
+		Guilds:  dir.Sub(GuildSubspaceName),
 		Members:  dir.Sub(MemberSubspaceName),
 		Messages: dir.Sub(MessageSubspaceName),
 		Users:    dir.Sub(UserSubspaceName),

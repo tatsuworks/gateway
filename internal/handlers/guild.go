@@ -101,6 +101,9 @@ func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*
 		if req.Guild.DefaultMessageNotifications != nil {
 			g.DefaultMessageNotifications = req.Guild.DefaultMessageNotifications.Value
 		}
+		if req.Guild.Emojis != nil {
+			g.Emojis = req.Guild.Emojis
+		}
 
 		raw, err = req.Guild.Marshal()
 		if err != nil {

@@ -12,6 +12,16 @@ message Guild {
 		HIGH = 3;
 	}
 
+	message Emoji {
+		string id = 1;
+		string guild_id = 2;
+		string name = 3;
+		repeated string roles = 4;
+		bool managed = 5;
+		bool require_colons = 6;
+		bool animated = 7;
+	}
+
 	string id = 1;
 	string name = 2;
 	string icon = 3;
@@ -27,6 +37,7 @@ message Guild {
 	bool embed_enabled = 13;
 	bool large = 14;
 	int32 default_message_notifications = 15;
+	repeated Emoji emojis = 16;
 }
 
 message GuildUpdate {
@@ -48,6 +59,7 @@ message GuildUpdate {
 	BoolValue embed_enabled = 12;
 	BoolValue large = 13;
 	Int32Value default_message_notifications = 14;
+	repeated Guild.Emoji emojis = 15;
 }
 
 message GetGuildRequest {

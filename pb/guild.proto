@@ -76,7 +76,9 @@ message UpdateGuildRequest {
 	string id = 1;
 	GuildUpdate guild = 2;
 }
-message UpdateGuildResponse {}
+message UpdateGuildResponse {
+	Guild guild = 1;
+}
 message DeleteGuildRequest {
 	string id = 1;
 }

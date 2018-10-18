@@ -23,6 +23,7 @@ func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
+			ch = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -93,8 +94,13 @@ func (s *Server) UpdateChannel(ctx context.Context, req *pb.UpdateChannelRequest
 		tx.Set(s.fmtChannelKey(ch.GuildId, ch.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateChannelResponse{
+		Channel: ch,
+	}, nil
 }
 
 func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest) (*pb.DeleteChannelResponse, error) {

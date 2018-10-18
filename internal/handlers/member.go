@@ -19,6 +19,7 @@ func (s *Server) GetMember(ctx context.Context, req *pb.GetMemberRequest) (*pb.G
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtMemberKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
+			m = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -75,7 +76,7 @@ func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) 
 			m.Roles = req.Member.Roles
 		}
 
-		raw, err = req.Member.Marshal()
+		raw, err = m.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -83,8 +84,13 @@ func (s *Server) UpdateMember(ctx context.Context, req *pb.UpdateMemberRequest) 
 		tx.Set(s.fmtMemberKey(req.GuildId, req.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateMemberResponse{
+		Member: m,
+	}, nil
 }
 
 func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) (*pb.DeleteMemberResponse, error) {

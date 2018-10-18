@@ -19,6 +19,7 @@ func (s *Server) GetGuild(ctx context.Context, req *pb.GetGuildRequest) (*pb.Get
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtGuildKey(req.Id)).MustGet()
 		if raw == nil {
+			g = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -105,7 +106,7 @@ func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*
 			g.Emojis = req.Guild.Emojis
 		}
 
-		raw, err = req.Guild.Marshal()
+		raw, err = g.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -113,8 +114,13 @@ func (s *Server) UpdateGuild(ctx context.Context, req *pb.UpdateGuildRequest) (*
 		tx.Set(s.fmtGuildKey(req.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateGuildResponse{
+		Guild: g,
+	}, nil
 }
 
 func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*pb.DeleteGuildResponse, error) {
@@ -124,10 +130,6 @@ func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*
 		// clear channels
 		preChan, _ := fdb.PrefixRange(s.fmtChannelKey(req.Id, ""))
 		tx.ClearRange(preChan)
-
-		// clear emojis
-		preEm, _ := fdb.PrefixRange(s.fmtEmojiKey(req.Id, ""))
-		tx.ClearRange(preEm)
 
 		// clear members
 		preMem, _ := fdb.PrefixRange(s.fmtMemberKey(req.Id, ""))

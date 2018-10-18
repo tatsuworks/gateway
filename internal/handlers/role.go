@@ -21,6 +21,7 @@ func (s *Server) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.GetRo
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtRoleKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
+			r = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -83,7 +84,7 @@ func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb
 			r.Permissions = req.Role.Permissions.Value
 		}
 
-		raw, err = req.Role.Marshal()
+		raw, err = r.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -91,8 +92,13 @@ func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb
 		tx.Set(s.fmtRoleKey(req.GuildId, req.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateRoleResponse{
+		Role: r,
+	}, nil
 }
 
 func (s *Server) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {

@@ -57,7 +57,9 @@ message UpdateChannelRequest {
 	string guild_id = 2;
 	ChannelUpdate channel = 3;
 }
-message UpdateChannelResponse {}
+message UpdateChannelResponse {
+	Channel channel = 1;
+}
 message DeleteChannelRequest {
 	string id = 1;
 	string guild_id = 2;

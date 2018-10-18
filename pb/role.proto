@@ -42,7 +42,9 @@ message UpdateRoleRequest {
     string guild_id = 2;
     RoleUpdate role = 3;
 }
-message UpdateRoleResponse {}
+message UpdateRoleResponse {
+    Role role = 1;
+}
 message DeleteRoleRequest {
     string id = 1;
     string guild_id = 2;

@@ -19,6 +19,7 @@ func (s *Server) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUs
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtUserKey(req.Id)).MustGet()
 		if raw == nil {
+			u = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -59,32 +60,32 @@ func (s *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb
 			return nil, err
 		}
 
-		if req.User.Email != nil {
-			u.Email = req.User.Email.Value
-		}
 		if req.User.Username != nil {
 			u.Username = req.User.Username.Value
-		}
-		if req.User.Avatar != nil {
-			u.Avatar = req.User.Avatar.Value
 		}
 		if req.User.Discriminator != nil {
 			u.Discriminator = req.User.Discriminator.Value
 		}
-		if req.User.Token != nil {
-			u.Token = req.User.Token.Value
+		if req.User.Avatar != nil {
+			u.Avatar = req.User.Avatar.Value
 		}
-		if req.User.Verified != nil {
-			u.Verified = req.User.Verified.Value
-		}
-		if req.User.MfaEnabled != nil {
-			u.MfaEnabled = req.User.MfaEnabled.Value
-		}
-		if req.User.Bot != nil {
-			u.Bot = req.User.Bot.Value
-		}
+		// if req.User.Email != nil {
+		// 	u.Email = req.User.Email.Value
+		// }
+		// if req.User.Token != nil {
+		// 	u.Token = req.User.Token.Value
+		// }
+		// if req.User.Verified != nil {
+		// 	u.Verified = req.User.Verified.Value
+		// }
+		// if req.User.MfaEnabled != nil {
+		// 	u.MfaEnabled = req.User.MfaEnabled.Value
+		// }
+		// if req.User.Bot != nil {
+		// 	u.Bot = req.User.Bot.Value
+		// }
 
-		raw, err = req.User.Marshal()
+		raw, err = u.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -92,8 +93,13 @@ func (s *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb
 		tx.Set(s.fmtUserKey(req.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateUserResponse{
+		User: u,
+	}, nil
 }
 
 func (s *Server) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {

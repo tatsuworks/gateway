@@ -24,6 +24,7 @@ func (s *Server) GetMessage(ctx context.Context, req *pb.GetMessageRequest) (*pb
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtMessageKey(req.ChannelId, req.Id)).MustGet()
 		if raw == nil {
+			msg = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -74,7 +75,7 @@ func (s *Server) UpdateMessage(ctx context.Context, req *pb.UpdateMessageRequest
 			msg.MentionRoles = req.Message.MentionRoles
 		}
 
-		raw, err = req.Message.Marshal()
+		raw, err = msg.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -82,8 +83,13 @@ func (s *Server) UpdateMessage(ctx context.Context, req *pb.UpdateMessageRequest
 		tx.Set(s.fmtMessageKey(req.ChannelId, req.Id), raw)
 		return nil, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	return &pb.UpdateMessageResponse{
+		Message: msg,
+	}, nil
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *pb.DeleteMessageRequest) (*pb.DeleteMessageResponse, error) {

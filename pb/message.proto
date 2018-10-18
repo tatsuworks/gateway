@@ -45,7 +45,9 @@ message UpdateMessageRequest {
 	string channel_id = 2;
 	MessageUpdate message = 3;
 }
-message UpdateMessageResponse {}
+message UpdateMessageResponse {
+	Message message = 1;
+}
 message DeleteMessageRequest {
 	string id = 1;
 	string channel_id = 2;

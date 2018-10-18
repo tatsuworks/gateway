@@ -5,6 +5,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/olivere/elastic"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
@@ -32,7 +34,12 @@ func main() {
 		logger.Fatal("failed to connect to postgres", zap.Error(err))
 	}
 
-	ss, err := state.NewServer(logger, psql)
+	elastic, err := elastic.NewClient(elastic.SetURL("http://localhost:9200"), elastic.SetSniff(true))
+	if err != nil {
+		panic(err)
+	}
+
+	ss, err := state.NewServer(logger, psql, elastic)
 	if err != nil {
 		panic(err)
 	}

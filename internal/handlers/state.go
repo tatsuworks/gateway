@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/olivere/elastic"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -24,11 +26,12 @@ type Server struct {
 
 	PDB  *sql.DB
 	FDB  fdb.Database
+	EDB  *elastic.Client
 	Subs *Subspaces
 }
 
 // NewServer creates a new state Server.
-func NewServer(logger *zap.Logger, psql *sql.DB) (*Server, error) {
+func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client) (*Server, error) {
 	fdb.MustAPIVersion(510)
 	db := fdb.MustOpenDefault()
 
@@ -40,6 +43,7 @@ func NewServer(logger *zap.Logger, psql *sql.DB) (*Server, error) {
 	return &Server{
 		log:  logger,
 		FDB:  db,
+		EDB:  elastic,
 		Subs: NewSubspaces(dir),
 	}, nil
 }

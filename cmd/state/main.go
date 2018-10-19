@@ -48,7 +48,7 @@ func main() {
 
 	elastic, err := elastic.NewClient(elastic.SetURL("http://localhost:9200"), elastic.SetSniff(true))
 	if err != nil {
-		panic(err)
+		logger.Warn("continuing without elastic support...")
 	}
 
 	ss, err := state.NewServer(logger, psql, elastic)

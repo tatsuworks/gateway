@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime/debug"
+	"time"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -40,6 +42,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			logger.Info("freeing memory")
+			debug.FreeOSMemory()
+		}
+	}()
 
 	psql, err := sql.Open("postgres", "host=localhost user=state dbname=state sslmode=disable")
 	if err != nil {

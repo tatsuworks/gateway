@@ -102,12 +102,12 @@ func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb
 }
 
 func (s *Server) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
-	_, err := s.deleteRoleFromID(ctx, req.Id)
-	if err != nil {
-		return nil, liftPDB(err, "failed to delete role by id")
-	}
+	// _, err := s.deleteRoleFromID(ctx, req.Id)
+	// if err != nil {
+	// 	return nil, liftPDB(err, "failed to delete role by id")
+	// }
 
-	_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		tx.Clear(s.fmtRoleKey(req.GuildId, req.Id))
 		return nil, nil
 	})

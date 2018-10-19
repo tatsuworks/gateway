@@ -24,6 +24,7 @@ service State {
 	rpc SetMember(SetMemberRequest) returns (SetMemberResponse) {}
 	rpc UpdateMember(UpdateMemberRequest) returns (UpdateMemberResponse) {}
 	rpc DeleteMember(DeleteMemberRequest) returns (DeleteMemberResponse) {}
+	rpc SetMemberChunk(SetMemberChunkRequest) returns (SetMemberChunkResponse) {}
 
 	rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
 	rpc SetUser(SetUserRequest) returns (SetUserResponse) {}

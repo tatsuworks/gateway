@@ -101,3 +101,26 @@ func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) 
 
 	return nil, err
 }
+
+func (s *Server) SetMemberChunk(ctx context.Context, req *pb.SetMemberChunkRequest) (*pb.SetMemberChunkResponse, error) {
+	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+		for _, member := range req.Members {
+			rawUser, err := member.User.Marshal()
+			if err != nil {
+				return nil, err
+			}
+
+			tx.Set(s.fmtUserKey(member.User.Id), rawUser)
+
+			rawMember, err := member.Marshal()
+			if err != nil {
+				return nil, err
+			}
+
+			tx.Set(s.fmtMemberKey(req.GuildId, member.User.Id), rawMember)
+		}
+		return nil, nil
+	})
+
+	return nil, err
+}

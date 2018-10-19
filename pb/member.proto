@@ -3,6 +3,7 @@ package state;
 option go_package = "pb";
 
 import "wrappers.proto";
+import "user.proto";
 
 message Member {
 	string id = 1;
@@ -12,6 +13,7 @@ message Member {
 	repeated string roles = 5;
 	bool deaf = 6;
 	bool mute = 7;
+	User user = 8;
 }
 
 message MemberUpdate {
@@ -46,3 +48,9 @@ message DeleteMemberRequest {
 	string guild_id = 2;
 }
 message DeleteMemberResponse {}
+
+message SetMemberChunkRequest {
+	string guild_id = 1;
+	repeated Member members = 2;
+}
+message SetMemberChunkResponse {}

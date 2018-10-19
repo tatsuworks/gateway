@@ -28,13 +28,14 @@ type Member struct {
 	Roles    []string `protobuf:"bytes,5,rep,name=roles" json:"roles,omitempty"`
 	Deaf     bool     `protobuf:"varint,6,opt,name=deaf,proto3" json:"deaf,omitempty"`
 	Mute     bool     `protobuf:"varint,7,opt,name=mute,proto3" json:"mute,omitempty"`
+	User     *User    `protobuf:"bytes,8,opt,name=user" json:"user,omitempty"`
 }
 
 func (m *Member) Reset()         { *m = Member{} }
 func (m *Member) String() string { return proto.CompactTextString(m) }
 func (*Member) ProtoMessage()    {}
 func (*Member) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{0}
+	return fileDescriptor_member_98754e5d705f2b81, []int{0}
 }
 func (m *Member) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -112,6 +113,13 @@ func (m *Member) GetMute() bool {
 	return false
 }
 
+func (m *Member) GetUser() *User {
+	if m != nil {
+		return m.User
+	}
+	return nil
+}
+
 type MemberUpdate struct {
 	JoinedAt *StringValue `protobuf:"bytes,1,opt,name=joined_at,json=joinedAt" json:"joined_at,omitempty"`
 	Nick     *StringValue `protobuf:"bytes,2,opt,name=nick" json:"nick,omitempty"`
@@ -124,7 +132,7 @@ func (m *MemberUpdate) Reset()         { *m = MemberUpdate{} }
 func (m *MemberUpdate) String() string { return proto.CompactTextString(m) }
 func (*MemberUpdate) ProtoMessage()    {}
 func (*MemberUpdate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{1}
+	return fileDescriptor_member_98754e5d705f2b81, []int{1}
 }
 func (m *MemberUpdate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -197,7 +205,7 @@ func (m *GetMemberRequest) Reset()         { *m = GetMemberRequest{} }
 func (m *GetMemberRequest) String() string { return proto.CompactTextString(m) }
 func (*GetMemberRequest) ProtoMessage()    {}
 func (*GetMemberRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{2}
+	return fileDescriptor_member_98754e5d705f2b81, []int{2}
 }
 func (m *GetMemberRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -248,7 +256,7 @@ func (m *GetMemberResponse) Reset()         { *m = GetMemberResponse{} }
 func (m *GetMemberResponse) String() string { return proto.CompactTextString(m) }
 func (*GetMemberResponse) ProtoMessage()    {}
 func (*GetMemberResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{3}
+	return fileDescriptor_member_98754e5d705f2b81, []int{3}
 }
 func (m *GetMemberResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -292,7 +300,7 @@ func (m *SetMemberRequest) Reset()         { *m = SetMemberRequest{} }
 func (m *SetMemberRequest) String() string { return proto.CompactTextString(m) }
 func (*SetMemberRequest) ProtoMessage()    {}
 func (*SetMemberRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{4}
+	return fileDescriptor_member_98754e5d705f2b81, []int{4}
 }
 func (m *SetMemberRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -335,7 +343,7 @@ func (m *SetMemberResponse) Reset()         { *m = SetMemberResponse{} }
 func (m *SetMemberResponse) String() string { return proto.CompactTextString(m) }
 func (*SetMemberResponse) ProtoMessage()    {}
 func (*SetMemberResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{5}
+	return fileDescriptor_member_98754e5d705f2b81, []int{5}
 }
 func (m *SetMemberResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -374,7 +382,7 @@ func (m *UpdateMemberRequest) Reset()         { *m = UpdateMemberRequest{} }
 func (m *UpdateMemberRequest) String() string { return proto.CompactTextString(m) }
 func (*UpdateMemberRequest) ProtoMessage()    {}
 func (*UpdateMemberRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{6}
+	return fileDescriptor_member_98754e5d705f2b81, []int{6}
 }
 func (m *UpdateMemberRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -432,7 +440,7 @@ func (m *UpdateMemberResponse) Reset()         { *m = UpdateMemberResponse{} }
 func (m *UpdateMemberResponse) String() string { return proto.CompactTextString(m) }
 func (*UpdateMemberResponse) ProtoMessage()    {}
 func (*UpdateMemberResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{7}
+	return fileDescriptor_member_98754e5d705f2b81, []int{7}
 }
 func (m *UpdateMemberResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -477,7 +485,7 @@ func (m *DeleteMemberRequest) Reset()         { *m = DeleteMemberRequest{} }
 func (m *DeleteMemberRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteMemberRequest) ProtoMessage()    {}
 func (*DeleteMemberRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{8}
+	return fileDescriptor_member_98754e5d705f2b81, []int{8}
 }
 func (m *DeleteMemberRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -527,7 +535,7 @@ func (m *DeleteMemberResponse) Reset()         { *m = DeleteMemberResponse{} }
 func (m *DeleteMemberResponse) String() string { return proto.CompactTextString(m) }
 func (*DeleteMemberResponse) ProtoMessage()    {}
 func (*DeleteMemberResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_member_af62d8d88b8c7f74, []int{9}
+	return fileDescriptor_member_98754e5d705f2b81, []int{9}
 }
 func (m *DeleteMemberResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -556,6 +564,94 @@ func (m *DeleteMemberResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_DeleteMemberResponse proto.InternalMessageInfo
 
+type SetMemberChunkRequest struct {
+	GuildId string    `protobuf:"bytes,1,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	Members []*Member `protobuf:"bytes,2,rep,name=members" json:"members,omitempty"`
+}
+
+func (m *SetMemberChunkRequest) Reset()         { *m = SetMemberChunkRequest{} }
+func (m *SetMemberChunkRequest) String() string { return proto.CompactTextString(m) }
+func (*SetMemberChunkRequest) ProtoMessage()    {}
+func (*SetMemberChunkRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_member_98754e5d705f2b81, []int{10}
+}
+func (m *SetMemberChunkRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *SetMemberChunkRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_SetMemberChunkRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *SetMemberChunkRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetMemberChunkRequest.Merge(dst, src)
+}
+func (m *SetMemberChunkRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *SetMemberChunkRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SetMemberChunkRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SetMemberChunkRequest proto.InternalMessageInfo
+
+func (m *SetMemberChunkRequest) GetGuildId() string {
+	if m != nil {
+		return m.GuildId
+	}
+	return ""
+}
+
+func (m *SetMemberChunkRequest) GetMembers() []*Member {
+	if m != nil {
+		return m.Members
+	}
+	return nil
+}
+
+type SetMemberChunkResponse struct {
+}
+
+func (m *SetMemberChunkResponse) Reset()         { *m = SetMemberChunkResponse{} }
+func (m *SetMemberChunkResponse) String() string { return proto.CompactTextString(m) }
+func (*SetMemberChunkResponse) ProtoMessage()    {}
+func (*SetMemberChunkResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_member_98754e5d705f2b81, []int{11}
+}
+func (m *SetMemberChunkResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *SetMemberChunkResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_SetMemberChunkResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *SetMemberChunkResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetMemberChunkResponse.Merge(dst, src)
+}
+func (m *SetMemberChunkResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *SetMemberChunkResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_SetMemberChunkResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SetMemberChunkResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*Member)(nil), "state.Member")
 	proto.RegisterType((*MemberUpdate)(nil), "state.MemberUpdate")
@@ -567,6 +663,8 @@ func init() {
 	proto.RegisterType((*UpdateMemberResponse)(nil), "state.UpdateMemberResponse")
 	proto.RegisterType((*DeleteMemberRequest)(nil), "state.DeleteMemberRequest")
 	proto.RegisterType((*DeleteMemberResponse)(nil), "state.DeleteMemberResponse")
+	proto.RegisterType((*SetMemberChunkRequest)(nil), "state.SetMemberChunkRequest")
+	proto.RegisterType((*SetMemberChunkResponse)(nil), "state.SetMemberChunkResponse")
 }
 func (m *Member) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -642,6 +740,16 @@ func (m *Member) MarshalTo(dAtA []byte) (int, error) {
 		}
 		i++
 	}
+	if m.User != nil {
+		dAtA[i] = 0x42
+		i++
+		i = encodeVarintMember(dAtA, i, uint64(m.User.Size()))
+		n1, err := m.User.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
 	return i, nil
 }
 
@@ -664,21 +772,21 @@ func (m *MemberUpdate) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.JoinedAt.Size()))
-		n1, err := m.JoinedAt.MarshalTo(dAtA[i:])
+		n2, err := m.JoinedAt.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n1
+		i += n2
 	}
 	if m.Nick != nil {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Nick.Size()))
-		n2, err := m.Nick.MarshalTo(dAtA[i:])
+		n3, err := m.Nick.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n2
+		i += n3
 	}
 	if len(m.Roles) > 0 {
 		for _, s := range m.Roles {
@@ -699,21 +807,21 @@ func (m *MemberUpdate) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x22
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Deaf.Size()))
-		n3, err := m.Deaf.MarshalTo(dAtA[i:])
+		n4, err := m.Deaf.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n3
+		i += n4
 	}
 	if m.Mute != nil {
 		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Mute.Size()))
-		n4, err := m.Mute.MarshalTo(dAtA[i:])
+		n5, err := m.Mute.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n4
+		i += n5
 	}
 	return i, nil
 }
@@ -767,11 +875,11 @@ func (m *GetMemberResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Member.Size()))
-		n5, err := m.Member.MarshalTo(dAtA[i:])
+		n6, err := m.Member.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n6
 	}
 	return i, nil
 }
@@ -795,11 +903,11 @@ func (m *SetMemberRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Member.Size()))
-		n6, err := m.Member.MarshalTo(dAtA[i:])
+		n7, err := m.Member.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n7
 	}
 	return i, nil
 }
@@ -853,11 +961,11 @@ func (m *UpdateMemberRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x1a
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Member.Size()))
-		n7, err := m.Member.MarshalTo(dAtA[i:])
+		n8, err := m.Member.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n8
 	}
 	return i, nil
 }
@@ -881,11 +989,11 @@ func (m *UpdateMemberResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintMember(dAtA, i, uint64(m.Member.Size()))
-		n8, err := m.Member.MarshalTo(dAtA[i:])
+		n9, err := m.Member.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n8
+		i += n9
 	}
 	return i, nil
 }
@@ -938,6 +1046,60 @@ func (m *DeleteMemberResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *SetMemberChunkRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SetMemberChunkRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.GuildId) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintMember(dAtA, i, uint64(len(m.GuildId)))
+		i += copy(dAtA[i:], m.GuildId)
+	}
+	if len(m.Members) > 0 {
+		for _, msg := range m.Members {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintMember(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *SetMemberChunkResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SetMemberChunkResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
 func encodeVarintMember(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -980,6 +1142,10 @@ func (m *Member) Size() (n int) {
 	}
 	if m.Mute {
 		n += 2
+	}
+	if m.User != nil {
+		l = m.User.Size()
+		n += 1 + l + sovMember(uint64(l))
 	}
 	return n
 }
@@ -1119,6 +1285,34 @@ func (m *DeleteMemberRequest) Size() (n int) {
 }
 
 func (m *DeleteMemberResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *SetMemberChunkRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.GuildId)
+	if l > 0 {
+		n += 1 + l + sovMember(uint64(l))
+	}
+	if len(m.Members) > 0 {
+		for _, e := range m.Members {
+			l = e.Size()
+			n += 1 + l + sovMember(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *SetMemberChunkResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1354,6 +1548,39 @@ func (m *Member) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Mute = bool(v != 0)
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMember
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMember
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.User == nil {
+				m.User = &User{}
+			}
+			if err := m.User.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMember(dAtA[iNdEx:])
@@ -2292,6 +2519,166 @@ func (m *DeleteMemberResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *SetMemberChunkRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMember
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SetMemberChunkRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SetMemberChunkRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GuildId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMember
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMember
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GuildId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Members", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMember
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMember
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Members = append(m.Members, &Member{})
+			if err := m.Members[len(m.Members)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMember(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMember
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SetMemberChunkResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMember
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SetMemberChunkResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SetMemberChunkResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMember(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMember
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func skipMember(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2397,34 +2784,37 @@ var (
 	ErrIntOverflowMember   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("member.proto", fileDescriptor_member_af62d8d88b8c7f74) }
+func init() { proto.RegisterFile("member.proto", fileDescriptor_member_98754e5d705f2b81) }
 
-var fileDescriptor_member_af62d8d88b8c7f74 = []byte{
-	// 403 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x93, 0x4f, 0x8b, 0xda, 0x40,
-	0x18, 0xc6, 0x9d, 0xc4, 0x44, 0x7d, 0x6b, 0x45, 0x27, 0x52, 0xd2, 0x3f, 0x04, 0x09, 0xb6, 0x08,
-	0x05, 0x0b, 0xed, 0xa9, 0x05, 0xa1, 0x95, 0x42, 0xe9, 0xa1, 0x97, 0x48, 0x7b, 0xe8, 0x45, 0xe2,
-	0xce, 0xbb, 0x92, 0xdd, 0xfc, 0xdb, 0x64, 0xc2, 0x7e, 0x8d, 0xfd, 0x0c, 0xfb, 0x69, 0x76, 0x6f,
-	0x1e, 0xf7, 0xb8, 0xe8, 0x17, 0x59, 0x32, 0x33, 0x48, 0x14, 0x84, 0xd5, 0xdb, 0x3b, 0xcf, 0xbc,
-	0xef, 0x3c, 0xbf, 0x67, 0x86, 0x81, 0x76, 0x84, 0xd1, 0x02, 0xb3, 0x71, 0x9a, 0x25, 0x3c, 0xa1,
-	0x46, 0xce, 0x7d, 0x8e, 0x6f, 0x3a, 0xd7, 0x99, 0x9f, 0xa6, 0x98, 0xe5, 0x52, 0x76, 0x6f, 0x09,
-	0x98, 0x7f, 0x44, 0x1f, 0xed, 0x80, 0x16, 0x30, 0x9b, 0x0c, 0xc8, 0xa8, 0xe5, 0x69, 0x01, 0xa3,
-	0xaf, 0xa1, 0xb9, 0x2c, 0x82, 0x90, 0xcd, 0x03, 0x66, 0x6b, 0x42, 0x6d, 0x88, 0xf5, 0x6f, 0x46,
-	0xdf, 0x42, 0xeb, 0x22, 0x09, 0x62, 0x64, 0x73, 0x9f, 0xdb, 0xba, 0xd8, 0x6b, 0x4a, 0xe1, 0x07,
-	0xa7, 0x14, 0xea, 0x71, 0x70, 0x76, 0x69, 0xd7, 0x85, 0x2e, 0x6a, 0xda, 0x07, 0x23, 0x4b, 0x42,
-	0xcc, 0x6d, 0x63, 0xa0, 0x8f, 0x5a, 0x9e, 0x5c, 0x94, 0x9d, 0x0c, 0xfd, 0x73, 0xdb, 0x1c, 0x90,
-	0x51, 0xd3, 0x13, 0x75, 0xa9, 0x45, 0x05, 0x47, 0xbb, 0x21, 0xb5, 0xb2, 0x76, 0xef, 0x09, 0xb4,
-	0x25, 0xe4, 0xdf, 0x94, 0xf9, 0x1c, 0xe9, 0xa7, 0xaa, 0x7f, 0x49, 0xfc, 0xe2, 0x33, 0x1d, 0x8b,
-	0x80, 0xe3, 0x19, 0xcf, 0x82, 0x78, 0xf9, 0xcf, 0x0f, 0x0b, 0xac, 0x30, 0x7d, 0x50, 0x4c, 0xda,
-	0xc1, 0xde, 0x3d, 0x4e, 0xbd, 0xca, 0x39, 0x54, 0x9c, 0x75, 0x31, 0xdd, 0x55, 0xd3, 0xd3, 0x24,
-	0x09, 0xd5, 0xac, 0x20, 0x1f, 0x2a, 0x72, 0xe3, 0x50, 0x97, 0xc8, 0x32, 0x81, 0xee, 0x2f, 0xe4,
-	0x32, 0x8d, 0x87, 0x57, 0x05, 0xe6, 0xfc, 0x88, 0x9b, 0x77, 0xbf, 0x41, 0xaf, 0x32, 0x9e, 0xa7,
-	0x49, 0x9c, 0x23, 0x7d, 0x0f, 0xa6, 0x7c, 0x6b, 0x75, 0x17, 0x2f, 0x95, 0xb7, 0x6a, 0x53, 0x9b,
-	0xee, 0x57, 0xe8, 0xce, 0xf6, 0xad, 0x9f, 0x39, 0x6a, 0x41, 0x6f, 0xb6, 0x6f, 0xeb, 0x46, 0x60,
-	0xc9, 0xf7, 0x38, 0x35, 0x0d, 0xfd, 0xb8, 0x75, 0xd7, 0x85, 0xbb, 0xb5, 0xe3, 0x2e, 0x0f, 0xdf,
-	0x32, 0x4c, 0xa0, 0xbf, 0x6b, 0x77, 0x5c, 0xfa, 0xef, 0x60, 0xfd, 0xc4, 0x10, 0x4f, 0xa7, 0x75,
-	0x5f, 0x41, 0x7f, 0xf7, 0x04, 0x09, 0x30, 0x7d, 0x77, 0xb7, 0x76, 0xc8, 0x6a, 0xed, 0x90, 0xc7,
-	0xb5, 0x43, 0x6e, 0x36, 0x4e, 0x6d, 0xb5, 0x71, 0x6a, 0x0f, 0x1b, 0xa7, 0xf6, 0x5f, 0x4b, 0x17,
-	0x0b, 0x53, 0x7c, 0xb4, 0x2f, 0x4f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xeb, 0x79, 0xb6, 0xf0, 0x8f,
-	0x03, 0x00, 0x00,
+var fileDescriptor_member_98754e5d705f2b81 = []byte{
+	// 462 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0xcd, 0xda, 0xf9, 0x9c, 0x96, 0x2a, 0xdd, 0x84, 0x6a, 0x29, 0xc8, 0x58, 0xab, 0x02, 0x91,
+	0x90, 0x82, 0x04, 0x27, 0x90, 0x2a, 0x41, 0x41, 0x42, 0x1c, 0xb8, 0x38, 0x2a, 0x07, 0x38, 0x54,
+	0x0e, 0x3b, 0x14, 0x53, 0xc7, 0x36, 0xde, 0xb5, 0xf8, 0x1b, 0xfc, 0x27, 0x2e, 0x70, 0xeb, 0x91,
+	0x23, 0x4a, 0xfe, 0x08, 0xf2, 0xee, 0x26, 0xb2, 0x8d, 0x2a, 0xd1, 0xdc, 0x76, 0xdf, 0xcc, 0x9b,
+	0xf7, 0xde, 0xac, 0x65, 0xd8, 0x5d, 0xe0, 0x62, 0x8e, 0xf9, 0x34, 0xcb, 0x53, 0x95, 0xd2, 0x8e,
+	0x54, 0xa1, 0xc2, 0xc3, 0xbd, 0x6f, 0x79, 0x98, 0x65, 0x98, 0x4b, 0x03, 0x1f, 0x42, 0x21, 0xd7,
+	0x2d, 0xfc, 0x07, 0x81, 0xee, 0x5b, 0xcd, 0xa1, 0x7b, 0xe0, 0x44, 0x82, 0x11, 0x9f, 0x4c, 0x06,
+	0x81, 0x13, 0x09, 0x7a, 0x0b, 0xfa, 0xe7, 0x45, 0x14, 0x8b, 0xb3, 0x48, 0x30, 0x47, 0xa3, 0x3d,
+	0x7d, 0x7f, 0x23, 0xe8, 0x6d, 0x18, 0x7c, 0x49, 0xa3, 0x04, 0xc5, 0x59, 0xa8, 0x98, 0xab, 0x6b,
+	0x7d, 0x03, 0xbc, 0x50, 0x94, 0x42, 0x3b, 0x89, 0x3e, 0x5e, 0xb0, 0xb6, 0xc6, 0xf5, 0x99, 0x8e,
+	0xa1, 0x93, 0xa7, 0x31, 0x4a, 0xd6, 0xf1, 0xdd, 0xc9, 0x20, 0x30, 0x97, 0xb2, 0x53, 0x60, 0xf8,
+	0x89, 0x75, 0x7d, 0x32, 0xe9, 0x07, 0xfa, 0x5c, 0x62, 0x8b, 0x42, 0x21, 0xeb, 0x19, 0xac, 0x3c,
+	0xd3, 0xbb, 0xd0, 0x2e, 0x2d, 0xb3, 0xbe, 0x4f, 0x26, 0x3b, 0x8f, 0x77, 0xa6, 0x3a, 0xd6, 0xf4,
+	0x54, 0x62, 0x1e, 0xe8, 0x02, 0xff, 0x45, 0x60, 0xd7, 0xa4, 0x38, 0xcd, 0x44, 0xa8, 0x90, 0x3e,
+	0xaa, 0x1a, 0x24, 0x9a, 0x46, 0x2d, 0x6d, 0xa6, 0xf2, 0x28, 0x39, 0x7f, 0x17, 0xc6, 0x05, 0x56,
+	0x4c, 0xdf, 0xb7, 0xa6, 0x9d, 0x2b, 0x7b, 0x1b, 0x41, 0xdc, 0x6a, 0x90, 0x23, 0x1b, 0xa4, 0xad,
+	0xd9, 0x43, 0xcb, 0x3e, 0x49, 0xd3, 0xd8, 0x72, 0x75, 0xb4, 0x23, 0x1b, 0xad, 0x73, 0x55, 0x57,
+	0x59, 0xe5, 0xc7, 0x30, 0x7c, 0x8d, 0xca, 0xa4, 0x09, 0xf0, 0x6b, 0x81, 0x52, 0x5d, 0xe3, 0x69,
+	0xf8, 0x33, 0xd8, 0xaf, 0xd0, 0x65, 0x96, 0x26, 0x12, 0xe9, 0x3d, 0xe8, 0x9a, 0x0f, 0xc3, 0xee,
+	0xe2, 0x86, 0xd5, 0xb6, 0x6d, 0xb6, 0xc8, 0x9f, 0xc2, 0x70, 0xd6, 0x94, 0xfe, 0x4f, 0xea, 0x08,
+	0xf6, 0x67, 0x4d, 0x59, 0xbe, 0x80, 0x91, 0x79, 0x8f, 0x6d, 0xd3, 0xd0, 0x87, 0x1b, 0x75, 0x57,
+	0xab, 0x8f, 0x6a, 0xea, 0x66, 0xf8, 0xc6, 0xc3, 0x31, 0x8c, 0xeb, 0x72, 0xd7, 0x4b, 0xff, 0x1c,
+	0x46, 0xaf, 0x30, 0xc6, 0xed, 0xdd, 0xf2, 0x03, 0x18, 0xd7, 0x27, 0xd8, 0x3d, 0x7c, 0x80, 0x9b,
+	0x9b, 0xe5, 0xbc, 0xfc, 0x5c, 0x24, 0x17, 0xeb, 0xd9, 0xd5, 0x59, 0xa4, 0x9e, 0xfc, 0x01, 0xf4,
+	0x8c, 0x2f, 0xc9, 0x1c, 0xdf, 0xfd, 0xd7, 0xf5, 0xba, 0xca, 0x19, 0x1c, 0x34, 0x87, 0x1b, 0xd9,
+	0x93, 0x3b, 0x3f, 0x97, 0x1e, 0xb9, 0x5c, 0x7a, 0xe4, 0xcf, 0xd2, 0x23, 0xdf, 0x57, 0x5e, 0xeb,
+	0x72, 0xe5, 0xb5, 0x7e, 0xaf, 0xbc, 0xd6, 0x7b, 0x27, 0x9b, 0xcf, 0xbb, 0xfa, 0x07, 0xf0, 0xe4,
+	0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x5e, 0x71, 0x87, 0x45, 0x33, 0x04, 0x00, 0x00,
 }

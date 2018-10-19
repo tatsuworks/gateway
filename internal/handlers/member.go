@@ -2,6 +2,14 @@ package state
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/pkg/errors"
+
+	"google.golang.org/grpc/codes"
+
+	"github.com/olivere/elastic"
+	"google.golang.org/grpc/status"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
@@ -35,7 +43,44 @@ func (s *Server) GetMember(ctx context.Context, req *pb.GetMemberRequest) (*pb.G
 	}, nil
 }
 
+func fmtMembersIndex(guild, user string) string {
+	return fmt.Sprintf("%s:%s", guild, user)
+}
+
+func liftEDB(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	if elastic.IsNotFound(err) {
+		// errors.Wrap(err, "document not found")
+		return status.Error(codes.NotFound, errors.Wrap(err, msg).Error())
+	}
+
+	if elastic.IsTimeout(err) {
+		// errors.Wrap(err, "query timed out")
+		return status.Error(codes.Internal, errors.Wrap(err, msg).Error())
+	}
+
+	if elastic.IsConnErr(err) {
+		// errors.Wrap(err, "query timed out")
+		return status.Error(codes.Internal, errors.Wrap(err, msg).Error())
+	}
+
+	return status.Error(codes.Internal, errors.Wrap(err, msg).Error())
+}
+
 func (s *Server) SetMember(ctx context.Context, req *pb.SetMemberRequest) (*pb.SetMemberResponse, error) {
+	// _, err := s.EDB.Index().
+	// 	Index("members").
+	// 	Type("doc").
+	// 	Id(fmtMembersIndex(req.Member.GuildId, req.Member.Id)).
+	// 	BodyJson(req.Member).
+	// 	Do(ctx)
+	// if err != nil {
+	// 	return nil, liftEDB(err, "failed to index member")
+	// }
+
 	raw, err := req.Member.Marshal()
 	if err != nil {
 		return nil, err

@@ -6,14 +6,14 @@ import (
 
 	"github.com/olivere/elastic"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"git.friday.cafe/fndevs/state/pb"
 )
@@ -24,9 +24,10 @@ var _ pb.StateServer = &Server{}
 type Server struct {
 	log *zap.Logger
 
-	PDB  *sql.DB
-	FDB  fdb.Database
-	EDB  *elastic.Client
+	PDB *sql.DB
+	FDB fdb.Database
+	EDB *elastic.Client
+
 	Subs *Subspaces
 }
 
@@ -38,6 +39,11 @@ func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client) (*Serv
 	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open directory")
+	}
+
+	err = initEDB(logger, elastic)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Server{
@@ -108,6 +114,18 @@ func RequiredFieldsInterceptor() grpc.UnaryServerInterceptor {
 
 		return handler(ctx, req)
 	}
+}
+
+func initEDB(logger *zap.Logger, e *elastic.Client) error {
+	logger.Info("ensuring elastic indexes...")
+
+	// c, err := e.CreateIndex("members").Do(context.Background())
+	// if err != nil {
+	// 	return errors.Wrap(err, "failed to create elastic members index")
+	// }
+
+	// logger.Info("members index ensured", zap.Bool("created", c.Acknowledged), zap.Bool("shards_acknowledged", c.ShardsAcknowledged))
+	return nil
 }
 
 func liftPDB(err error, msg string) error {

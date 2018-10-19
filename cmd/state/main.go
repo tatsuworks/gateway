@@ -2,16 +2,20 @@ package main
 
 import (
 	"database/sql"
+	"log"
 	"net"
 	"os"
 
-	"github.com/olivere/elastic"
+	"net/http"
+	_ "net/http/pprof"
 
+	"github.com/google/gops/agent"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	_ "github.com/lib/pq"
+	"github.com/olivere/elastic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -22,6 +26,14 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		panic("please provide an address to listen on")
+	}
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	if err := agent.Listen(agent.Options{}); err != nil {
+		log.Fatal(err)
 	}
 
 	logger, err := zap.NewDevelopment()

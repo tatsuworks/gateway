@@ -3,6 +3,8 @@ package state
 import (
 	"context"
 	"database/sql"
+	"sync"
+	"time"
 
 	"github.com/olivere/elastic"
 
@@ -24,15 +26,19 @@ var _ pb.StateServer = &Server{}
 type Server struct {
 	log *zap.Logger
 
-	PDB *sql.DB
-	FDB fdb.Database
-	EDB *elastic.Client
+	PDB     *sql.DB
+	usePsql bool
+	FDB     fdb.Database
+	EDB     *elastic.Client
+	useEs   bool
 
 	Subs *Subspaces
+
+	indexMember chan *pb.Member
 }
 
 // NewServer creates a new state Server.
-func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client) (*Server, error) {
+func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client, usePsql, useEs bool) (*Server, error) {
 	fdb.MustAPIVersion(510)
 	db := fdb.MustOpenDefault()
 
@@ -41,17 +47,93 @@ func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client) (*Serv
 		return nil, errors.Wrap(err, "failed to open directory")
 	}
 
-	err = initEDB(logger, elastic)
-	if err != nil {
-		return nil, err
+	if useEs {
+		err = initEDB(logger, elastic)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &Server{
-		log:  logger,
-		FDB:  db,
-		EDB:  elastic,
+	srv := &Server{
+		log: logger,
+		FDB: db,
+
+		EDB:   elastic,
+		useEs: useEs,
+
+		PDB:     psql,
+		usePsql: usePsql,
+
 		Subs: NewSubspaces(dir),
-	}, nil
+
+		indexMember: make(chan *pb.Member, 4096),
+	}
+
+	go srv.listenIndexes()
+
+	return srv, nil
+}
+
+func (s *Server) listenIndexes() {
+	var (
+		mu sync.Mutex
+	)
+
+	if !s.useEs {
+		for {
+			<-s.indexMember
+		}
+	}
+
+	bulk := s.EDB.Bulk().Index("members").Type("doc")
+
+	reset := func() {
+		waiting := len(s.indexMember)
+		if bulk.NumberOfActions() == 0 {
+			return
+		}
+
+		bulkOld := bulk
+		bulk = s.EDB.Bulk().Index("members").Type("doc")
+
+		go func() {
+			start := time.Now()
+			_, err := bulkOld.Do(context.Background())
+			if err != nil {
+				s.log.Error("failed to send members bulk request", zap.Error(err))
+				return
+			}
+			s.log.Info("sent bulk index request",
+				zap.String("took", time.Since(start).String()),
+				zap.Int("amt_waiting", waiting),
+			)
+		}()
+	}
+
+	go func() {
+		for {
+			select {
+			case <-time.After(10 * time.Second):
+				mu.Lock()
+				reset()
+				mu.Unlock()
+			}
+		}
+	}()
+
+	for m := range s.indexMember {
+		mu.Lock()
+		if bulk.NumberOfActions() >= 256 {
+			reset()
+		}
+
+		// if m.Id == "" {
+		// 	s.log.Warn("member id is empty", zap.Any("member", *m))
+		// }
+
+		bulk.Add(elastic.NewBulkIndexRequest().Id(fmtMembersIndex(m.GuildId, m.Id)).Doc(m))
+		mu.Unlock()
+	}
 }
 
 // Subspaces is a struct containing all of the different subspaces used.
@@ -119,12 +201,23 @@ func RequiredFieldsInterceptor() grpc.UnaryServerInterceptor {
 func initEDB(logger *zap.Logger, e *elastic.Client) error {
 	logger.Info("ensuring elastic indexes...")
 
-	// c, err := e.CreateIndex("members").Do(context.Background())
-	// if err != nil {
-	// 	return errors.Wrap(err, "failed to create elastic members index")
-	// }
+	exists, err := e.IndexExists("members").Do(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "failed to index exists")
+	}
 
-	// logger.Info("members index ensured", zap.Bool("created", c.Acknowledged), zap.Bool("shards_acknowledged", c.ShardsAcknowledged))
+	if exists {
+		logger.Info("index already exists. skipping...")
+		return nil
+	}
+
+	c, err := e.CreateIndex("members").Do(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "failed to create elastic members index")
+	}
+
+	logger.Info("members index created", zap.Bool("shards_acknowledged", c.ShardsAcknowledged))
+
 	return nil
 }
 

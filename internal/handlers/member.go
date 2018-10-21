@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
-	"google.golang.org/grpc/codes"
-
-	"github.com/olivere/elastic"
-	"google.golang.org/grpc/status"
-
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/olivere/elastic"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"git.friday.cafe/fndevs/state/pb"
 )
@@ -71,15 +69,9 @@ func liftEDB(err error, msg string) error {
 }
 
 func (s *Server) SetMember(ctx context.Context, req *pb.SetMemberRequest) (*pb.SetMemberResponse, error) {
-	// _, err := s.EDB.Index().
-	// 	Index("members").
-	// 	Type("doc").
-	// 	Id(fmtMembersIndex(req.Member.GuildId, req.Member.Id)).
-	// 	BodyJson(req.Member).
-	// 	Do(ctx)
-	// if err != nil {
-	// 	return nil, liftEDB(err, "failed to index member")
-	// }
+	go func() {
+		s.indexMember <- req.Member
+	}()
 
 	raw, err := req.Member.Marshal()
 	if err != nil {
@@ -148,23 +140,33 @@ func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) 
 }
 
 func (s *Server) SetMemberChunk(ctx context.Context, req *pb.SetMemberChunkRequest) (*pb.SetMemberChunkResponse, error) {
+	eg := errgroup.Group{}
+
 	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
 		for _, member := range req.Members {
-			rawUser, err := member.User.Marshal()
-			if err != nil {
-				return nil, err
-			}
+			member := member
+			eg.Go(func() error {
+				go func() {
+					s.indexMember <- member
+				}()
 
-			tx.Set(s.fmtUserKey(member.User.Id), rawUser)
+				rawUser, err := member.User.Marshal()
+				if err != nil {
+					return err
+				}
+				tx.Set(s.fmtUserKey(member.Id), rawUser)
 
-			rawMember, err := member.Marshal()
-			if err != nil {
-				return nil, err
-			}
+				rawMember, err := member.Marshal()
+				if err != nil {
+					return err
+				}
 
-			tx.Set(s.fmtMemberKey(req.GuildId, member.User.Id), rawMember)
+				tx.Set(s.fmtMemberKey(req.GuildId, member.User.Id), rawMember)
+				return nil
+			})
 		}
-		return nil, nil
+
+		return nil, eg.Wait()
 	})
 
 	return nil, err

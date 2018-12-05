@@ -1,4 +1,4 @@
-module git.friday.cafe/fndevs/state
+module git.abal.moe/tatsu/state
 
 require (
 	github.com/apple/foundationdb v0.0.0-20181010171626-b58ea6302428

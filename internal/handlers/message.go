@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 func (s *Server) fmtMessageKey(channel, message string) fdb.Key {

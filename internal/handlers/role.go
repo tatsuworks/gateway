@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 func (s *Server) fmtRoleKey(guild, id string) fdb.Key {

@@ -6,7 +6,7 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 func (s *Server) fmtUserKey(user string) fdb.Key {

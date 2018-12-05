@@ -4,13 +4,11 @@ import (
 	"context"
 
 	"go.uber.org/zap"
-
 	"github.com/pkg/errors"
-
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 func (s *Server) fmtChannelKey(guild, channel string) fdb.Key {
@@ -23,7 +21,6 @@ func (s *Server) GetChannel(ctx context.Context, req *pb.GetChannelRequest) (*pb
 	_, err := s.FDB.ReadTransact(func(tx fdb.ReadTransaction) (interface{}, error) {
 		raw := tx.Get(s.fmtChannelKey(req.GuildId, req.Id)).MustGet()
 		if raw == nil {
-			ch = nil
 			// abal wants this to be idempotent i guess
 			return nil, nil
 		}
@@ -155,7 +152,7 @@ func (s *Server) channelsFromGuild(ctx context.Context, guild string) (channels 
 	res := []string{}
 	for q.Next() {
 		var c string
-
+		
 		err := q.Scan(&c)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan channel from guild")

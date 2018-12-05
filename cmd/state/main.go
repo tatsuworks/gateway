@@ -21,8 +21,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
-	"git.friday.cafe/fndevs/state/internal/handlers"
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/internal/handlers"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 var (

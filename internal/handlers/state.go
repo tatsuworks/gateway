@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"git.friday.cafe/fndevs/state/pb"
+	"git.abal.moe/tatsu/state/pb"
 )
 
 var _ pb.StateServer = &Server{}

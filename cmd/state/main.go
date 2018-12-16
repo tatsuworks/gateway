@@ -5,11 +5,12 @@ import (
 	"flag"
 	"log"
 	"net"
-	"os"
-
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
+	"git.abal.moe/tatsu/state/internal/handlers"
+	"git.abal.moe/tatsu/state/pb"
 	"github.com/google/gops/agent"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
@@ -20,9 +21,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
-
-	"git.abal.moe/tatsu/state/internal/handlers"
-	"git.abal.moe/tatsu/state/pb"
 )
 
 var (
@@ -38,7 +36,7 @@ func init() {
 	flag.BoolVar(&usePsql, "psql", false, "use postgres")
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
-	flag.StringVar(&port, "port", ":8080", ":8080")
+	flag.StringVar(&port, "port", ":80", ":80")
 	flag.Parse()
 }
 
@@ -127,7 +125,7 @@ func main() {
 	)
 	pb.RegisterStateServer(srv, ss)
 
-	lis, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp4", port)
 	if err != nil {
 		panic(err)
 	}

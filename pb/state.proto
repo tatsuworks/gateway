@@ -14,6 +14,7 @@ service State {
 	rpc SetChannel(SetChannelRequest) returns (SetChannelResponse) {}
 	rpc UpdateChannel(UpdateChannelRequest) returns (UpdateChannelResponse) {}
 	rpc DeleteChannel(DeleteChannelRequest) returns (DeleteChannelResponse) {}
+	rpc SetChannelChunk(SetChannelChunkRequest) returns (SetChannelChunkResponse) {}
 
 	rpc GetGuild(GetGuildRequest) returns (GetGuildResponse) {}
 	rpc SetGuild(SetGuildRequest) returns (SetGuildResponse) {}
@@ -40,4 +41,7 @@ service State {
 	rpc SetRole(SetRoleRequest) returns (SetRoleResponse) {}
 	rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse) {}
 	rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {}
+	rpc SetRoleChunk(SetRoleChunkRequest) returns (SetRoleChunkResponse) {}
+
+	rpc CheckOps(CheckOpsRequest) returns (CheckOpsResponse) {}
 }

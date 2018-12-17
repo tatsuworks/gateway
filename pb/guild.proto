@@ -83,3 +83,10 @@ message DeleteGuildRequest {
 	string id = 1;
 }
 message DeleteGuildResponse {}
+
+message CheckOpsRequest {
+	string guild_id = 1;
+}
+message CheckOpsResponse {
+	int32 ops = 1;
+}

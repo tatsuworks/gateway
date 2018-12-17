@@ -4,6 +4,7 @@ require (
 	github.com/apple/foundationdb v0.0.0-20181010171626-b58ea6302428
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/fortytw2/leaktest v1.2.0 // indirect
+	github.com/go-redis/redis v6.14.2+incompatible // indirect
 	github.com/gogo/protobuf v1.1.1
 	github.com/google/gops v0.3.5
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0

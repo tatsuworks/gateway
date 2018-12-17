@@ -2,11 +2,11 @@ package state
 
 import (
 	"context"
-
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"strconv"
 
 	"git.abal.moe/tatsu/state/pb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 )
 
 func (s *Server) fmtGuildKey(guild string) fdb.Key {
@@ -145,4 +145,26 @@ func (s *Server) DeleteGuild(ctx context.Context, req *pb.DeleteGuildRequest) (*
 	})
 
 	return &pb.DeleteGuildResponse{}, err
+}
+
+func (s *Server) CheckOps(ctx context.Context, req *pb.CheckOpsRequest) (*pb.CheckOpsResponse, error) {
+	opsRaw, err := s.RDB.Get(fmtPendingOpsKey(req.GuildId)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if opsRaw == "" {
+		return &pb.CheckOpsResponse{
+			Ops: 0,
+		}, nil
+	}
+
+	ops, err := strconv.Atoi(opsRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CheckOpsResponse{
+		Ops: ops,
+	}, nil
 }

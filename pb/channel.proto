@@ -65,3 +65,11 @@ message DeleteChannelRequest {
 	string guild_id = 2;
 }
 message DeleteChannelResponse {}
+
+message SetChannelChunkRequest {
+	string guild_id = 1;
+	repeated Channel channels = 2;
+}
+message SetChannelChunkResponse {
+    int32 ops = 1;
+}

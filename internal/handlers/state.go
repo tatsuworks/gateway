@@ -3,21 +3,21 @@ package state
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/olivere/elastic"
-
+	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
+	"github.com/go-redis/redis"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"git.abal.moe/tatsu/state/pb"
 )
 
 var _ pb.StateServer = &Server{}
@@ -26,11 +26,15 @@ var _ pb.StateServer = &Server{}
 type Server struct {
 	log *zap.Logger
 
-	PDB     *sql.DB
 	usePsql bool
-	FDB     fdb.Database
-	EDB     *elastic.Client
-	useEs   bool
+	PDB     *sql.DB
+
+	FDB fdb.Database
+
+	useEs bool
+	EDB   *elastic.Client
+
+	RDB *redis.Client
 
 	Subs *Subspaces
 
@@ -38,7 +42,13 @@ type Server struct {
 }
 
 // NewServer creates a new state Server.
-func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client, usePsql, useEs bool) (*Server, error) {
+func NewServer(
+	logger *zap.Logger,
+	psql *sql.DB,
+	ec *elastic.Client,
+	rdb *redis.Client,
+	usePsql, useEs bool,
+) (*Server, error) {
 	fdb.MustAPIVersion(510)
 	db := fdb.MustOpenDefault()
 
@@ -48,7 +58,7 @@ func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client, usePsq
 	}
 
 	if useEs {
-		err = initEDB(logger, elastic)
+		err = initEDB(logger, ec)
 		if err != nil {
 			return nil, err
 		}
@@ -58,11 +68,13 @@ func NewServer(logger *zap.Logger, psql *sql.DB, elastic *elastic.Client, usePsq
 		log: logger,
 		FDB: db,
 
-		EDB:   elastic,
+		EDB:   ec,
 		useEs: useEs,
 
 		PDB:     psql,
 		usePsql: usePsql,
+
+		RDB: rdb,
 
 		Subs: NewSubspaces(dir),
 
@@ -231,4 +243,20 @@ func liftPDB(err error, msg string) error {
 	}
 
 	return status.Error(codes.Internal, errors.Wrap(err, msg).Error())
+}
+
+func (s *Server) AddPendingOp(guild string) (int32, error) {
+	ops, err := s.RDB.Incr(fmtPendingOpsKey(guild)).Result()
+	return int32(ops), err
+}
+
+func (s *Server) OpDone(guild string) {
+	err := s.RDB.Decr(fmtPendingOpsKey(guild)).Err()
+	if err != nil {
+		s.log.Error("failed to decrement pending operations", zap.Error(err))
+	}
+}
+
+func fmtPendingOpsKey(guild string) string {
+	return fmt.Sprintf("state:pending_operations:%s", guild)
 }

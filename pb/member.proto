@@ -53,4 +53,6 @@ message SetMemberChunkRequest {
 	string guild_id = 1;
 	repeated Member members = 2;
 }
-message SetMemberChunkResponse {}
+message SetMemberChunkResponse {
+	int32 ops = 1;
+}

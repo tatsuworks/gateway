@@ -11,6 +11,7 @@ import (
 
 	"git.abal.moe/tatsu/state/internal/handlers"
 	"git.abal.moe/tatsu/state/pb"
+	"github.com/go-redis/redis"
 	"github.com/google/gops/agent"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
@@ -24,11 +25,12 @@ import (
 )
 
 var (
-	verbose  bool
-	usePsql  bool
-	useEs    bool
-	usePprof bool
-	port     string
+	verbose   bool
+	usePsql   bool
+	useEs     bool
+	usePprof  bool
+	port      string
+	redisAddr string
 )
 
 func init() {
@@ -37,14 +39,11 @@ func init() {
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
 	flag.StringVar(&port, "port", ":80", ":80")
+	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
 	flag.Parse()
 }
 
 func main() {
-	if port == "" {
-		panic("please provide an address to listen on with -port :port")
-	}
-
 	if usePprof {
 		go func() {
 			log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -108,9 +107,18 @@ func main() {
 		logger.Info("skipping elastic connectivity")
 	}
 
-	ss, err := state.NewServer(logger, psql, ec, usePsql, useEs)
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+
+	err = rdb.Ping().Err()
 	if err != nil {
-		panic(err)
+		logger.Panic("failed to ping redis", zap.Error(err))
+	}
+
+	ss, err := state.NewServer(logger, psql, ec, rdb, usePsql, useEs)
+	if err != nil {
+		logger.Panic("failed to create state client", zap.Error(err))
 	}
 
 	srv := grpc.NewServer(

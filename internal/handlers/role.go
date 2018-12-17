@@ -2,13 +2,12 @@ package state
 
 import (
 	"context"
-
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"time"
 
 	"git.abal.moe/tatsu/state/pb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"go.uber.org/zap"
 )
 
 func (s *Server) fmtRoleKey(guild, id string) fdb.Key {
@@ -115,63 +114,44 @@ func (s *Server) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb
 	return nil, err
 }
 
-func (s *Server) guildForRole(ctx context.Context, role, guild string) error {
-	const sqlstr = `
-		INSERT INTO public.roles (
-			"id", "guild"
-		) VALUES (
-			$1, $2
-		) ON CONFLICT ("id") DO NOTHING
-	`
-
-	_, err := s.PDB.ExecContext(ctx, sqlstr, role, guild)
-	return errors.Wrap(err, "failed to set guild for role")
-}
-
-func (s *Server) guildFromRole(role string) (g string, err error) {
-	const sqlstr = `
-		SELECT "guild" FROM public.roles WHERE "id" = $1
-	`
-
-	err = errors.Wrap(
-		s.PDB.QueryRow(sqlstr, role).Scan(&g),
-		"failed to query guild from role",
-	)
-	return
-}
-
-func (s *Server) deleteRoleFromID(ctx context.Context, id string) (int64, error) {
-	const sqlstr = `
-		DELETE FROM public.roles where "id" = $1
-	`
-
-	q, err := s.PDB.ExecContext(ctx, sqlstr, id)
+func (s *Server) SetRoleChunk(ctx context.Context, req *pb.SetRoleChunkRequest) (*pb.SetRoleChunkResponse, error) {
+	start := time.Now()
+	ops, err := s.AddPendingOp(req.GuildId)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to delete role from id")
+		return nil, err
 	}
 
-	aff, err := q.RowsAffected()
-	if err != nil {
-		s.log.Error("failed to get rows affected", zap.Error(err))
-	}
+	go func() {
+		defer s.OpDone(req.GuildId)
 
-	return aff, nil
-}
+		// because the fdb transaction will be retried if there conflicts, it's best to marshal
+		// everything outside of the txn. also, we want to keep txn lengths low.
+		raws := make([][]byte, 0, len(req.Roles))
+		for _, role := range req.Roles {
+			raw, err := role.Marshal()
+			if err != nil {
+				s.log.Error("failed to marshal role", zap.Error(err))
+				return
+			}
 
-func (s *Server) deleteRolesFromGuild(ctx context.Context, guild string) (int64, error) {
-	const sqlstr = `
-		DELETE FROM public.roles where "guild" = $1
-	`
+			raws = append(raws, raw)
+		}
 
-	q, err := s.PDB.ExecContext(ctx, sqlstr, guild)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to delete roles from guild")
-	}
+		_, err = s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+			for i, role := range req.Roles {
+				tx.Set(s.fmtRoleKey(role.GuildId, role.Id), raws[i])
+			}
 
-	aff, err := q.RowsAffected()
-	if err != nil {
-		s.log.Error("failed to get rows affected", zap.Error(err))
-	}
+			return nil, nil
+		})
+		if err != nil {
+			s.log.Error("failed to commit role chunk transaction", zap.Error(err))
+		}
 
-	return aff, nil
+		s.log.Info("processed role chunk", zap.Durations("took", time.Since(start)))
+	}()
+
+	return &pb.SetRoleChunkResponse{
+		Ops: ops,
+	}, nil
 }

@@ -3,16 +3,16 @@ package state
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"git.abal.moe/tatsu/state/pb"
 )
 
 func (s *Server) fmtMemberKey(guild, user string) fdb.Key {
@@ -140,34 +140,40 @@ func (s *Server) DeleteMember(ctx context.Context, req *pb.DeleteMemberRequest) 
 }
 
 func (s *Server) SetMemberChunk(ctx context.Context, req *pb.SetMemberChunkRequest) (*pb.SetMemberChunkResponse, error) {
-	eg := errgroup.Group{}
+	start := time.Now()
+	ops, err := s.AddPendingOp(req.GuildId)
+	if err != nil {
+		return nil, err
+	}
 
-	_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+	go func() {
+		defer s.OpDone(req.GuildId)
+
+		raws := make([][]byte, 0, len(req.Members))
 		for _, member := range req.Members {
-			member := member
-			eg.Go(func() error {
-				go func() {
-					s.indexMember <- member
-				}()
+			raw, err := member.Marshal()
+			if err != nil {
+				s.log.Error("failed to marshal member", zap.Errors(err))
+				return
+			}
 
-				rawUser, err := member.User.Marshal()
-				if err != nil {
-					return err
-				}
-				tx.Set(s.fmtUserKey(member.Id), rawUser)
-
-				rawMember, err := member.Marshal()
-				if err != nil {
-					return err
-				}
-
-				tx.Set(s.fmtMemberKey(req.GuildId, member.User.Id), rawMember)
-				return nil
-			})
+			raws = append(raws, raw)
 		}
 
-		return nil, eg.Wait()
-	})
+		_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+			for i, member := range req.Members {
+				tx.Set(s.fmtMemberKey(member.GuildId, member.Id), raws[i])
+			}
+			return nil, nil
+		})
+		if err != nil {
+			s.log.Error("failed to commit member chunk transaction", zap.Error(err))
+		}
 
-	return nil, err
+		s.log.Info("processed member chunk", zap.Duration("took", time.Since(start)))
+	}()
+
+	return &pb.SetMemberChunkResponse{
+		Ops: ops,
+	}, err
 }

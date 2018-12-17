@@ -2,13 +2,12 @@ package state
 
 import (
 	"context"
-
-	"go.uber.org/zap"
-	"github.com/pkg/errors"
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"time"
 
 	"git.abal.moe/tatsu/state/pb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"go.uber.org/zap"
 )
 
 func (s *Server) fmtChannelKey(guild, channel string) fdb.Key {
@@ -114,88 +113,41 @@ func (s *Server) DeleteChannel(ctx context.Context, req *pb.DeleteChannelRequest
 	return nil, err
 }
 
-func (s *Server) guildForChannel(ctx context.Context, channel, guild string) error {
-	const sqlstr = `
-		INSERT INTO public.channels (
-			"id", "guild"
-		) VALUES (
-			$1, $2
-		) ON CONFLICT ("id") DO NOTHING
-	`
-
-	_, err := s.PDB.ExecContext(ctx, sqlstr, channel, guild)
-	return errors.Wrap(err, "failed to set guild for channel")
-}
-
-func (s *Server) guildFromChannel(channel string) (g string, err error) {
-	const sqlstr = `
-		SELECT "guild" FROM public.channels WHERE "id" = $1
-	`
-
-	err = errors.Wrap(
-		s.PDB.QueryRow(sqlstr, channel).Scan(&g),
-		"failed to query guild from channel",
-	)
-	return
-}
-
-func (s *Server) channelsFromGuild(ctx context.Context, guild string) (channels []string, err error) {
-	const sqlstr = `
-		SELECT "id" FROM public.channels WHERE "guild" = $1
-	`
-
-	q, err := s.PDB.QueryContext(ctx, sqlstr, guild)
+func (s *Server) SetChannelChunk(ctx context.Context, req *pb.SetChannelChunkRequest) (*pb.SetChannelChunkResponse, error) {
+	start := time.Now()
+	ops, err := s.AddPendingOp(req.GuildId)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query channels from guild")
+		return nil, err
 	}
 
-	res := []string{}
-	for q.Next() {
-		var c string
-		
-		err := q.Scan(&c)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to scan channel from guild")
+	go func() {
+		defer s.OpDone(req.GuildId)
+
+		raws := make([][]byte, 0, len(req.Channels))
+		for _, channel := range req.Channels {
+			raw, err := channel.Marshal()
+			if err != nil {
+				s.log.Error("failed to marshal channel", zap.Errors(err))
+				return
+			}
+
+			raws = append(raws, raw)
 		}
 
-		res = append(res, c)
-	}
+		_, err := s.FDB.Transact(func(tx fdb.Transaction) (interface{}, error) {
+			for i, channel := range req.Channels {
+				tx.Set(s.fmtChannelKey(channel.GuildId, channel.Id), raws[i])
+			}
+			return nil, nil
+		})
+		if err != nil {
+			s.log.Error("failed to commit channel chunk transaction", zap.Error(err))
+		}
 
-	return res, nil
-}
+		s.log.Info("processed channel chunk", zap.Duration("took", time.Since(start)))
+	}()
 
-func (s *Server) deleteChannelFromID(ctx context.Context, id string) (int64, error) {
-	const sqlstr = `
-		DELETE FROM public.channels where "id" = $1
-	`
-
-	q, err := s.PDB.ExecContext(ctx, sqlstr, id)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to delete channel from id")
-	}
-
-	aff, err := q.RowsAffected()
-	if err != nil {
-		s.log.Error("failed to get rows affected", zap.Error(err))
-	}
-
-	return aff, nil
-}
-
-func (s *Server) deleteChannelsFromGuild(ctx context.Context, guild string) (int64, error) {
-	const sqlstr = `
-		DELETE FROM public.channels where "guild" = $1
-	`
-
-	q, err := s.PDB.ExecContext(ctx, sqlstr, guild)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to delete channels from guild")
-	}
-
-	aff, err := q.RowsAffected()
-	if err != nil {
-		s.log.Error("failed to get rows affected", zap.Error(err))
-	}
-
-	return aff, nil
+	return &pb.SetChannelChunkResponse{
+		Ops: ops,
+	}, nil
 }

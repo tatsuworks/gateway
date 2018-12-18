@@ -153,7 +153,7 @@ func (s *Server) SetMemberChunk(ctx context.Context, req *pb.SetMemberChunkReque
 		for _, member := range req.Members {
 			raw, err := member.Marshal()
 			if err != nil {
-				s.log.Error("failed to marshal member", zap.Errors(err))
+				s.log.Error("failed to marshal member", zap.Error(err))
 				return
 			}
 

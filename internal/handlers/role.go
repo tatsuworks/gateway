@@ -148,7 +148,7 @@ func (s *Server) SetRoleChunk(ctx context.Context, req *pb.SetRoleChunkRequest) 
 			s.log.Error("failed to commit role chunk transaction", zap.Error(err))
 		}
 
-		s.log.Info("processed role chunk", zap.Durations("took", time.Since(start)))
+		s.log.Info("processed role chunk", zap.Duration("took", time.Since(start)))
 	}()
 
 	return &pb.SetRoleChunkResponse{

@@ -192,6 +192,6 @@ func (s *Server) CheckOps(ctx context.Context, req *pb.CheckOpsRequest) (*pb.Che
 			}, nil
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }

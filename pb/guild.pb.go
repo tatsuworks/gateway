@@ -46,7 +46,7 @@ func (x Guild_VerificationLevel) String() string {
 	return proto.EnumName(Guild_VerificationLevel_name, int32(x))
 }
 func (Guild_VerificationLevel) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{0, 0}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{0, 0}
 }
 
 type Guild struct {
@@ -72,7 +72,7 @@ func (m *Guild) Reset()         { *m = Guild{} }
 func (m *Guild) String() string { return proto.CompactTextString(m) }
 func (*Guild) ProtoMessage()    {}
 func (*Guild) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{0}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{0}
 }
 func (m *Guild) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -227,7 +227,7 @@ func (m *Guild_Emoji) Reset()         { *m = Guild_Emoji{} }
 func (m *Guild_Emoji) String() string { return proto.CompactTextString(m) }
 func (*Guild_Emoji) ProtoMessage()    {}
 func (*Guild_Emoji) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{0, 0}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{0, 0}
 }
 func (m *Guild_Emoji) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -327,7 +327,7 @@ func (m *GuildUpdate) Reset()         { *m = GuildUpdate{} }
 func (m *GuildUpdate) String() string { return proto.CompactTextString(m) }
 func (*GuildUpdate) ProtoMessage()    {}
 func (*GuildUpdate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{1}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{1}
 }
 func (m *GuildUpdate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -469,7 +469,7 @@ func (m *GuildUpdate_VerificationLevelUpdate) Reset()         { *m = GuildUpdate
 func (m *GuildUpdate_VerificationLevelUpdate) String() string { return proto.CompactTextString(m) }
 func (*GuildUpdate_VerificationLevelUpdate) ProtoMessage()    {}
 func (*GuildUpdate_VerificationLevelUpdate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{1, 0}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{1, 0}
 }
 func (m *GuildUpdate_VerificationLevelUpdate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -513,7 +513,7 @@ func (m *GetGuildRequest) Reset()         { *m = GetGuildRequest{} }
 func (m *GetGuildRequest) String() string { return proto.CompactTextString(m) }
 func (*GetGuildRequest) ProtoMessage()    {}
 func (*GetGuildRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{2}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{2}
 }
 func (m *GetGuildRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -557,7 +557,7 @@ func (m *GetGuildResponse) Reset()         { *m = GetGuildResponse{} }
 func (m *GetGuildResponse) String() string { return proto.CompactTextString(m) }
 func (*GetGuildResponse) ProtoMessage()    {}
 func (*GetGuildResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{3}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{3}
 }
 func (m *GetGuildResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -601,7 +601,7 @@ func (m *SetGuildRequest) Reset()         { *m = SetGuildRequest{} }
 func (m *SetGuildRequest) String() string { return proto.CompactTextString(m) }
 func (*SetGuildRequest) ProtoMessage()    {}
 func (*SetGuildRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{4}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{4}
 }
 func (m *SetGuildRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -644,7 +644,7 @@ func (m *SetGuildResponse) Reset()         { *m = SetGuildResponse{} }
 func (m *SetGuildResponse) String() string { return proto.CompactTextString(m) }
 func (*SetGuildResponse) ProtoMessage()    {}
 func (*SetGuildResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{5}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{5}
 }
 func (m *SetGuildResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -682,7 +682,7 @@ func (m *UpdateGuildRequest) Reset()         { *m = UpdateGuildRequest{} }
 func (m *UpdateGuildRequest) String() string { return proto.CompactTextString(m) }
 func (*UpdateGuildRequest) ProtoMessage()    {}
 func (*UpdateGuildRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{6}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{6}
 }
 func (m *UpdateGuildRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -733,7 +733,7 @@ func (m *UpdateGuildResponse) Reset()         { *m = UpdateGuildResponse{} }
 func (m *UpdateGuildResponse) String() string { return proto.CompactTextString(m) }
 func (*UpdateGuildResponse) ProtoMessage()    {}
 func (*UpdateGuildResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{7}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{7}
 }
 func (m *UpdateGuildResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -777,7 +777,7 @@ func (m *DeleteGuildRequest) Reset()         { *m = DeleteGuildRequest{} }
 func (m *DeleteGuildRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteGuildRequest) ProtoMessage()    {}
 func (*DeleteGuildRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{8}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{8}
 }
 func (m *DeleteGuildRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -820,7 +820,7 @@ func (m *DeleteGuildResponse) Reset()         { *m = DeleteGuildResponse{} }
 func (m *DeleteGuildResponse) String() string { return proto.CompactTextString(m) }
 func (*DeleteGuildResponse) ProtoMessage()    {}
 func (*DeleteGuildResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{9}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{9}
 }
 func (m *DeleteGuildResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -858,7 +858,7 @@ func (m *CheckOpsRequest) Reset()         { *m = CheckOpsRequest{} }
 func (m *CheckOpsRequest) String() string { return proto.CompactTextString(m) }
 func (*CheckOpsRequest) ProtoMessage()    {}
 func (*CheckOpsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{10}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{10}
 }
 func (m *CheckOpsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -909,7 +909,7 @@ func (m *CheckOpsResponse) Reset()         { *m = CheckOpsResponse{} }
 func (m *CheckOpsResponse) String() string { return proto.CompactTextString(m) }
 func (*CheckOpsResponse) ProtoMessage()    {}
 func (*CheckOpsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_guild_612c1085a51c2731, []int{11}
+	return fileDescriptor_guild_47dd1bf048e42323, []int{11}
 }
 func (m *CheckOpsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -4141,9 +4141,9 @@ var (
 	ErrIntOverflowGuild   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("guild.proto", fileDescriptor_guild_612c1085a51c2731) }
+func init() { proto.RegisterFile("guild.proto", fileDescriptor_guild_47dd1bf048e42323) }
 
-var fileDescriptor_guild_612c1085a51c2731 = []byte{
+var fileDescriptor_guild_47dd1bf048e42323 = []byte{
 	// 904 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x56, 0xc1, 0x6e, 0xdb, 0x46,
 	0x10, 0x35, 0x25, 0x51, 0xa2, 0x46, 0xb2, 0x44, 0x6f, 0xd2, 0x96, 0x71, 0x5a, 0x55, 0x61, 0x5d,

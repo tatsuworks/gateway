@@ -86,6 +86,7 @@ message DeleteGuildResponse {}
 
 message CheckOpsRequest {
 	string guild_id = 1;
+    int32 wait = 2;
 }
 message CheckOpsResponse {
 	int32 ops = 1;

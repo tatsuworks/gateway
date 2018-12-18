@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -164,7 +165,33 @@ func (s *Server) CheckOps(ctx context.Context, req *pb.CheckOpsRequest) (*pb.Che
 		return nil, err
 	}
 
-	return &pb.CheckOpsResponse{
-		Ops: ops,
-	}, nil
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Wait)*time.Minute)
+	defer cancel()
+
+	last := ops
+	for {
+		if ctx.Err() != nil {
+			return &pb.CheckOpsResponse{
+				Ops: int32(last),
+			}, nil
+		}
+
+		opsRaw, err := s.RDB.Get(fmtPendingOpsKey(req.GuildId)).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		last, err = strconv.Atoi(opsRaw)
+		if err != nil {
+			return nil, err
+		}
+
+		if last == 0 {
+			return &pb.CheckOpsResponse{
+				Ops: 0,
+			}, nil
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
 }

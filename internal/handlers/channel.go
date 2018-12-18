@@ -127,7 +127,7 @@ func (s *Server) SetChannelChunk(ctx context.Context, req *pb.SetChannelChunkReq
 		for _, channel := range req.Channels {
 			raw, err := channel.Marshal()
 			if err != nil {
-				s.log.Error("failed to marshal channel", zap.Errors(err))
+				s.log.Error("failed to marshal channel", zap.Error(err))
 				return
 			}
 

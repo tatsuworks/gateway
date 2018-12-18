@@ -165,7 +165,7 @@ func (s *Server) CheckOps(ctx context.Context, req *pb.CheckOpsRequest) (*pb.Che
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Wait)*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Wait)*time.Millisecond)
 	defer cancel()
 
 	last := ops

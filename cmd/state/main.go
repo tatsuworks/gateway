@@ -9,7 +9,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"git.abal.moe/tatsu/state/internal/handlers"
+	"git.abal.moe/tatsu/state/internal/etfstate"
+	"git.abal.moe/tatsu/state/internal/grpcstate"
 	"git.abal.moe/tatsu/state/pb"
 	"github.com/go-redis/redis"
 	"github.com/google/gops/agent"
@@ -44,6 +45,11 @@ func init() {
 }
 
 func main() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
 	if usePprof {
 		go func() {
 			log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -51,8 +57,16 @@ func main() {
 	}
 
 	if err := agent.Listen(agent.Options{}); err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to create gops agent", zap.Error(err))
 	}
+
+	eState, err := etfstate.NewServer(logger)
+	if err != nil {
+		logger.Panic("failed to create etfstate", zap.Error(err))
+	}
+
+	eState.Init()
+	logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
 
 	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		return lvl >= zapcore.WarnLevel
@@ -76,11 +90,6 @@ func main() {
 
 	grpcLogger := zap.New(core)
 	defer grpcLogger.Sync()
-
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
 
 	var (
 		psql *sql.DB
@@ -116,7 +125,7 @@ func main() {
 		logger.Panic("failed to ping redis", zap.Error(err))
 	}
 
-	ss, err := state.NewServer(logger, psql, ec, rdb, usePsql, useEs)
+	ss, err := grpcstate.NewServer(logger, psql, ec, rdb, usePsql, useEs)
 	if err != nil {
 		logger.Panic("failed to create state client", zap.Error(err))
 	}
@@ -127,7 +136,7 @@ func main() {
 				grpc_prometheus.UnaryServerInterceptor,
 				grpc_zap.UnaryServerInterceptor(grpcLogger),
 				grpc_recovery.UnaryServerInterceptor(),
-				state.RequiredFieldsInterceptor(),
+				grpcstate.RequiredFieldsInterceptor(),
 			),
 		),
 	)

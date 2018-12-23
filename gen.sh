@@ -4,6 +4,6 @@
 pushd () { command pushd "$@" > /dev/null ; }
 popd () { command popd "$@" > /dev/null ; }
 
-pushd pb
-    protoc --gogofaster_out=plugins=grpc:. *.proto
+pushd pb/proto
+    protoc --gogofaster_out=plugins=grpc:.. *.proto
 popd

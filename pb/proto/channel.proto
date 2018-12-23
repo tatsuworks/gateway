@@ -1,0 +1,75 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+import "wrappers.proto";
+
+message Channel {
+	message PermissionOverwrite {
+		string id = 1;
+		string type = 2;
+		int32 deny = 3;
+		int32 allow = 4;
+	}
+	enum Type {
+		GUILD_TEXT = 0;
+		DM = 1;
+		GUILD_VOICE = 2;
+		GROUP_DM = 3;
+		GUILD_CATEGORY = 4;
+	}
+
+	string id = 1;
+	string guild_id = 2;
+	Type type = 3;
+	string name = 4;
+	string topic = 5;
+	bool nsfw = 6;
+	int32 position = 7;
+	int32 bitrate = 8;
+	repeated PermissionOverwrite overwrites = 9;
+	string parent_id = 10;
+}
+
+message ChannelUpdate {
+	StringValue name = 1;
+	StringValue topic = 2;
+	BoolValue nsfw = 3;
+	Int32Value position = 4;
+	Int32Value bitrate = 5;
+	repeated Channel.PermissionOverwrite overwrites = 6;
+	StringValue parent_id = 7;
+}
+
+message GetChannelRequest {
+	string id = 1;
+	string guild_id = 2;
+}
+message GetChannelResponse {
+	Channel channel = 1;
+}
+message SetChannelRequest {
+	Channel channel = 1;
+}
+message SetChannelResponse {}
+message UpdateChannelRequest {
+	string id = 1;
+	string guild_id = 2;
+	ChannelUpdate channel = 3;
+}
+message UpdateChannelResponse {
+	Channel channel = 1;
+}
+message DeleteChannelRequest {
+	string id = 1;
+	string guild_id = 2;
+}
+message DeleteChannelResponse {}
+
+message SetChannelChunkRequest {
+	string guild_id = 1;
+	repeated Channel channels = 2;
+}
+message SetChannelChunkResponse {
+    int32 ops = 1;
+}

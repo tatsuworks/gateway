@@ -1,0 +1,55 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+import "wrappers.proto";
+
+message Message {
+	message Attachment {
+		string id = 1;
+		string url = 2;
+		string proxy_url = 3;
+		string filename = 4;
+	}
+
+	string id = 1;
+	string channel_id = 2;
+	string content = 3;
+	string timestamp = 4;
+	string edited_timestamp = 5;
+	repeated Attachment attachments = 6;
+	repeated string mention_roles = 7;
+	bool tts = 8;
+	string author_id = 9;
+}
+
+message MessageUpdate {
+	StringValue content = 1;
+	StringValue edited_timestamp = 2;
+	repeated string mention_roles = 3;
+}
+
+message GetMessageRequest {
+	string id = 1;
+	string channel_id = 2;
+}
+message GetMessageResponse {
+	Message message = 1;
+}
+message SetMessageRequest {
+	Message message = 1;
+}
+message SetMessageResponse {}
+message UpdateMessageRequest {
+	string id = 1;
+	string channel_id = 2;
+	MessageUpdate message = 3;
+}
+message UpdateMessageResponse {
+	Message message = 1;
+}
+message DeleteMessageRequest {
+	string id = 1;
+	string channel_id = 2;
+}
+message DeleteMessageResponse {}

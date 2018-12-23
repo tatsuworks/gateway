@@ -3,6 +3,8 @@ module git.abal.moe/tatsu/state
 require (
 	github.com/apple/foundationdb v0.0.0-20181010171626-b58ea6302428
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
+	github.com/davecgh/go-spew v1.1.1
+	github.com/fasthttp/router v0.2.0
 	github.com/fortytw2/leaktest v1.2.0 // indirect
 	github.com/go-redis/redis v6.14.2+incompatible
 	github.com/gogo/protobuf v1.1.1
@@ -22,9 +24,11 @@ require (
 	github.com/prometheus/common v0.0.0-20181015124227-bcb74de08d37 // indirect
 	github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d // indirect
 	github.com/sirupsen/logrus v1.1.1 // indirect
+	github.com/valyala/fasthttp v1.0.0
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1
 	golang.org/x/net v0.0.0-20181011144130-49bb7cea24b1
+	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
 	google.golang.org/grpc v1.15.0
 )

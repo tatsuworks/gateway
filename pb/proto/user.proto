@@ -1,0 +1,50 @@
+syntax = "proto3";
+package state;
+option go_package = "pb";
+
+import "wrappers.proto";
+
+message User {
+	string id = 1;
+	string username = 2;
+	string discriminator = 3;
+	string avatar = 4;
+	// string email = 5;
+	// string token = 6;
+	// bool verified = 7;
+	// bool mfa_enabled = 8;
+	// bool bot = 9;
+}
+
+message UserUpdate {
+	StringValue username = 1;
+	StringValue discriminator = 2;
+	StringValue avatar = 3;
+	// StringValue email = 4;
+	// StringValue token = 5;
+	// BoolValue verified = 6;
+	// BoolValue mfa_enabled = 7;
+	// BoolValue bot = 8;
+}
+
+message GetUserRequest {
+	string id = 1;
+}
+message GetUserResponse {
+	User user = 1;
+}
+message SetUserRequest {
+	User user = 1;
+}
+message SetUserResponse {}
+message UpdateUserRequest {
+	string id = 1;
+	UserUpdate user = 2;
+}
+message UpdateUserResponse {
+	User user = 1;
+}
+message DeleteUserRequest {
+	string id = 1;
+}
+message DeleteUserResponse {}

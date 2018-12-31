@@ -269,7 +269,7 @@ type Guild struct {
 	// A list of roles in the guild.
 	Roles []etf.Map //Role `json:"roles"`
 
-	// A list of the custom emojis present in the guild.
+	// A list of the discordetf emojis present in the guild.
 	//Emojis []etf.Map //Emoji `json:"emojis"`
 
 	// A list of the members in the guild.

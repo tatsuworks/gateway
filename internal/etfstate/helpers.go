@@ -3,8 +3,8 @@ package etfstate
 import (
 	"net/http"
 
-	"git.abal.moe/tatsu/state/internal/mwerr"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/fngdevs/state/internal/mwerr"
 	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 )

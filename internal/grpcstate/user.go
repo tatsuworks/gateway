@@ -3,9 +3,9 @@ package grpcstate
 import (
 	"context"
 
-	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/fngdevs/state/pb"
 )
 
 func (s *Server) fmtUserKey(user string) fdb.Key {

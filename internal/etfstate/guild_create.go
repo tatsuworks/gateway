@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"git.abal.moe/tatsu/state/discord"
-	"git.abal.moe/tatsu/state/etf/discordetf"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/fngdevs/state/discord"
+	"github.com/fngdevs/state/etf/discordetf"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"

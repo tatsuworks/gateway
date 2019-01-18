@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
+	"github.com/fngdevs/state/pb"
 	"github.com/go-redis/redis"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"

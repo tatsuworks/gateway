@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"git.abal.moe/tatsu/state/pb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/fngdevs/state/pb"
 	"go.uber.org/zap"
 )
 

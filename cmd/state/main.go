@@ -9,9 +9,9 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"git.abal.moe/tatsu/state/internal/etfstate"
-	"git.abal.moe/tatsu/state/internal/grpcstate"
-	"git.abal.moe/tatsu/state/pb"
+	"github.com/fngdevs/state/internal/etfstate"
+	"github.com/fngdevs/state/internal/grpcstate"
+	"github.com/fngdevs/state/pb"
 	"github.com/go-redis/redis"
 	"github.com/google/gops/agent"
 	"github.com/grpc-ecosystem/go-grpc-middleware"

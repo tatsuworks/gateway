@@ -10,10 +10,10 @@ import (
 	"os"
 	"time"
 
-	"git.abal.moe/tatsu/state/discord"
-	"git.abal.moe/tatsu/state/etf"
-	"git.abal.moe/tatsu/state/etf/discordetf"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/fngdevs/state/discord"
+	"github.com/fngdevs/state/state/etf"
+	"github.com/fngdevs/state/state/etf/discordetf"
 	"github.com/klauspost/compress/zlib"
 )
 

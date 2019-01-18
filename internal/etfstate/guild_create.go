@@ -1,16 +1,13 @@
 package etfstate
 
 import (
-	"bytes"
 	"net/http"
 	"time"
 
 	"git.abal.moe/tatsu/state/discord"
-	"git.abal.moe/tatsu/state/etf"
-	"git.abal.moe/tatsu/state/internal/mwerr"
+	"git.abal.moe/tatsu/state/etf/discordetf"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
-	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -27,27 +24,20 @@ type guildCreate struct {
 	defaultVals
 }
 
-func (s *Server) guildCreate(ctx *fasthttp.RequestCtx) error {
+func (s *Server) handleGuildCreate(ctx *fasthttp.RequestCtx) error {
 	// Will be overwritten if error.
 	ctx.SetStatusCode(http.StatusCreated)
 	ctx.SetBodyString("Guild create processed.")
 
-	var (
-		buf = bytes.NewBuffer(ctx.Request.Body())
-		dec = new(etf.Context).NewDecoder(buf)
-	)
-
 	termStart := time.Now()
-
-	term, err := dec.NextTerm()
+	ev, err := discordetf.DecodeT(ctx.Request.Body())
 	if err != nil {
-		return &mwerr.EtfErr{E: err}
+		return err
 	}
 
-	gc := new(guildCreate)
-	err = etf.TermIntoStruct(term, gc)
+	gc, err := discordetf.DecodeGuildCreate(ev.D)
 	if err != nil {
-		return &mwerr.EtfErr{E: err}
+		return err
 	}
 
 	termStop := time.Since(termStart)
@@ -56,13 +46,13 @@ func (s *Server) guildCreate(ctx *fasthttp.RequestCtx) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		return s.setETFs(gc.D.Roles, s.fmtRoleKey)
+		return s.setETFs(gc.Id, gc.Roles, s.fmtRoleKey)
 	})
-	//eg.Go(func() error {
-	//	return s.setETFs(gc.D.Members, s.fmtMemberKey)
-	//})
 	eg.Go(func() error {
-		return s.setETFs(gc.D.Channels, s.fmtChannelKey)
+		return s.setETFs(gc.Id, gc.Members, s.fmtMemberKey)
+	})
+	eg.Go(func() error {
+		return s.setETFs(gc.Id, gc.Channels, s.fmtChannelKey)
 	})
 
 	err = eg.Wait()
@@ -78,32 +68,31 @@ func (s *Server) guildCreate(ctx *fasthttp.RequestCtx) error {
 	return err
 }
 
-func (s *Server) setETFs(etfs []etf.Map, key func(term etf.Term) fdb.Key) error {
+func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {
 	return s.Transact(func(t fdb.Transaction) error {
-		for _, e := range etfs {
-			var (
-				buf    = s.getBuf()
-				etfctx = new(etf.Context)
-				err    = etfctx.Write(buf, e)
-			)
-			if err != nil {
-				return errors.Wrap(err, "failed to encode term")
-			}
+		//eg := new(errgroup.Group)
 
-			t.Set(key(e[etf.Atom("id")]), buf.Bytes())
+		for id, e := range etfs {
+			//eg.Go(func() error {
+			//	t.Set(key(guild, id), e)
+			//	return nil
+			//})
+			t.Set(key(guild, id), e)
 		}
+
+		//return eg.Wait()
 		return nil
 	})
 }
 
-func (s *Server) fmtRoleKey(term etf.Term) fdb.Key {
-	return s.subs.Roles.Pack(tuple.Tuple{term})
+func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
+	return s.subs.Roles.Pack(tuple.Tuple{guild, id})
 }
 
-func (s *Server) fmtMemberKey(term etf.Term) fdb.Key {
-	return s.subs.Members.Pack(tuple.Tuple{term})
+func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
+	return s.subs.Members.Pack(tuple.Tuple{guild, id})
 }
 
-func (s *Server) fmtChannelKey(term etf.Term) fdb.Key {
-	return s.subs.Channels.Pack(tuple.Tuple{term})
+func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
+	return s.subs.Channels.Pack(tuple.Tuple{guild, id})
 }

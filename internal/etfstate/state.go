@@ -52,7 +52,7 @@ func NewServer(
 }
 
 func (s *Server) Init() {
-	s.router.POST("/v1/events/guild_create", wrapHandler(s.guildCreate))
+	s.router.POST("/v1/events/guild_create", wrapHandler(s.handleGuildCreate))
 }
 
 func (s *Server) Start(addr string) error {

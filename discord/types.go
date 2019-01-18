@@ -275,7 +275,7 @@ type Guild struct {
 	// A list of the members in the guild.
 	// This field is only present in GUILD_CREATE events and websocket
 	// update events, and thus is only present in state-cached guilds.
-	//Members []etf.Map //Member `json:"members"`
+	Members []etf.Map //Member `json:"members"`
 
 	// A list of partial presence objects for members in the guild.
 	// This field is only present in GUILD_CREATE events and websocket

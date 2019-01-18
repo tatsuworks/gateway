@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"compress/zlib"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,14 +11,74 @@ import (
 	"time"
 
 	"git.abal.moe/tatsu/state/discord"
-
 	"git.abal.moe/tatsu/state/etf"
-
+	"git.abal.moe/tatsu/state/etf/discordetf"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/klauspost/compress/zlib"
 )
 
+var _ = json.Unmarshal
+
+func xd() {
+	fi, err := ioutil.ReadFile("173184118492889089.GUILD_CREATE.etf.bin")
+	if err != nil {
+		panic(err)
+	}
+
+	start := time.Now()
+
+	e, err := discordetf.DecodeT(fi)
+	if err != nil {
+		panic(err)
+	}
+
+	//end := time.Since(start)
+	//fmt.Println("took       ", end)
+	//fmt.Println(e.S)
+	//fmt.Println(string(e.S))
+	//fmt.Println(len(lul))
+
+	start = time.Now()
+
+	gc, err := discordetf.DecodeGuildCreate(e.D)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//fmt.Println("guild", gc.Guild)
+
+	fmt.Println("took       ", time.Since(start))
+	fmt.Println("")
+	fmt.Println("id         ", gc.Id)
+	fmt.Println("channels   ", len(gc.Channels))
+	fmt.Println("emojis     ", len(gc.Emojis))
+	fmt.Println("members    ", len(gc.Members))
+	fmt.Println("presences  ", len(gc.Presences))
+	fmt.Println("roles      ", len(gc.Roles))
+	fmt.Println("voicestates", len(gc.VoiceStates))
+
+	//if true {
+	//	return
+	//}
+
+	var (
+		rd  = bytes.NewReader(gc.Members[0])
+		dec = new(etf.Context).NewDecoder(rd)
+	)
+
+	term, err := dec.NextTerm()
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(term)
+}
+
 func main() {
-	asdf()
+	xd()
+	//asdf()
+	//abc123()
+	//mainabc()
 
 	if true {
 		return

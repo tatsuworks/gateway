@@ -147,6 +147,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		// skip
 		term, err = d.NextTerm()
 	case ettAtom, ettAtomUTF8:
+		//fmt.Println("atom/utf8", etype)
 		// $dLL… | $vLL…
 		b, err = d.uint16BorrowRead()
 		if err != nil {
@@ -161,9 +162,11 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 			break
 		}
 		term = Atom(b)
+		//fmt.Println("small atom/utf8")
 
 	case ettBinary:
 		// $mLLLL…
+		//fmt.Println("binary")
 		if d.context.ConvertBinaryToString {
 			b, err = d.uint32BorrowRead()
 			if err != nil {
@@ -184,6 +187,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettString:
 		// $kLL…
+		//fmt.Println("string")
 		if b, err = d.buint16(); err == nil {
 			_, err = io.ReadFull(d.r, b)
 			term = string(b)
@@ -191,6 +195,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettFloat:
 		// $cFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0
+		//fmt.Println("float")
 		b, err = d.read(31)
 		if err != nil {
 			break
@@ -205,6 +210,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettNewFloat:
 		// $FFFFFFFFF
+		//fmt.Println("new float")
 		b, err = d.read(8)
 		if err != nil {
 			break
@@ -214,12 +220,14 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettSmallInteger:
 		// $aI
+		//fmt.Println("small int")
 		var x uint8
 		x, err = d.readByte()
 		term = int(x)
 
 	case ettInteger:
 		// $bIIII
+		//fmt.Println("int")
 		// var x int32
 		// b, err := d.read(4)
 		// if err != nil {
@@ -240,6 +248,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettSmallBig:
 		// $nAS…
+		//fmt.Println("small/big")
 		b, err = d.read(2)
 		if err != nil {
 			break
@@ -249,6 +258,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettLargeBig:
 		// $oAAAAS…
+		//fmt.Println("large big")
 		b, err = d.read(5)
 		if err != nil {
 			break
@@ -259,6 +269,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettNil:
 		// $j
+		//fmt.Println("nil")
 		term = List{}
 
 	case ettPid:
@@ -275,6 +286,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		pid.Serial = be.Uint32(b[4:8])
 		pid.Creation = b[8]
 		term = pid
+		//fmt.Println("pid")
 
 	case ettNewRef:
 		// $rLL…
@@ -296,9 +308,11 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 			}
 		}
 		term = ref
+		//fmt.Println("new ref")
 
 	case ettRef:
 		// $e…LLLLB
+		//fmt.Println("ref")
 		var ref Ref
 		var node interface{}
 		if node, err = d.NextTerm(); err != nil {
@@ -316,6 +330,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettSmallTuple:
 		// $hA…
+		//fmt.Println("small tuple")
 		var arity uint8
 		if arity, err = d.readByte(); err != nil {
 			break
@@ -341,9 +356,11 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 			}
 		}
 		term = tuple
+		//fmt.Println("large tuple")
 
 	case ettList:
 		// $lLLLL…$j
+		//fmt.Println("list")
 		var n uint32
 		if n, err = d.ruint32(); err != nil {
 			return
@@ -365,6 +382,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 
 	case ettMap:
 		// $mLLLL...
+		//fmt.Println("map")
 		var n uint32
 		if n, err = d.ruint32(); err != nil {
 			return
@@ -399,6 +417,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		_, err = io.ReadFull(d.r, b)
 		b[len(b)-1] = b[len(b)-1] >> (8 - bits)
 		term = b
+		//fmt.Println("bit binary")
 
 	case ettExport:
 		// $qM…F…A
@@ -413,6 +432,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		}
 
 		term = Export{m.(Atom), f.(Atom), a}
+		//fmt.Println("export")
 
 	case ettNewFun:
 		// $pSSSSAUUUUUUUUUUUUUUUUIIIIFFFFM…i…u…P…[V…]
@@ -439,6 +459,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		f.OldUnique = uint32(oldu.(int))
 		f.Pid = pid.(Pid)
 		term = f
+		fmt.Println("new func")
 
 	case ettFun:
 		// $uFFFFP…M…i…u…[V…]
@@ -461,6 +482,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		f.OldUnique = uint32(oldu.(int))
 		f.Pid = pid.(Pid)
 		term = f
+		fmt.Println("func")
 
 	case ettPort:
 		// $fA…IIIIC
@@ -470,6 +492,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 		p.Id, _ = d.ruint32()
 		p.Creation, err = d.readByte()
 		term = p
+		fmt.Println("port")
 
 	case ettCacheRef:
 		b = make([]byte, 1)
@@ -477,6 +500,7 @@ func (d *Decoder) NextTerm() (term Term, err error) {
 			break
 		}
 		term = Atom(*d.context.currentCache[b[0]])
+		fmt.Println("cache ref")
 
 	default:
 		err = &ErrUnknownTerm{etype}

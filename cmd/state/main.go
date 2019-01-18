@@ -30,6 +30,7 @@ var (
 	usePsql   bool
 	useEs     bool
 	usePprof  bool
+	useGrpc   bool
 	port      string
 	redisAddr string
 )
@@ -39,6 +40,7 @@ func init() {
 	flag.BoolVar(&usePsql, "psql", false, "use postgres")
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
+	flag.BoolVar(&useGrpc, "grpc", false, "use grpc instead of custom loggers")
 	flag.StringVar(&port, "port", ":80", ":80")
 	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
 	flag.Parse()
@@ -60,13 +62,15 @@ func main() {
 		logger.Fatal("failed to create gops agent", zap.Error(err))
 	}
 
-	eState, err := etfstate.NewServer(logger)
-	if err != nil {
-		logger.Panic("failed to create etfstate", zap.Error(err))
-	}
+	if !useGrpc {
+		eState, err := etfstate.NewServer(logger)
+		if err != nil {
+			logger.Panic("failed to create etfstate", zap.Error(err))
+		}
 
-	eState.Init()
-	logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
+		eState.Init()
+		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
+	}
 
 	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		return lvl >= zapcore.WarnLevel

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/fngdevs/state/internal/mwerr"
 	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
@@ -44,4 +45,38 @@ func wrapHandler(fn func(ctx *fasthttp.RequestCtx) error) fasthttp.RequestHandle
 		}
 
 	}
+}
+
+func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {
+	return s.Transact(func(t fdb.Transaction) error {
+		//eg := new(errgroup.Group)
+
+		for id, e := range etfs {
+			//eg.Go(func() error {
+			//	t.Set(key(guild, id), e)
+			//	return nil
+			//})
+			t.Set(key(guild, id), e)
+		}
+
+		//return eg.Wait()
+		return nil
+	})
+}
+
+func (s *Server) fmtGuildKey(guild int64) fdb.Key {
+	return s.subs.Guilds.Pack(tuple.Tuple{guild})
+}
+
+func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
+	return s.subs.Roles.Pack(tuple.Tuple{guild, id})
+}
+
+func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
+	//s.subs.Members.
+	return s.subs.Members.Pack(tuple.Tuple{guild, id})
+}
+
+func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
+	return s.subs.Channels.Pack(tuple.Tuple{guild, id})
 }

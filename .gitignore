@@ -1,3 +1,4 @@
 vendor/
 cmd/state/state
 .DS_STORE
+out.txt

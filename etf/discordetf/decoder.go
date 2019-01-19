@@ -67,6 +67,10 @@ func (d *decoder) inc(n int) {
 	d.off += n
 }
 
+func (d *decoder) reset() {
+	d.off = 0
+}
+
 func (d *decoder) readListLen() int {
 	raw := d.read(listLenBytes)
 	// add one for nil byte
@@ -97,8 +101,8 @@ var powers = []int64{
 	int64(math.Pow(256, 7)),
 }
 
-// smallBigWithTagToInt64 reads a small big into an int64 and checks the term tag.
-func (d *decoder) smallBigWithTagToInt64() (int64, error) {
+// readSmallBigWithTagToInt64 reads a small big into an int64 and checks the term tag.
+func (d *decoder) readSmallBigWithTagToInt64() (int64, error) {
 	err := d.checkByte(ettSmallBig)
 	if err != nil {
 		return 0, errors.WithStack(err)
@@ -144,14 +148,13 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 		// instead of checking the string every time, check the length first
 		if l == 2 {
 			if string(d.buf[d.off-l:d.off]) == "id" {
-				id, err = d.smallBigWithTagToInt64()
+				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
 					return 0, nil, errors.WithStack(err)
 				}
 
 				continue
 			}
-			fmt.Println("homo")
 		}
 
 		if l == 4 {
@@ -162,7 +165,6 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 				}
 				continue
 			}
-
 		}
 
 		err = d.readTerm()
@@ -173,6 +175,43 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 
 	data := d.buf[start:d.off]
 	return id, data, nil
+}
+
+// guildIDFromMap extracts a guild id from an ETF map.
+func (d *decoder) guildIDFromMap() (int64, error) {
+	var id int64
+
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+
+	left := d.readMapLen()
+	for ; left > 0; left-- {
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			return 0, errors.WithStack(err)
+		}
+
+		// instead of checking the string every time, check the length first
+		if l == 8 {
+			if string(d.buf[d.off-l:d.off]) == "guild_id" {
+				id, err = d.readSmallBigWithTagToInt64()
+				if err != nil {
+					return 0, errors.WithStack(err)
+				}
+
+				break
+			}
+		}
+
+		err = d.readTerm()
+		if err != nil {
+			return 0, errors.WithStack(err)
+		}
+	}
+
+	return id, nil
 }
 
 // readListIntoMapByID turns a list of ETF maps with an `id` key into a Go map by that key.
@@ -227,7 +266,7 @@ func (d *decoder) readTerm() (err error) {
 	switch t[0] {
 	case ettAtom, ettAtomUTF8:
 		//fmt.Println("utf8")
-		d.readAtom()
+		d.readRawAtom()
 	case ettInteger:
 		//fmt.Println("int")
 		d.readRawInt()

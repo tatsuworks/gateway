@@ -2,6 +2,7 @@ package etfstate
 
 import (
 	"bytes"
+	"path"
 	"sync"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -52,7 +53,19 @@ func NewServer(
 }
 
 func (s *Server) Init() {
-	s.router.POST("/v1/events/guild_create", wrapHandler(s.handleGuildCreate))
+	base := "/v1/events"
+	s.router.POST(path.Join(base, "guild_create"), wrapHandler(s.handleGuildCreate))
+	s.router.POST(path.Join(base, "guild_update"), wrapHandler(s.handleGuildCreate))
+	s.router.POST(path.Join(base, "guild_delete"), wrapHandler(s.handleGuildDelete))
+
+	s.router.POST(path.Join(base, "guild_members_chunk"), wrapHandler(s.handleMemberChunk))
+	s.router.POST(path.Join(base, "guild_member_add"), wrapHandler(s.handleMemberAdd))
+	s.router.POST(path.Join(base, "guild_members_update"), wrapHandler(s.handleMemberAdd))
+	s.router.POST(path.Join(base, "guild_members_remove"), wrapHandler(s.handleMemberRemove))
+
+	s.router.POST(path.Join(base, "guild_channel_create"), wrapHandler(s.handleChannelCreate))
+	s.router.POST(path.Join(base, "guild_channel_update"), wrapHandler(s.handleChannelCreate))
+	s.router.POST(path.Join(base, "guild_channel_delete"), wrapHandler(s.handleChannelDelete))
 }
 
 func (s *Server) Start(addr string) error {

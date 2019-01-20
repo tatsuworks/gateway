@@ -66,6 +66,7 @@ func (s *Server) handleMemberAdd(ctx *fasthttp.RequestCtx) error {
 
 	err = s.Transact(func(t fdb.Transaction) error {
 		t.Set(s.fmtMemberKey(mc.Guild, mc.Id), mc.Raw)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -103,6 +104,7 @@ func (s *Server) handleMemberRemove(ctx *fasthttp.RequestCtx) error {
 
 	err = s.Transact(func(t fdb.Transaction) error {
 		t.Clear(s.fmtMemberKey(mc.Guild, mc.Id))
+		return nil
 	})
 	if err != nil {
 		return err

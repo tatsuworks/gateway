@@ -60,8 +60,8 @@ func (s *Server) Init() {
 
 	s.router.POST(path.Join(base, "guild_members_chunk"), wrapHandler(s.handleMemberChunk))
 	s.router.POST(path.Join(base, "guild_member_add"), wrapHandler(s.handleMemberAdd))
-	s.router.POST(path.Join(base, "guild_members_update"), wrapHandler(s.handleMemberAdd))
-	s.router.POST(path.Join(base, "guild_members_remove"), wrapHandler(s.handleMemberRemove))
+	s.router.POST(path.Join(base, "guild_member_update"), wrapHandler(s.handleMemberAdd))
+	s.router.POST(path.Join(base, "guild_member_remove"), wrapHandler(s.handleMemberRemove))
 
 	s.router.POST(path.Join(base, "guild_channel_create"), wrapHandler(s.handleChannelCreate))
 	s.router.POST(path.Join(base, "guild_channel_update"), wrapHandler(s.handleChannelCreate))

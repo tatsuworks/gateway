@@ -9,7 +9,7 @@ require (
 	github.com/go-redis/redis v6.14.2+incompatible
 	github.com/gogo/protobuf v1.1.1
 	github.com/google/gops v0.3.5
-	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
 	github.com/klauspost/compress v1.4.1

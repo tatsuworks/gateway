@@ -52,7 +52,7 @@ func DecodeT(buf []byte) (*Event, error) {
 			return e, errors.Wrap(err, "failed to verify map key byte")
 		}
 
-		l := d.readAtom()
+		l := d.readRawAtom()
 		key := string(d.buf[d.off-l : d.off])
 
 		switch key {
@@ -113,7 +113,7 @@ func (d *decoder) readUntilData() error {
 			return errors.Wrap(err, "failed to verify map key byte")
 		}
 
-		l := d.readAtom()
+		l := d.readRawAtom()
 		key := string(d.buf[d.off-l : d.off])
 		if key == "d" {
 			return nil
@@ -144,5 +144,5 @@ func (d *decoder) readAtomWithTag() (int, error) {
 		return 0, err
 	}
 
-	return d.readAtom(), nil
+	return d.readRawAtom(), nil
 }

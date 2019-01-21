@@ -15,9 +15,9 @@ var (
 
 type Event struct {
 	D  []byte
-	Op []byte
+	Op uint8
 	S  uint8
-	T  []byte
+	T  string
 }
 
 func DecodeT(buf []byte) (*Event, error) {
@@ -57,11 +57,10 @@ func DecodeT(buf []byte) (*Event, error) {
 
 		switch key {
 		case "op":
-			raw, err := d.readTermIntoSlice()
+			e.Op, err = d.readSmallIntWithIndicatorIntoInt()
 			if err != nil {
-				return e, errors.Wrap(err, "failed to read Op value")
+				return e, errors.Wrap(err, "failed to read OP value")
 			}
-			e.Op = raw
 
 		case "d":
 			raw, err := d.readTermIntoSlice()
@@ -81,7 +80,7 @@ func DecodeT(buf []byte) (*Event, error) {
 			if err != nil {
 				return e, errors.Wrap(err, "failed to read event type")
 			}
-			e.T = d.buf[d.off-l : d.off]
+			e.T = string(d.buf[d.off-l : d.off])
 
 		default:
 			return e, errors.Errorf("unknown map key %s", string(key))

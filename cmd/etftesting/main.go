@@ -12,8 +12,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fngdevs/state/discord"
-	"github.com/fngdevs/state/state/etf"
-	"github.com/fngdevs/state/state/etf/discordetf"
+	"github.com/fngdevs/state/etf"
+	"github.com/fngdevs/state/etf/discordetf"
 	"github.com/klauspost/compress/zlib"
 )
 

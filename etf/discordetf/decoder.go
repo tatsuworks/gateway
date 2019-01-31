@@ -105,7 +105,14 @@ var powers = []int64{
 func (d *decoder) readSmallBigWithTagToInt64() (int64, error) {
 	err := d.checkByte(ettSmallBig)
 	if err != nil {
-		return 0, errors.WithStack(err)
+		d.inc(-1)
+		if err := d.checkByte(ettAtom); err == nil {
+			// nil
+			d.readRawAtom()
+			return 0, nil
+		}
+
+		return 0, errors.Wrap(err, "failed to verify small big byte")
 	}
 
 	var (
@@ -142,7 +149,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, nil, errors.WithStack(err)
+			return 0, nil, errors.Wrap(err, "failed to read map key")
 		}
 
 		// instead of checking the string every time, check the length first
@@ -157,8 +164,27 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 			}
 		}
 
+		if l == 7 {
+			if string(d.buf[d.off-l:d.off]) == "user_id" {
+				id, err = d.readSmallBigWithTagToInt64()
+				if err != nil {
+					return 0, nil, errors.WithStack(err)
+				}
+
+				continue
+			}
+		}
+
 		if l == 4 {
-			if string(d.buf[d.off-l:d.off]) == "user" {
+			key := string(d.buf[d.off-l : d.off])
+			if key == "user" {
+				id, _, err = d.readMapWithIDIntoSlice()
+				if err != nil {
+					return 0, nil, errors.WithStack(err)
+				}
+				continue
+			}
+			if key == "role" {
 				id, _, err = d.readMapWithIDIntoSlice()
 				if err != nil {
 					return 0, nil, errors.WithStack(err)
@@ -175,6 +201,43 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 
 	data := d.buf[start:d.off]
 	return id, data, nil
+}
+
+// guildIDFromMap extracts a guild id from an ETF map.
+func (d *decoder) idFromMap(name string) (int64, error) {
+	var id int64
+
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+
+	left := d.readMapLen()
+	for ; left > 0; left-- {
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			return 0, errors.WithStack(err)
+		}
+
+		// instead of checking the string every time, check the length first
+		if l == len(name) {
+			if string(d.buf[d.off-l:d.off]) == name {
+				id, err = d.readSmallBigWithTagToInt64()
+				if err != nil {
+					return 0, errors.WithStack(err)
+				}
+
+				break
+			}
+		}
+
+		err = d.readTerm()
+		if err != nil {
+			return 0, errors.WithStack(err)
+		}
+	}
+
+	return id, nil
 }
 
 // guildIDFromMap extracts a guild id from an ETF map.
@@ -292,11 +355,17 @@ func (d *decoder) readTerm() (err error) {
 		//err = D.readTerm()
 	case ettString:
 		d.readRawString()
+	case ettNewFloat:
+		d.readRawNewFloat()
 	default:
 		err = errors.Errorf("unknown type: %v", t)
 	}
 
 	return errors.Wrap(err, "failed to read raw term into buf")
+}
+
+func (d *decoder) readRawNewFloat() {
+	d.inc(8)
 }
 
 //
@@ -351,6 +420,10 @@ func (d *decoder) readRawInt() {
 	d.inc(intLenBytes)
 }
 
+func (d *decoder) readRawIntIntoInt() int {
+	return int(binary.BigEndian.Uint32(d.read(4)))
+}
+
 // readRawSmallBig advances the offset past the big small at the current offset.
 func (d *decoder) readRawSmallBig() {
 	// add 1 because of sign byte
@@ -359,9 +432,11 @@ func (d *decoder) readRawSmallBig() {
 }
 
 // readRawBinary advances the offset past the binary tag at the current offset.
-func (d *decoder) readRawBinary() {
+func (d *decoder) readRawBinary() int {
 	binLenRaw := d.read(binaryLenBytes)
-	d.inc(int(binary.BigEndian.Uint32(binLenRaw)))
+	i := int(binary.BigEndian.Uint32(binLenRaw))
+	d.inc(i)
+	return i
 }
 
 // readRawString advances the offset past the string at the current offset.

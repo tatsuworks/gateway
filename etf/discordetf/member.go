@@ -71,3 +71,60 @@ func DecodeMember(buf []byte) (*Member, error) {
 
 	return m, err
 }
+
+type Presence struct {
+	Id    int64
+	Guild int64
+	Raw   []byte
+}
+
+func DecodePresence(buf []byte) (*Presence, error) {
+	var (
+		p   = &Presence{}
+		d   = &decoder{buf: buf}
+		err error
+	)
+
+	p.Id, p.Raw, err = d.readMapWithIDIntoSlice()
+	if err != nil {
+		return p, errors.WithStack(err)
+	}
+
+	d.reset()
+	p.Guild, err = d.guildIDFromMap()
+	if err != nil {
+		return p, errors.WithStack(err)
+	}
+
+	return p, err
+}
+
+//type PlayedPresence struct {
+//	Id   int64
+//	Game string
+//}
+//
+//func DecodePlayedPresence(buf []byte) (*Presence, error) {
+//	var (
+//		p   = &Presence{}
+//		d   = &decoder{buf: buf}
+//		err error
+//	)
+//
+//	err = d.readUntilData()
+//	if err != nil {
+//		return nil, errors.Wrap(err, "failed to skip to data")
+//	}
+//
+//	err = d.checkByte(ettMap)
+//	if err != nil {
+//		return nil, errors.Wrap(err, "failed to verify map byte")
+//	}
+//
+//	arity := d.readMapLen()
+//	for ; arity > 0; arity-- {
+//		l, err := d.readAtomWithTag()
+//	}
+//
+//	return p, err
+//}

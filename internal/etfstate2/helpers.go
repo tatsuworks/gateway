@@ -1,4 +1,4 @@
-package etfstate
+package etfstate2
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/fngdevs/state/internal/mwerr"
+	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/valyala/fasthttp"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -30,9 +30,9 @@ func (s *Server) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
 	return errors.Wrap(err, "failed to commit fdb read txn")
 }
 
-func wrapHandler(fn func(ctx *fasthttp.RequestCtx) error) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
-		err := fn(ctx)
+func wrapHandler(fn func(w http.ResponseWriter, r *http.Request) error) httprouter.Handle {
+	return httprouter.Handle(func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+		err := fn(w, r)
 		if err != nil {
 			var (
 				msg  = err.Error()
@@ -44,10 +44,9 @@ func wrapHandler(fn func(ctx *fasthttp.RequestCtx) error) fasthttp.RequestHandle
 			}
 
 			fmt.Println(msg)
-			ctx.Error(msg, code)
+			http.Error(w, msg, code)
 		}
-
-	}
+	})
 }
 
 func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {

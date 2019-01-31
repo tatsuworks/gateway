@@ -54,6 +54,7 @@ func (c *Context) Write(w io.Writer, term interface{}) (err error) {
 		rv := reflect.ValueOf(v)
 		switch rv.Kind() {
 		case reflect.Struct:
+			fmt.Println("struct")
 			err = c.writeStruct(w, term)
 		case reflect.Array, reflect.Slice:
 			err = c.writeList(w, term)
@@ -276,6 +277,7 @@ func (c *Context) writeStruct(w io.Writer, r interface{}) (err error) {
 	rv := reflect.ValueOf(r)
 	rt := reflect.TypeOf(r)
 	n := rv.NumField()
+	fmt.Println("num", n)
 	buf := new(bytes.Buffer)
 	arity := uint32(0)
 
@@ -294,7 +296,8 @@ func (c *Context) writeStruct(w io.Writer, r interface{}) (err error) {
 				}
 			}
 
-			err = c.Write(buf, Atom(fieldName))
+			fmt.Println("name:", fieldName)
+			err = c.Write(buf, fieldName)
 			if err != nil {
 				return
 			}

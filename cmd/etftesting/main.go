@@ -57,9 +57,9 @@ func xd() {
 	fmt.Println("roles      ", len(gc.Roles))
 	fmt.Println("voicestates", len(gc.VoiceStates))
 
-	//if true {
-	//	return
-	//}
+	if true {
+		return
+	}
 
 	var (
 		rd  = bytes.NewReader(gc.Members[0])

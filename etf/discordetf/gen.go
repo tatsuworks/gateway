@@ -1,6 +1,8 @@
 package discordetf
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -15,8 +17,8 @@ var (
 
 type Event struct {
 	D  []byte
-	Op uint8
-	S  uint8
+	Op int
+	S  int
 	T  string
 }
 
@@ -57,7 +59,7 @@ func DecodeT(buf []byte) (*Event, error) {
 
 		switch key {
 		case "op":
-			e.Op, err = d.readSmallIntWithIndicatorIntoInt()
+			e.Op, err = d.readSmallIntWithTagIntoInt()
 			if err != nil {
 				return e, errors.Wrap(err, "failed to read OP value")
 			}
@@ -70,8 +72,14 @@ func DecodeT(buf []byte) (*Event, error) {
 			e.D = raw
 
 		case "s":
-			i, err := d.readSmallIntWithIndicatorIntoInt()
+			i, err := d.readIntWithTagIntoInt()
 			if err != nil {
+				d.inc(-1)
+				_, err2 := d.readAtomWithTag()
+				if err2 == nil {
+					continue
+				}
+
 				return e, errors.Wrap(err, "failed to read s value")
 			}
 			e.S = i
@@ -88,6 +96,18 @@ func DecodeT(buf []byte) (*Event, error) {
 	}
 
 	return e, nil
+}
+
+func (d *decoder) readIntWithTagIntoInt() (int, error) {
+	t := d.read(1)[0]
+	switch t {
+	case ettSmallInteger:
+		return d.readSmallIntIntoInt(), nil
+	case ettInteger:
+		return d.readRawIntIntoInt(), nil
+	default:
+		return 0, errors.Errorf("expected bytes 97/98, got %v", t)
+	}
 }
 
 func (d *decoder) readUntilData() error {
@@ -127,21 +147,109 @@ func (d *decoder) readUntilData() error {
 	return errors.New("couldn't find data key")
 }
 
-func (d *decoder) readSmallIntWithIndicatorIntoInt() (uint8, error) {
+func (d *decoder) readSmallIntWithTagIntoInt() (int, error) {
 	err := d.checkByte(ettSmallInteger)
 	if err != nil {
 		return 0, err
 	}
 
 	d.inc(1)
-	return uint8(d.buf[d.off-1]), nil
+	return int(d.buf[d.off-1]), nil
+}
+
+func (d *decoder) readSmallIntIntoInt() int {
+	return int(d.read(1)[0])
 }
 
 func (d *decoder) readAtomWithTag() (int, error) {
 	err := d.checkByte(ettAtom)
 	if err != nil {
+		d.inc(-1)
+		if err := d.checkByte(ettBinary); err == nil {
+			return d.readRawBinary(), nil
+		}
+
 		return 0, err
 	}
 
 	return d.readRawAtom(), nil
+}
+
+func (d *decoder) readEmojiID() (interface{}, error) {
+	var (
+		id   int64
+		name string
+	)
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to verify emoji map byte")
+	}
+
+	arity := d.readMapLen()
+
+	for ; arity > 0; arity-- {
+		start := d.off
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			fmt.Println(d.buf)
+			fmt.Println(d.buf[start-5:])
+			return nil, errors.Wrap(err, "failed to read emoji map key")
+		}
+
+		key := string(d.buf[d.off-l : d.off])
+		switch key {
+		case "id":
+			id, err = d.readSmallBigWithTagToInt64()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to read emoji id")
+			}
+			continue
+		case "name":
+			l, err := d.readAtomWithTag()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to read emoji name")
+			}
+
+			name = string(d.buf[d.off-l : d.off])
+			continue
+		}
+
+		err = d.readTerm()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read emoji value")
+		}
+	}
+
+	if id == 0 {
+		return name, err
+	}
+
+	return id, err
+}
+
+func (d *decoder) readUntilKey(name string) error {
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return errors.Wrap(err, "failed to verify map byte")
+	}
+
+	arity := d.readMapLen()
+	for ; arity > 0; arity-- {
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			return errors.Wrap(err, "failed to read map key")
+		}
+
+		key := string(d.buf[d.off-l : d.off])
+		if key == name {
+			return nil
+		}
+
+		err = d.readTerm()
+		if err != nil {
+			return errors.Wrap(err, "failed to read map value")
+		}
+	}
+
+	return errors.Errorf("couldn't find key %s", name)
 }

@@ -30,3 +30,30 @@ func DecodeChannel(buf []byte) (*Channel, error) {
 
 	return ch, err
 }
+
+type VoiceState struct {
+	User    int64
+	Channel int64
+	Raw     []byte
+}
+
+func DecodeVoiceState(buf []byte) (*VoiceState, error) {
+	var (
+		vs  = &VoiceState{}
+		d   = &decoder{buf: buf}
+		err error
+	)
+
+	vs.User, vs.Raw, err = d.readMapWithIDIntoSlice()
+	if err != nil {
+		return vs, errors.WithStack(err)
+	}
+
+	d.reset()
+	vs.Channel, err = d.idFromMap("channel_id")
+	if err != nil {
+		return vs, errors.WithStack(err)
+	}
+
+	return vs, err
+}

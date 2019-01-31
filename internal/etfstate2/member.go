@@ -1,4 +1,4 @@
-package etfstate
+package etfstate2
 
 import (
 	"net/http"
@@ -6,17 +6,21 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/fngdevs/state/etf/discordetf"
-	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleMemberChunk(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Member chunk processed.")
+func (s *Server) handleMemberChunk(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -45,13 +49,18 @@ func (s *Server) handleMemberChunk(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleMemberAdd(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Member add processed.")
+func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -83,13 +92,18 @@ func (s *Server) handleMemberAdd(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleMemberRemove(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Member remove processed.")
+func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -121,13 +135,18 @@ func (s *Server) handleMemberRemove(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handlePresenceUpdate(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Presence update processed.")
+func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -151,12 +170,12 @@ func (s *Server) handlePresenceUpdate(ctx *fasthttp.RequestCtx) error {
 	fdbStop := time.Since(fdbStart)
 	_ = termStop
 	_ = fdbStop
-	//s.log.Info(
-	//	"finished presence_update",
-	//	zap.Duration("decode", termStop),
-	//	zap.Duration("fdb", fdbStop),
-	//	zap.Duration("total", termStop+fdbStop),
-	//)
+	s.log.Info(
+		"finished presence_update",
+		zap.Duration("decode", termStop),
+		zap.Duration("fdb", fdbStop),
+		zap.Duration("total", termStop+fdbStop),
+	)
 
 	return nil
 }

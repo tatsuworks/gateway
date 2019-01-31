@@ -1,4 +1,4 @@
-package etfstate
+package etfstate2
 
 import (
 	"net/http"
@@ -6,18 +6,22 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/fngdevs/state/etf/discordetf"
-	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *Server) handleGuildCreate(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Guild create processed.")
+func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -64,13 +68,18 @@ func (s *Server) handleGuildCreate(ctx *fasthttp.RequestCtx) error {
 	return err
 }
 
-func (s *Server) handleGuildDelete(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Guild delete processed.")
+func (s *Server) handleGuildDelete(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -132,13 +141,18 @@ func (s *Server) handleGuildDelete(ctx *fasthttp.RequestCtx) error {
 	return err
 }
 
-func (s *Server) handleGuildBanAdd(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Guild ban create processed.")
+func (s *Server) handleGuildBanAdd(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -170,13 +184,18 @@ func (s *Server) handleGuildBanAdd(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleGuildBanRemove(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Guild ban remove processed.")
+func (s *Server) handleGuildBanRemove(w http.ResponseWriter, r *http.Request) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}

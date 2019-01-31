@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os"
 
 	"github.com/fngdevs/state/internal/etfstate"
+	"github.com/fngdevs/state/internal/etfstate2"
 	"github.com/fngdevs/state/internal/grpcstate"
 	"github.com/fngdevs/state/pb"
 	"github.com/go-redis/redis"
@@ -31,8 +33,11 @@ var (
 	useEs     bool
 	usePprof  bool
 	useGrpc   bool
+	useHttp2  bool
 	port      string
 	redisAddr string
+
+	Version string
 )
 
 func init() {
@@ -40,7 +45,8 @@ func init() {
 	flag.BoolVar(&usePsql, "psql", false, "use postgres")
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
-	flag.BoolVar(&useGrpc, "grpc", false, "use grpc instead of custom loggers")
+	flag.BoolVar(&useGrpc, "grpc", false, "use grpc")
+	flag.BoolVar(&useHttp2, "http2", false, "use http2")
 	flag.StringVar(&port, "port", ":80", ":80")
 	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
 	flag.Parse()
@@ -62,12 +68,24 @@ func main() {
 		logger.Fatal("failed to create gops agent", zap.Error(err))
 	}
 
+	if useHttp2 {
+		eState, err := etfstate2.NewServer(logger, Version)
+		if err != nil {
+			logger.Panic("failed to create etfstate", zap.Error(err))
+		}
+
+		fmt.Println("test2")
+		eState.Init()
+		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
+	}
+
 	if !useGrpc {
 		eState, err := etfstate.NewServer(logger)
 		if err != nil {
 			logger.Panic("failed to create etfstate", zap.Error(err))
 		}
 
+		fmt.Println("test2")
 		eState.Init()
 		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
 	}

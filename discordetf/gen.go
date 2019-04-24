@@ -18,7 +18,7 @@ var (
 type Event struct {
 	D  []byte
 	Op int
-	S  int
+	S  int64
 	T  string
 }
 
@@ -82,7 +82,7 @@ func DecodeT(buf []byte) (*Event, error) {
 
 				return e, errors.Wrap(err, "failed to read s value")
 			}
-			e.S = i
+			e.S = int64(i)
 		case "t":
 			l, err := d.readAtomWithTag()
 			if err != nil {

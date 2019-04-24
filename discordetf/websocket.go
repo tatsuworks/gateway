@@ -60,3 +60,50 @@ func DecodeHello(buf []byte) (int, string, error) {
 
 	return interval, trace, nil
 }
+
+func DecodeReady(buf []byte) (int, string, error) {
+	var (
+		d      = &decoder{buf: buf}
+		v      int
+		sessID string
+	)
+
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return 0, "", errors.Wrap(err, "failed to verify map byte")
+	}
+
+	arity := d.readMapLen()
+	for ; arity > 0; arity-- {
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			return 0, "", err
+		}
+
+		key := string(d.buf[d.off-l : d.off])
+		switch key {
+		case "v":
+			v, err = d.readIntWithTagIntoInt()
+			if err != nil {
+				return 0, "", errors.Wrap(err, "failed to read version")
+			}
+
+		case "session_id":
+			a, err := d.readAtomWithTag()
+			if err != nil {
+				return 0, "", errors.Wrap(err, "failed to read session_id")
+			}
+
+			sessID = string(d.buf[d.off-a : d.off])
+
+		default:
+			err := d.readTerm()
+			if err != nil {
+				return 0, "", errors.Wrap(err, "failed to read "+key)
+			}
+		}
+
+	}
+
+	return v, sessID, nil
+}

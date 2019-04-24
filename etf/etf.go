@@ -25,6 +25,7 @@ type Context struct {
 	currentCache          []*string
 	ConvertBinaryToString bool
 	ConvertAtomsToBinary  bool
+	wroteHeader           bool
 }
 
 type Term interface{}

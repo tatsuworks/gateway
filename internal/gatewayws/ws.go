@@ -2,15 +2,21 @@ package gatewayws
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
+	"fmt"
+	"github.com/go-redis/redis"
+	"go.uber.org/zap"
 	"io"
-	"io/ioutil"
-	"nhooyr.io/websocket"
+	"runtime"
+	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/fngdevs/gateway/discordetf"
 	"github.com/pkg/errors"
 	"github.com/valyala/bytebufferpool"
+	"nhooyr.io/websocket"
+
+	"github.com/fngdevs/gateway/discordetf"
+	"github.com/fngdevs/gateway/etf"
 )
 
 var (
@@ -22,25 +28,66 @@ type Session struct {
 	ctx    context.Context
 	cancel func()
 
+	log *zap.Logger
+
+	token           string
+	shardID, shards int
+
 	seq    int64
+	sessID string
+	last   int64
+
 	wsConn *websocket.Conn
 
 	interval time.Duration
 	trace    string
 
 	bufs *bytebufferpool.Pool
+
+	rc *redis.Client
 }
 
-func NewSession() *Session {
+func NewSession(logger *zap.Logger, token string, shardID, shards int) *Session {
 	return &Session{
+		log:     logger,
+		token:   token,
+		shardID: shardID,
+		shards:  shards,
+
 		bufs: &bytebufferpool.Pool{},
+	}
+}
+
+func (s *Session) logTotalEvents() {
+	for {
+		time.Sleep(5 * time.Second)
+		seq := atomic.LoadInt64(&s.seq)
+
+		s.log.Info(
+			"event report",
+			zap.Int("shard", s.shardID),
+			zap.Int64("seq", seq),
+			zap.Int64("since", seq-s.last),
+			zap.Float64("/sec", float64(seq-s.last)/5),
+		)
+
+		s.last = seq
 	}
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
-	c, _, err := websocket.Dial(s.ctx, GatewayETF)
+	s.rc = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	err := s.rc.Ping().Err()
+	if err != nil {
+		return errors.Wrap(err, "failed to ping redis")
+	}
+
+	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to dial gateway")
 	}
@@ -51,10 +98,46 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		return errors.Wrap(err, "failed to handle hello message")
 	}
 
-	err = s.writeIdentify()
-	if err != nil {
-		return errors.Wrap(err, "failed to write identify payload")
+	if s.seq == 0 && s.sessID == "" {
+		err := s.writeIdentify()
+		if err != nil {
+			return errors.Wrap(err, "failed to send identify")
+		}
+
+	} else {
+		err := s.writeResume()
+		if err != nil {
+			return errors.Wrap(err, "failed to send resume")
+		}
 	}
+
+	byt, err := s.readMessage()
+	if err != nil {
+		return errors.Wrap(err, "failed to read message")
+	}
+
+	e, err := discordetf.DecodeT(byt)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode event")
+	}
+
+	if e.T == "READY" {
+		_, sess, err := discordetf.DecodeReady(e.D)
+		if err != nil {
+			return errors.Wrap(err, "failed to decode ready")
+		}
+
+		s.sessID = sess
+		s.log.Info("ready", zap.Int("shard", s.shardID))
+
+	} else if e.T == "RESUMED" {
+		s.log.Info("resumed", zap.Int("shard", s.shardID))
+	}
+
+	go s.sendHeartbeats()
+	go s.logTotalEvents()
+
+	s.log.Info("websocket connected", zap.Int("shard", s.shardID))
 
 	for {
 		var byt []byte
@@ -71,7 +154,18 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			break
 		}
 
-		spew.Dump(ev)
+		if ev.S != 0 {
+			atomic.StoreInt64(&s.seq, ev.S)
+		} else {
+			// s.log.Info("0 seq received", zap.Int("shard", s.shardID), zap.String("type", ev.T), zap.Int("op", ev.Op))
+		}
+
+		err = s.rc.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err()
+		if err != nil {
+			s.log.Error("failed to push event to redis", zap.Error(err))
+		}
+
+		s.putRawBuf(byt)
 	}
 
 	c.Close(websocket.StatusNormalClosure, "")
@@ -79,7 +173,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 }
 
 func (s *Session) writeIdentify() error {
-	w, err := s.wsConn.Write(s.ctx, websocket.MessageBinary)
+	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
 		return errors.Wrap(err, "failed to get writer")
 	}
@@ -94,16 +188,11 @@ func (s *Session) writeIdentify() error {
 		return errors.Wrap(err, "failed to write identify payload")
 	}
 
-	err = w.Close()
-	if err != nil {
-		return errors.Wrap(err, "failed to close identify writer")
-	}
-
-	return nil
+	return errors.Wrap(w.Close(), "failed to close identify writer")
 }
 
 func (s *Session) readHello() error {
-	_, r, err := s.wsConn.Read(s.ctx)
+	_, r, err := s.wsConn.Reader(s.ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get hello reader")
 	}
@@ -127,7 +216,7 @@ func (s *Session) readHello() error {
 }
 
 func (s *Session) readMessage() ([]byte, error) {
-	_, r, err := s.wsConn.Read(s.ctx)
+	_, r, err := s.wsConn.Reader(s.ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get reader")
 	}
@@ -147,27 +236,115 @@ func (s *Session) putRawBuf(buf []byte) {
 }
 
 func (s *Session) identifyPayload() ([]byte, error) {
-	// var (
-	// 	buf = s.bufs.Get()
-	// 	c   = new(etf.Context)
-	// )
+	var (
+		buf = s.bufs.Get()
+		c   = new(etf.Context)
+	)
 
-	// err := c.Write(buf, identifyOp{
-	// 	Op: 2,
-	// 	Data: identify{
-	// 		Token: "Bot ",
-	// 		Properties: props{
-	// 			Os:      runtime.GOOS,
-	// 			Browser: "https://github.com/fngdevs/gateway",
-	// 			Device:  "Go",
-	// 		},
-	// 		Compress:       true,
-	// 		LargeThreshold: 250,
-	// 	},
-	// })
+	err := c.Write(buf, identifyOp{
+		Op: 2,
+		Data: identify{
+			Token: s.token,
+			Properties: props{
+				Os:      runtime.GOOS,
+				Browser: "https://github.com/fngdevs/gateway",
+				Device:  "Go",
+			},
+			Compress:       false,
+			LargeThreshold: 250,
+			Shard:          []int{s.shardID, s.shards},
+		},
+	})
 
-	b, err := ioutil.ReadFile("rawetf")
-	return b, errors.Wrap(err, "failed to write identify payload")
+	return buf.B, errors.Wrap(err, "failed to write identify payload")
+}
+
+func (s *Session) writeResume() error {
+	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
+	if err != nil {
+		return errors.Wrap(err, "failed to get writer")
+	}
+
+	payload, err := s.resumePayload()
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(payload)
+	if err != nil {
+		return errors.Wrap(err, "failed to write identify payload")
+	}
+
+	return errors.Wrap(w.Close(), "failed to close identify writer")
+}
+
+func (s *Session) resumePayload() ([]byte, error) {
+	var (
+		buf = s.bufs.Get()
+		c   = new(etf.Context)
+	)
+
+	err := c.Write(buf, resumeOp{
+		Op: 6,
+		Data: resume{
+			Token:     s.token,
+			SessionID: s.sessID,
+			Sequence:  s.seq,
+		},
+	})
+
+	return buf.B, errors.Wrap(err, "failed to write resume payload")
+}
+
+func (s *Session) heartbeat() error {
+	var (
+		buf = s.bufs.Get()
+		c   = new(etf.Context)
+	)
+
+	defer s.bufs.Put(buf)
+	err := c.Write(buf, heartbeatOp{
+		Op:   1,
+		Data: atomic.LoadInt64(&s.seq),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to write heartbeat")
+	}
+
+	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
+	if err != nil {
+		return errors.Wrap(err, "failed to get heartbeat writer")
+	}
+	defer w.Close()
+
+	_, err = w.Write(buf.B)
+	if err != nil {
+		return errors.Wrap(err, "failed to copy heartbear")
+	}
+
+	return nil
+}
+
+func (s *Session) sendHeartbeats() {
+	t := time.NewTicker(s.interval)
+
+	for {
+		err := s.heartbeat()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+type heartbeatOp struct {
+	Op   int   `json:"op"`
+	Data int64 `json:"d"`
 }
 
 type identifyOp struct {
@@ -180,6 +357,18 @@ type identify struct {
 	Properties     props  `json:"properties"`
 	Compress       bool   `json:"compress"`
 	LargeThreshold int    `json:"large_threshold"`
+	Shard          []int  `json:"shard"`
+}
+
+type resumeOp struct {
+	Op   int    `json:"op"`
+	Data resume `json:"d"`
+}
+
+type resume struct {
+	Token     string `json:"token"`
+	SessionID string `json:"session_id"`
+	Sequence  int64  `json:"seq"`
 }
 
 type props struct {

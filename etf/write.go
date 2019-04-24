@@ -21,7 +21,11 @@ func (c *Context) WriteDist(w io.Writer, _ []Term) (err error) {
 }
 
 func (c *Context) Write(w io.Writer, term interface{}) (err error) {
-	w.Write([]byte{131})
+	if !c.wroteHeader {
+		w.Write([]byte{131})
+		c.wroteHeader = true
+	}
+
 	switch v := term.(type) {
 	case bool:
 		err = c.writeBool(w, v)

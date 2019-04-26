@@ -3,9 +3,12 @@ package gatewayws
 import (
 	"context"
 	"fmt"
+	"github.com/fngdevs/gateway/state"
 	"github.com/go-redis/redis"
 	"go.uber.org/zap"
 	"io"
+	"net/url"
+	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -44,18 +47,31 @@ type Session struct {
 
 	bufs *bytebufferpool.Pool
 
+	zlr io.ReadCloser
+
+	state *state.Client
+
 	rc *redis.Client
 }
 
-func NewSession(logger *zap.Logger, token string, shardID, shards int) *Session {
+func NewSession(logger *zap.Logger, token string, shardID, shards int, stateURL string) (*Session, error) {
+	sc, err := state.NewClient(url.URL{
+		Scheme: "https",
+		Host:   stateURL,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &Session{
 		log:     logger,
 		token:   token,
 		shardID: shardID,
 		shards:  shards,
+		state:   sc,
 
 		bufs: &bytebufferpool.Pool{},
-	}
+	}, nil
 }
 
 func (s *Session) logTotalEvents() {
@@ -160,10 +176,22 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			// s.log.Info("0 seq received", zap.Int("shard", s.shardID), zap.String("type", ev.T), zap.Int("op", ev.Op))
 		}
 
-		err = s.rc.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err()
+		start := time.Now()
+		err = s.state.HandleEvent(ev)
 		if err != nil {
-			s.log.Error("failed to push event to redis", zap.Error(err))
+			s.log.Error("failed to send event to state", zap.Error(err))
+			os.Exit(0)
 		}
+
+		done := time.Since(start)
+		_ = done
+		// s.log.Info("sent event", zap.String("type", ev.T), zap.String("since", done.String()))
+
+		_ = strings.ToLower
+		// err = s.rc.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err()
+		// if err != nil {
+		// 	s.log.Error("failed to push event to redis", zap.Error(err))
+		// }
 
 		s.putRawBuf(byt)
 	}
@@ -220,6 +248,18 @@ func (s *Session) readMessage() ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get reader")
 	}
+
+	// if s.zlr == nil {
+	// 	s.zlr, err = zlib.NewReader(r)
+	// 	if err != nil {
+	// 		return nil, errors.Wrap(err, "failed to create zlib reader")
+	// 	}
+	// } else {
+	// 	err = s.zlr.(zlib.Resetter).Reset(r, nil)
+	// 	if err != nil {
+	// 		return nil, errors.Wrap(err, "failed to reset zlib reader")
+	// 	}
+	// }
 
 	raw := s.bufs.Get()
 	_, err = io.Copy(raw, r)

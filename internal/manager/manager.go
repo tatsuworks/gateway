@@ -8,13 +8,15 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(ctx context.Context, logger *zap.Logger, token string, shards int) *Manager {
+func New(ctx context.Context, logger *zap.Logger, token string, shards int, stateURL string) *Manager {
 	return &Manager{
 		ctx: ctx,
 		log: logger,
 
 		token:  token,
 		shards: shards,
+
+		stateURL: stateURL,
 	}
 }
 
@@ -24,6 +26,8 @@ type Manager struct {
 
 	token  string
 	shards int
+
+	stateURL string
 
 	up int
 }
@@ -48,7 +52,11 @@ func (m *Manager) Start(stopAt int) error {
 }
 
 func (m *Manager) startShard(shard int) {
-	s := gatewayws.NewSession(m.log, m.token, shard, m.shards)
+	s, err := gatewayws.NewSession(m.log, m.token, shard, m.shards, m.stateURL)
+	if err != nil {
+		m.log.Error("failed to make gateway session", zap.Error(err))
+		return
+	}
 
 	for {
 		select {
@@ -62,6 +70,8 @@ func (m *Manager) startShard(shard int) {
 		if err != nil {
 			m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
 		}
+
+		time.Sleep(time.Second)
 	}
 
 }

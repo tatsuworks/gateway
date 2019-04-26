@@ -1,0 +1,156 @@
+package state
+
+import (
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/fngdevs/gateway/discordetf"
+)
+
+func (c *Client) HandleEvent(e *discordetf.Event) error {
+	switch e.T {
+	case "GUILD_CREATE":
+		return c.GuildCreate(e.D)
+	case "GUILD_UPDATE":
+		return c.GuildCreate(e.D)
+	case "GUILD_DELETE":
+		return c.GuildDelete(e.D)
+	case "GUILD_BAN_ADD":
+		return c.GuildBanAdd(e.D)
+	case "GUILD_BAN_REMOVE":
+		return c.GuildBanRemove(e.D)
+	case "GUILD_ROLE_CREATE":
+		return c.RoleCreate(e.D)
+	case "GUILD_ROLE_UPDATE":
+		return c.RoleCreate(e.D)
+	case "GUILD_ROLE_DELETE":
+		return c.RoleDelete(e.D)
+	case "GUILD_MEMBERS_CHUNK":
+		return c.MemberChunk(e.D)
+	case "GUILD_MEMBER_ADD":
+		return c.MemberAdd(e.D)
+	case "GUILD_MEMBER_UPDATE":
+		return c.MemberAdd(e.D)
+	case "GUILD_MEMBER_REMOVE":
+		return c.MemberRemove(e.D)
+	case "PRESENCE_UPDATE":
+		return c.PresenceUpdate(e.D)
+	case "CHANNEL_CREATE":
+		return c.ChannelCreate(e.D)
+	case "CHANNEL_UPDATE":
+		return c.ChannelCreate(e.D)
+	case "CHANNEL_DELETE":
+		return c.ChannelDelete(e.D)
+	case "VOICE_STATE_UPDATE":
+		return c.VoiceStateUpdate(e.D)
+	case "MESSAGE_CREATE":
+		return c.MessageCreate(e.D)
+	case "MESSAGE_UPDATE":
+		return c.MessageCreate(e.D)
+	case "MESSAGE_DELETE":
+		return c.MessageDelete(e.D)
+	case "MESSAGE_REACTION_ADD":
+		return c.MessageReactionAdd(e.D)
+	case "MESSAGE_REACTION_REMOVE":
+		return c.MessageReactionRemove(e.D)
+	case "MESSAGE_REACTION_REMOVE_ALL":
+		return c.MessageReactionRemoveAll(e.D)
+	case "TYPING_START":
+		return nil
+	case "nil":
+		return nil
+	default:
+		// return errors.Errorf("unknown event: %s", e.T)
+		return nil
+	}
+}
+
+// Transact is a helper around (fdb.Database).Transact which accepts a function that doesn't require a return value.
+func (c *Client) Transact(fn func(t fdb.Transaction) error) error {
+	_, err := c.fdb.Transact(func(t fdb.Transaction) (ret interface{}, err error) {
+		return nil, fn(t)
+	})
+
+	return errors.Wrap(err, "failed to commit fdb txn")
+}
+
+// ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a function that doesn't require a return value.
+func (c *Client) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
+	_, err := c.fdb.ReadTransact(func(t fdb.ReadTransaction) (ret interface{}, err error) {
+		return nil, fn(t)
+	})
+
+	return errors.Wrap(err, "failed to commit fdb read txn")
+}
+
+func (c *Client) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {
+	eg := new(errgroup.Group)
+
+	send := func(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) {
+		eg.Go(func() error {
+			return c.Transact(func(t fdb.Transaction) error {
+				for id, e := range etfs {
+					t.Set(key(guild, id), e)
+				}
+
+				return nil
+			})
+		})
+
+	}
+
+	bufMap := etfs
+	if len(etfs) > 1000 {
+		bufMap = make(map[int64][]byte, 1000)
+
+		for i, e := range etfs {
+			bufMap[i] = e
+
+			if len(bufMap) >= 1000 {
+				send(guild, bufMap, key)
+				bufMap = make(map[int64][]byte, 1000)
+			}
+		}
+	}
+
+	send(guild, bufMap, key)
+	return eg.Wait()
+}
+
+func (c *Client) fmtChannelKey(guild, id int64) fdb.Key {
+	return c.subs.Channels.Pack(tuple.Tuple{guild, id})
+}
+
+func (c *Client) fmtGuildKey(guild int64) fdb.Key {
+	return c.subs.Guilds.Pack(tuple.Tuple{guild})
+}
+
+func (c *Client) fmtGuildBanKey(guild, user int64) fdb.Key {
+	return c.subs.Guilds.Pack(tuple.Tuple{guild, "bans", user})
+}
+
+func (c *Client) fmtMemberKey(guild, id int64) fdb.Key {
+	return c.subs.Members.Pack(tuple.Tuple{guild, id})
+}
+
+func (c *Client) fmtMessageKey(channel, id int64) fdb.Key {
+	return c.subs.Messages.Pack(tuple.Tuple{channel, id})
+}
+
+func (c *Client) fmtMessageReactionKey(channel, id, user int64, name interface{}) fdb.Key {
+	return c.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns", user, name})
+}
+
+func (c *Client) fmtPresenceKey(guild, id int64) fdb.Key {
+	return c.subs.Presences.Pack(tuple.Tuple{guild, id})
+}
+
+func (c *Client) fmtRoleKey(guild, id int64) fdb.Key {
+	return c.subs.Roles.Pack(tuple.Tuple{guild, id})
+}
+
+func (c *Client) fmtVoiceStateKey(channel, id int64) fdb.Key {
+	return c.subs.VoiceStates.Pack(tuple.Tuple{channel, id})
+}

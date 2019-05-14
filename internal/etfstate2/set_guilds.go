@@ -1,16 +1,19 @@
 package etfstate2
 
 import (
+	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/fngdevs/state/etf/discordetf"
+	"github.com/fngdevs/gateway/discordetf"
+	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -20,6 +23,18 @@ func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error
 		}
 	}()
 
+	s.log.Info("copy")
+	_, err := io.Copy(ioutil.Discard, r.Body)
+	if err != nil {
+		return err
+	}
+
+	s.log.Info("done")
+	if true {
+		return nil
+	}
+
+	s.log.Info("decode")
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
@@ -36,6 +51,7 @@ func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error
 
 	eg := new(errgroup.Group)
 
+	s.log.Info("set")
 	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
 			return s.setETFs(gc.Id, gc.Roles, s.fmtRoleKey)
@@ -57,6 +73,7 @@ func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error
 
 	err = eg.Wait()
 
+	s.log.Info("done")
 	fdbStop := time.Since(fdbStart)
 	s.log.Info(
 		"finished guild_create",
@@ -68,7 +85,7 @@ func (s *Server) handleGuildCreate(w http.ResponseWriter, r *http.Request) error
 	return err
 }
 
-func (s *Server) handleGuildDelete(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleGuildDelete(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -77,6 +94,11 @@ func (s *Server) handleGuildDelete(w http.ResponseWriter, r *http.Request) error
 			s.log.Error("failed to close request body", zap.Error(err))
 		}
 	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
@@ -141,7 +163,7 @@ func (s *Server) handleGuildDelete(w http.ResponseWriter, r *http.Request) error
 	return err
 }
 
-func (s *Server) handleGuildBanAdd(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleGuildBanAdd(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -150,6 +172,11 @@ func (s *Server) handleGuildBanAdd(w http.ResponseWriter, r *http.Request) error
 			s.log.Error("failed to close request body", zap.Error(err))
 		}
 	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
@@ -184,7 +211,7 @@ func (s *Server) handleGuildBanAdd(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
-func (s *Server) handleGuildBanRemove(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleGuildBanRemove(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -193,6 +220,11 @@ func (s *Server) handleGuildBanRemove(w http.ResponseWriter, r *http.Request) er
 			s.log.Error("failed to close request body", zap.Error(err))
 		}
 	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)

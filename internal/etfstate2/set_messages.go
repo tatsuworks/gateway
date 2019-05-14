@@ -1,15 +1,18 @@
 package etfstate2
 
 import (
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/fngdevs/state/etf/discordetf"
+	"github.com/julienschmidt/httprouter"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleMemberChunk(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -19,45 +22,10 @@ func (s *Server) handleMemberChunk(w http.ResponseWriter, r *http.Request) error
 		}
 	}()
 
-	termStart := time.Now()
-	ev, err := discordetf.DecodeT(buf.B)
+	_, err := io.Copy(buf, r.Body)
 	if err != nil {
 		return err
 	}
-
-	mc, err := discordetf.DecodeMemberChunk(ev.D)
-	if err != nil {
-		return err
-	}
-
-	termStop := time.Since(termStart)
-	fdbStart := time.Now()
-
-	err = s.setETFs(mc.Guild, mc.Members, s.fmtChannelKey)
-	if err != nil {
-		return err
-	}
-
-	fdbStop := time.Since(fdbStart)
-	s.log.Info(
-		"finished member_chunk",
-		zap.Duration("decode", termStop),
-		zap.Duration("fdb", fdbStop),
-		zap.Duration("total", termStop+fdbStop),
-	)
-
-	return nil
-}
-
-func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
-	buf := s.bufs.Get()
-	defer func() {
-		s.bufs.Put(buf)
-		err := r.Body.Close()
-		if err != nil {
-			s.log.Error("failed to close request body", zap.Error(err))
-		}
-	}()
 
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
@@ -65,7 +33,7 @@ func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	mc, err := discordetf.DecodeMember(ev.D)
+	mc, err := discordetf.DecodeMessage(ev.D)
 	if err != nil {
 		return err
 	}
@@ -74,7 +42,7 @@ func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
 	fdbStart := time.Now()
 
 	err = s.Transact(func(t fdb.Transaction) error {
-		t.Set(s.fmtMemberKey(mc.Guild, mc.Id), mc.Raw)
+		t.Set(s.fmtMessageKey(mc.Channel, mc.Id), mc.Raw)
 		return nil
 	})
 	if err != nil {
@@ -83,7 +51,7 @@ func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
 
 	fdbStop := time.Since(fdbStart)
 	s.log.Info(
-		"finished member_add/member_update",
+		"finished message create",
 		zap.Duration("decode", termStop),
 		zap.Duration("fdb", fdbStop),
 		zap.Duration("total", termStop+fdbStop),
@@ -92,7 +60,7 @@ func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -102,13 +70,18 @@ func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) erro
 		}
 	}()
 
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
+
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
 
-	mc, err := discordetf.DecodeMember(ev.D)
+	mc, err := discordetf.DecodeMessage(ev.D)
 	if err != nil {
 		return err
 	}
@@ -117,7 +90,7 @@ func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) erro
 	fdbStart := time.Now()
 
 	err = s.Transact(func(t fdb.Transaction) error {
-		t.Clear(s.fmtMemberKey(mc.Guild, mc.Id))
+		t.Clear(s.fmtMessageKey(mc.Channel, mc.Id))
 		return nil
 	})
 	if err != nil {
@@ -126,7 +99,7 @@ func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) erro
 
 	fdbStop := time.Since(fdbStart)
 	s.log.Info(
-		"finished member_remove",
+		"finished message update",
 		zap.Duration("decode", termStop),
 		zap.Duration("fdb", fdbStop),
 		zap.Duration("total", termStop+fdbStop),
@@ -135,7 +108,7 @@ func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleMessageReactionAdd(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	buf := s.bufs.Get()
 	defer func() {
 		s.bufs.Put(buf)
@@ -145,13 +118,18 @@ func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request) er
 		}
 	}()
 
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
+
 	termStart := time.Now()
 	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
 
-	p, err := discordetf.DecodePresence(ev.D)
+	rc, err := discordetf.DecodeMessageReaction(ev.D)
 	if err != nil {
 		return err
 	}
@@ -160,7 +138,7 @@ func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request) er
 	fdbStart := time.Now()
 
 	err = s.Transact(func(t fdb.Transaction) error {
-		t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
+		t.Set(s.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, rc.Name), rc.Raw)
 		return nil
 	})
 	if err != nil {
@@ -168,10 +146,108 @@ func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request) er
 	}
 
 	fdbStop := time.Since(fdbStart)
-	_ = termStop
-	_ = fdbStop
 	s.log.Info(
-		"finished presence_update",
+		"finished message reaction add",
+		zap.Duration("decode", termStop),
+		zap.Duration("fdb", fdbStop),
+		zap.Duration("total", termStop+fdbStop),
+	)
+
+	return nil
+}
+
+func (s *Server) handleMessageReactionRemove(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	if _, err := io.Copy(buf, r.Body); err != nil {
+		return errors.Wrap(err, "failed to copy body")
+	}
+
+	termStart := time.Now()
+	ev, err := discordetf.DecodeT(buf.B)
+	if err != nil {
+		return err
+	}
+
+	rc, err := discordetf.DecodeMessageReaction(ev.D)
+	if err != nil {
+		return err
+	}
+
+	termStop := time.Since(termStart)
+	fdbStart := time.Now()
+
+	err = s.Transact(func(t fdb.Transaction) error {
+		t.Clear(s.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, rc.Name))
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	fdbStop := time.Since(fdbStart)
+	s.log.Info(
+		"finished message reaction remove",
+		zap.Duration("decode", termStop),
+		zap.Duration("fdb", fdbStop),
+		zap.Duration("total", termStop+fdbStop),
+	)
+
+	s.bufs.Put(buf)
+	return nil
+}
+
+func (s *Server) handleMessageReactionRemoveAll(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	if _, err := io.Copy(buf, r.Body); err != nil {
+		return errors.Wrap(err, "failed to copy body")
+	}
+
+	termStart := time.Now()
+	ev, err := discordetf.DecodeT(buf.B)
+	if err != nil {
+		return err
+	}
+
+	rc, err := discordetf.DecodeMessageReactionRemoveAll(ev.D)
+	if err != nil {
+		return err
+	}
+
+	termStop := time.Since(termStart)
+	fdbStart := time.Now()
+
+	err = s.Transact(func(t fdb.Transaction) error {
+		pre, err := fdb.PrefixRange(s.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, ""))
+		if err != nil {
+			return errors.Wrap(err, "failed to make message reaction prefixrange")
+		}
+
+		t.ClearRange(pre)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	fdbStop := time.Since(fdbStart)
+	s.log.Info(
+		"finished message reaction remove all",
 		zap.Duration("decode", termStop),
 		zap.Duration("fdb", fdbStop),
 		zap.Duration("total", termStop+fdbStop),

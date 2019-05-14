@@ -4,14 +4,11 @@ import (
 	"bytes"
 	"path"
 	"sync"
-	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
 	"github.com/fasthttp/router"
-	"github.com/fngdevs/state/etf/discordetf"
-	"github.com/nats-io/go-nats"
 	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
@@ -85,54 +82,54 @@ func (s *Server) Init() {
 	s.router.POST(path.Join(base, "message_reaction_remove"), wrapHandler(s.handleMessageReactionRemove))
 	s.router.POST(path.Join(base, "message_reaction_remove_all"), wrapHandler(s.handleMessageReactionRemoveAll))
 
-	fn := func(m *nats.Msg) {
-		termStart := time.Now()
-		ev, err := discordetf.DecodeT(m.Data)
-		if err != nil {
-			s.log.Error("failed to decode t", zap.Error(err))
-			return
-		}
+	// fn := func(m *nats.Msg) {
+	// 	termStart := time.Now()
+	// 	ev, err := discordetf.DecodeT(m.Data)
+	// 	if err != nil {
+	// 		s.log.Error("failed to decode t", zap.Error(err))
+	// 		return
+	// 	}
 
-		p, err := discordetf.DecodePresence(ev.D)
-		if err != nil {
-			s.log.Error("failed to decode presence", zap.Error(err))
-			return
-		}
+	// 	p, err := discordetf.DecodePresence(ev.D)
+	// 	if err != nil {
+	// 		s.log.Error("failed to decode presence", zap.Error(err))
+	// 		return
+	// 	}
 
-		termStop := time.Since(termStart)
-		fdbStart := time.Now()
+	// 	termStop := time.Since(termStart)
+	// 	fdbStart := time.Now()
 
-		err = s.Transact(func(t fdb.Transaction) error {
-			t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
-			return nil
-		})
-		if err != nil {
-			s.log.Error("failed to fdb transact", zap.Error(err))
-			return
-		}
+	// 	err = s.Transact(func(t fdb.Transaction) error {
+	// 		t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		s.log.Error("failed to fdb transact", zap.Error(err))
+	// 		return
+	// 	}
 
-		fdbStop := time.Since(fdbStart)
-		_ = termStop
-		_ = fdbStop
-		s.log.Info(
-			"finished presence_update",
-			zap.Duration("decode", termStop),
-			zap.Duration("fdb", fdbStop),
-			zap.Duration("total", termStop+fdbStop),
-		)
-	}
+	// 	fdbStop := time.Since(fdbStart)
+	// 	_ = termStop
+	// 	_ = fdbStop
+	// 	s.log.Info(
+	// 		"finished presence_update",
+	// 		zap.Duration("decode", termStop),
+	// 		zap.Duration("fdb", fdbStop),
+	// 		zap.Duration("total", termStop+fdbStop),
+	// 	)
+	// }
 
-	for range make([]struct{}, 5) {
-		nc, err := nats.Connect(nats.DefaultURL)
-		if err != nil {
-			panic(err)
-		}
+	// for range make([]struct{}, 5) {
+	// 	nc, err := nats.Connect(nats.DefaultURL)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
 
-		_, err = nc.QueueSubscribe("PRESENCE_UPDATE", "workers", fn)
-		if err != nil {
-			panic(err)
-		}
-	}
+	// 	_, err = nc.QueueSubscribe("PRESENCE_UPDATE", "workers", fn)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }
 }
 
 func (s *Server) Start(addr string) error {

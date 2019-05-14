@@ -85,7 +85,7 @@ func main() {
 			logger.Panic("failed to create etfstate", zap.Error(err))
 		}
 
-		fmt.Println("test2")
+		fmt.Println("test1")
 		eState.Init()
 		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
 	}

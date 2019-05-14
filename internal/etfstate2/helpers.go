@@ -30,9 +30,9 @@ func (s *Server) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
 	return errors.Wrap(err, "failed to commit fdb read txn")
 }
 
-func wrapHandler(fn func(w http.ResponseWriter, r *http.Request) error) httprouter.Handle {
-	return httprouter.Handle(func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		err := fn(w, r)
+func wrapHandler(fn func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error) httprouter.Handle {
+	return httprouter.Handle(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		err := fn(w, r, p)
 		if err != nil {
 			var (
 				msg  = err.Error()

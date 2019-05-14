@@ -4,14 +4,11 @@ import (
 	"net/http"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
-	"github.com/fngdevs/state/etf/discordetf"
 	"github.com/julienschmidt/httprouter"
-	"github.com/nats-io/go-nats"
 	"github.com/pkg/errors"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp/reuseport"
@@ -57,7 +54,7 @@ func NewServer(
 func (s *Server) Init() {
 	base := "/v1/events"
 
-	s.router.GET("/v", wrapHandler(func(w http.ResponseWriter, r *http.Request) error {
+	s.router.GET("/v", wrapHandler(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 		w.WriteHeader(http.StatusOK)
 		//w.Write([]byte("Version: " + s.version))
 		return nil
@@ -90,54 +87,63 @@ func (s *Server) Init() {
 	s.router.POST(path.Join(base, strings.ToUpper("message_reaction_remove")), wrapHandler(s.handleMessageReactionRemove))
 	s.router.POST(path.Join(base, strings.ToUpper("message_reaction_remove_all")), wrapHandler(s.handleMessageReactionRemoveAll))
 
-	fn := func(m *nats.Msg) {
-		termStart := time.Now()
-		ev, err := discordetf.DecodeT(m.Data)
-		if err != nil {
-			s.log.Error("failed to decode t", zap.Error(err))
-			return
-		}
+	s.router.GET(path.Join(base, "channels"), wrapHandler(s.getChannels))
+	s.router.GET(path.Join(base, "channels", ":id"), wrapHandler(s.getChannel))
+	s.router.GET(path.Join(base, "guilds", ":id"), wrapHandler(s.getGuild))
+	s.router.GET(path.Join(base, "roles", ":guild"), wrapHandler(s.getRoles))
+	s.router.GET(path.Join(base, "roles", ":guild", ":id"), wrapHandler(s.getRole))
+	s.router.GET(path.Join(base, "messages", ":channel", ":id"), wrapHandler(s.getMessage))
+	s.router.GET(path.Join(base, "members", ":guild"), wrapHandler(s.getMembers))
+	s.router.GET(path.Join(base, "members", ":guild", ":id"), wrapHandler(s.getMember))
 
-		p, err := discordetf.DecodePresence(ev.D)
-		if err != nil {
-			s.log.Error("failed to decode presence", zap.Error(err))
-			return
-		}
+	// fn := func(m *nats.Msg) {
+	// 	termStart := time.Now()
+	// 	ev, err := discordetf.DecodeT(m.Data)
+	// 	if err != nil {
+	// 		s.log.Error("failed to decode t", zap.Error(err))
+	// 		return
+	// 	}
 
-		termStop := time.Since(termStart)
-		fdbStart := time.Now()
+	// 	p, err := discordetf.DecodePresence(ev.D)
+	// 	if err != nil {
+	// 		s.log.Error("failed to decode presence", zap.Error(err))
+	// 		return
+	// 	}
 
-		err = s.Transact(func(t fdb.Transaction) error {
-			t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
-			return nil
-		})
-		if err != nil {
-			s.log.Error("failed to fdb transact", zap.Error(err))
-			return
-		}
+	// 	termStop := time.Since(termStart)
+	// 	fdbStart := time.Now()
 
-		fdbStop := time.Since(fdbStart)
-		_ = termStop
-		_ = fdbStop
-		s.log.Info(
-			"finished presence_update",
-			zap.Duration("decode", termStop),
-			zap.Duration("fdb", fdbStop),
-			zap.Duration("total", termStop+fdbStop),
-		)
-	}
+	// 	err = s.Transact(func(t fdb.Transaction) error {
+	// 		t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		s.log.Error("failed to fdb transact", zap.Error(err))
+	// 		return
+	// 	}
 
-	for range make([]struct{}, 5) {
-		nc, err := nats.Connect(nats.DefaultURL)
-		if err != nil {
-			panic(err)
-		}
+	// 	fdbStop := time.Since(fdbStart)
+	// 	_ = termStop
+	// 	_ = fdbStop
+	// 	s.log.Info(
+	// 		"finished presence_update",
+	// 		zap.Duration("decode", termStop),
+	// 		zap.Duration("fdb", fdbStop),
+	// 		zap.Duration("total", termStop+fdbStop),
+	// 	)
+	// }
 
-		_, err = nc.QueueSubscribe("PRESENCE_UPDATE", "workers", fn)
-		if err != nil {
-			panic(err)
-		}
-	}
+	// for range make([]struct{}, 5) {
+	// 	nc, err := nats.Connect(nats.DefaultURL)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+
+	// 	_, err = nc.QueueSubscribe("PRESENCE_UPDATE", "workers", fn)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }
 }
 
 func (s *Server) Start(addr string) error {

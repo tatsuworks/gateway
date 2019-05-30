@@ -3,7 +3,7 @@ package gatewayws
 import (
 	"context"
 	"fmt"
-	"github.com/fngdevs/gateway/state"
+	"github.com/tatsuworks/gateway/state"
 	"github.com/go-redis/redis"
 	"go.uber.org/zap"
 	"io"
@@ -18,8 +18,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 	"nhooyr.io/websocket"
 
-	"github.com/fngdevs/gateway/discordetf"
-	"github.com/fngdevs/gateway/etf"
+	"github.com/tatsuworks/gateway/discordetf"
+	"github.com/tatsuworks/gateway/etf"
 )
 
 var (
@@ -287,7 +287,7 @@ func (s *Session) identifyPayload() ([]byte, error) {
 			Token: s.token,
 			Properties: props{
 				Os:      runtime.GOOS,
-				Browser: "https://github.com/fngdevs/gateway",
+				Browser: "https://github.com/tatsuworks/gateway",
 				Device:  "Go",
 			},
 			Compress:       false,

@@ -15,7 +15,7 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
-	"github.com/fngdevs/gateway/discordetf"
+	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/pkg/errors"
 )
 

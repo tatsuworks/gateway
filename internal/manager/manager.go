@@ -2,7 +2,7 @@ package manager
 
 import (
 	"context"
-	"github.com/fngdevs/gateway/internal/gatewayws"
+	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"time"
 
 	"go.uber.org/zap"

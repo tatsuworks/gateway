@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/fngdevs/gateway/discordetf"
+	"github.com/tatsuworks/gateway/discordetf"
 )
 
 func (c *Client) HandleEvent(e *discordetf.Event) error {

@@ -2,7 +2,7 @@ package state
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/fngdevs/gateway/discordetf"
+	"github.com/tatsuworks/gateway/discordetf"
 )
 
 func (c *Client) RoleCreate(d []byte) error {

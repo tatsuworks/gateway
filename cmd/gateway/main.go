@@ -10,7 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/fngdevs/gateway/internal/manager"
+	"github.com/tatsuworks/gateway/internal/manager"
 )
 
 func main() {

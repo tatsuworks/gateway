@@ -1,4 +1,4 @@
-module github.com/fngdevs/gateway
+module github.com/tatsuworks/gateway
 
 go 1.12
 

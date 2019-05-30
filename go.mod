@@ -1,11 +1,11 @@
-module github.com/fngdevs/state
+module github.com/tatsuworks/state
 
 require (
 	github.com/apple/foundationdb v0.0.0-20181010171626-b58ea6302428
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fasthttp/router v0.2.0
-	github.com/fngdevs/gateway v0.0.0-20190424073655-a692fb2f07da
+	github.com/tatsuworks/gateway v0.0.0-20190424073655-a692fb2f07da
 	github.com/fortytw2/leaktest v1.2.0 // indirect
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/gogo/protobuf v1.1.1

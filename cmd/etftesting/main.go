@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/fngdevs/state/discord"
-	"github.com/fngdevs/state/etf"
-	"github.com/fngdevs/state/etf/discordetf"
+	"github.com/tatsuworks/state/discord"
+	"github.com/tatsuworks/state/etf"
+	"github.com/tatsuworks/state/etf/discordetf"
 	"github.com/klauspost/compress/zlib"
 )
 

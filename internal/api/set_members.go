@@ -1,22 +1,33 @@
-package etfstate
+package api
 
 import (
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/fngdevs/state/etf/discordetf"
-	"github.com/valyala/fasthttp"
+	"github.com/tatsuworks/state/etf/discordetf"
+	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleMemberChunk(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Member chunk processed.")
+func (s *Server) handleMemberChunk(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -45,13 +56,23 @@ func (s *Server) handleMemberChunk(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleMemberAdd(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Member add processed.")
+func (s *Server) handleMemberAdd(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -83,13 +104,23 @@ func (s *Server) handleMemberAdd(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleMemberRemove(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Member remove processed.")
+func (s *Server) handleMemberRemove(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -121,18 +152,28 @@ func (s *Server) handleMemberRemove(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handlePresenceUpdate(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Presence update processed.")
+func (s *Server) handlePresenceUpdate(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
 
-	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	_, err := io.Copy(buf, r.Body)
 	if err != nil {
 		return err
 	}
 
-	p, err := discordetf.DecodePresence(ev.D)
+	termStart := time.Now()
+	ev, err := discordetf.DecodeT(buf.B)
+	if err != nil {
+		return err
+	}
+
+	pre, err := discordetf.DecodePresence(ev.D)
 	if err != nil {
 		return err
 	}
@@ -141,7 +182,7 @@ func (s *Server) handlePresenceUpdate(ctx *fasthttp.RequestCtx) error {
 	fdbStart := time.Now()
 
 	err = s.Transact(func(t fdb.Transaction) error {
-		t.Set(s.fmtPresenceKey(p.Guild, p.Id), p.Raw)
+		t.Set(s.fmtPresenceKey(pre.Guild, pre.Id), pre.Raw)
 		return nil
 	})
 	if err != nil {
@@ -151,12 +192,12 @@ func (s *Server) handlePresenceUpdate(ctx *fasthttp.RequestCtx) error {
 	fdbStop := time.Since(fdbStart)
 	_ = termStop
 	_ = fdbStop
-	//s.log.Info(
-	//	"finished presence_update",
-	//	zap.Duration("decode", termStop),
-	//	zap.Duration("fdb", fdbStop),
-	//	zap.Duration("total", termStop+fdbStop),
-	//)
+	s.log.Info(
+		"finished presence_update",
+		zap.Duration("decode", termStop),
+		zap.Duration("fdb", fdbStop),
+		zap.Duration("total", termStop+fdbStop),
+	)
 
 	return nil
 }

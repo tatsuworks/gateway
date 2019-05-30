@@ -1,4 +1,4 @@
-package etfstate2
+package api
 
 import (
 	"net/http"
@@ -14,6 +14,10 @@ import (
 	"github.com/valyala/fasthttp/reuseport"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
+)
+
+var (
+	FDBRangeWantAll = fdb.RangeOptions{Mode: fdb.StreamingModeWantAll}
 )
 
 type Server struct {

@@ -9,8 +9,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fasthttp/router v0.2.0 h1:1k4jLGRwDTPq1QbIYVa5+zJxWixWCWYxgOG5mwbpRvA=
 github.com/fasthttp/router v0.2.0/go.mod h1:ENXeGFIg8mQS+sUPNQ/DboXat7SpQMKlDKMpKgE39pc=
-github.com/fngdevs/gateway v0.0.0-20190424073655-a692fb2f07da h1:OoqFtL/Aa5kSXXbkDyHtwFzXjv7vn8TgJF5+gzPtmmg=
-github.com/fngdevs/gateway v0.0.0-20190424073655-a692fb2f07da/go.mod h1:Tu5llJCX7VsJ3ndIo623bb3XdVbRmBtVIDZayIDEInE=
+github.com/tatsuworks/gateway v0.0.0-20190424073655-a692fb2f07da h1:OoqFtL/Aa5kSXXbkDyHtwFzXjv7vn8TgJF5+gzPtmmg=
+github.com/tatsuworks/gateway v0.0.0-20190424073655-a692fb2f07da/go.mod h1:Tu5llJCX7VsJ3ndIo623bb3XdVbRmBtVIDZayIDEInE=
 github.com/fortytw2/leaktest v1.2.0 h1:cj6GCiwJDH7l3tMHLjZDo0QqPtrXJiWSI9JgpeQKw+Q=
 github.com/fortytw2/leaktest v1.2.0/go.mod h1:jDsjWgpAGjm2CA7WthBh/CdZYEPF31XHquHwclZch5g=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=

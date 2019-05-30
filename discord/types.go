@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fngdevs/state/etf"
+	"github.com/tatsuworks/state/etf"
 )
 
 // Timestamp stores a timestamp, as sent by the Discord API.

@@ -1,4 +1,4 @@
-package etfstate2
+package api
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/fngdevs/state/etf/discordetf"
+	"github.com/tatsuworks/state/etf/discordetf"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"

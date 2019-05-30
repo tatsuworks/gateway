@@ -3,28 +3,18 @@ package main
 import (
 	"database/sql"
 	"flag"
-	"fmt"
 	"log"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/fngdevs/state/internal/etfstate"
-	"github.com/fngdevs/state/internal/etfstate2"
-	"github.com/fngdevs/state/internal/grpcstate"
-	"github.com/fngdevs/state/pb"
 	"github.com/go-redis/redis"
 	"github.com/google/gops/agent"
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
-	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	_ "github.com/lib/pq"
 	"github.com/olivere/elastic"
+	"github.com/tatsuworks/state/internal/api"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -32,8 +22,6 @@ var (
 	usePsql   bool
 	useEs     bool
 	usePprof  bool
-	useGrpc   bool
-	useHttp2  bool
 	port      string
 	redisAddr string
 
@@ -45,8 +33,6 @@ func init() {
 	flag.BoolVar(&usePsql, "psql", false, "use postgres")
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
-	flag.BoolVar(&useGrpc, "grpc", false, "use grpc")
-	flag.BoolVar(&useHttp2, "http2", false, "use http2")
 	flag.StringVar(&port, "port", ":80", ":80")
 	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
 	flag.Parse()
@@ -68,27 +54,13 @@ func main() {
 		logger.Fatal("failed to create gops agent", zap.Error(err))
 	}
 
-	if useHttp2 {
-		eState, err := etfstate2.NewServer(logger, Version)
-		if err != nil {
-			logger.Panic("failed to create etfstate", zap.Error(err))
-		}
-
-		fmt.Println("test2")
-		eState.Init()
-		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
+	state, err := api.NewServer(logger, Version)
+	if err != nil {
+		logger.Panic("failed to create etfstate", zap.Error(err))
 	}
 
-	if !useGrpc {
-		eState, err := etfstate.NewServer(logger)
-		if err != nil {
-			logger.Panic("failed to create etfstate", zap.Error(err))
-		}
-
-		fmt.Println("test1")
-		eState.Init()
-		logger.Fatal("failed to run server", zap.Error(eState.Start(":8080")))
-	}
+	state.Init()
+	logger.Fatal("failed to run server", zap.Error(state.Start(":8080")))
 
 	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		return lvl >= zapcore.WarnLevel
@@ -116,6 +88,7 @@ func main() {
 	var (
 		psql *sql.DB
 		ec   *elastic.Client
+		_, _ = psql, ec
 	)
 
 	if usePsql {
@@ -146,29 +119,4 @@ func main() {
 	if err != nil {
 		logger.Panic("failed to ping redis", zap.Error(err))
 	}
-
-	ss, err := grpcstate.NewServer(logger, psql, ec, rdb, usePsql, useEs)
-	if err != nil {
-		logger.Panic("failed to create state client", zap.Error(err))
-	}
-
-	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(
-			grpc_middleware.ChainUnaryServer(
-				grpc_prometheus.UnaryServerInterceptor,
-				grpc_zap.UnaryServerInterceptor(grpcLogger),
-				grpc_recovery.UnaryServerInterceptor(),
-				grpcstate.RequiredFieldsInterceptor(),
-			),
-		),
-	)
-	pb.RegisterStateServer(srv, ss)
-
-	lis, err := net.Listen("tcp4", port)
-	if err != nil {
-		panic(err)
-	}
-
-	logger.Info("listening at " + port)
-	srv.Serve(lis)
 }

@@ -1,22 +1,33 @@
-package etfstate
+package api
 
 import (
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/fngdevs/state/etf/discordetf"
-	"github.com/valyala/fasthttp"
+	"github.com/tatsuworks/state/etf/discordetf"
+	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 )
 
-func (s *Server) handleChannelCreate(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusCreated)
-	ctx.SetBodyString("Channel create processed.")
+func (s *Server) handleChannelCreate(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -48,13 +59,23 @@ func (s *Server) handleChannelCreate(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleChannelDelete(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Channel delete processed.")
+func (s *Server) handleChannelDelete(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}
@@ -86,13 +107,23 @@ func (s *Server) handleChannelDelete(ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-func (s *Server) handleVoiceStateUpdate(ctx *fasthttp.RequestCtx) error {
-	// Will be overwritten if error.
-	ctx.SetStatusCode(http.StatusOK)
-	ctx.SetBodyString("Voice state update processed.")
+func (s *Server) handleVoiceStateUpdate(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	buf := s.bufs.Get()
+	defer func() {
+		s.bufs.Put(buf)
+		err := r.Body.Close()
+		if err != nil {
+			s.log.Error("failed to close request body", zap.Error(err))
+		}
+	}()
+
+	_, err := io.Copy(buf, r.Body)
+	if err != nil {
+		return err
+	}
 
 	termStart := time.Now()
-	ev, err := discordetf.DecodeT(ctx.Request.Body())
+	ev, err := discordetf.DecodeT(buf.B)
 	if err != nil {
 		return err
 	}

@@ -2,23 +2,13 @@ package manager
 
 import (
 	"context"
-	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"time"
 
+	"github.com/go-redis/redis"
 	"go.uber.org/zap"
+
+	"github.com/tatsuworks/gateway/internal/gatewayws"
 )
-
-func New(ctx context.Context, logger *zap.Logger, token string, shards int, stateURL string) *Manager {
-	return &Manager{
-		ctx: ctx,
-		log: logger,
-
-		token:  token,
-		shards: shards,
-
-		stateURL: stateURL,
-	}
-}
 
 type Manager struct {
 	ctx context.Context
@@ -27,9 +17,32 @@ type Manager struct {
 	token  string
 	shards int
 
-	stateURL string
-
 	up int
+}
+
+func New(
+	ctx context.Context,
+	logger *zap.Logger,
+	token string,
+	shards int,
+	redisAddr string,
+) *Manager {
+	client := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+
+	_, err := client.Ping().Result()
+	if err != nil {
+		logger.Fatal("failed to ping redis", zap.Error(err))
+	}
+
+	return &Manager{
+		ctx: ctx,
+		log: logger,
+
+		token:  token,
+		shards: shards,
+	}
 }
 
 func (m *Manager) Start(stopAt int) error {
@@ -52,7 +65,7 @@ func (m *Manager) Start(stopAt int) error {
 }
 
 func (m *Manager) startShard(shard int) {
-	s, err := gatewayws.NewSession(m.log, m.token, shard, m.shards, m.stateURL)
+	s, err := gatewayws.NewSession(m.log, m.token, shard, m.shards)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
 		return

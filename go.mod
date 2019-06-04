@@ -3,9 +3,11 @@ module github.com/tatsuworks/gateway
 go 1.12
 
 require (
-	github.com/apple/foundationdb/bindings/go v0.0.0-20190425015057-9fea60675f86
+	github.com/apple/foundationdb/bindings/go v0.0.0-20190604013539-2f78b08c1c16
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-redis/redis v6.15.2+incompatible
+	github.com/google/go-cmp v0.3.0 // indirect
+	github.com/kr/pty v1.1.4 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
@@ -14,7 +16,10 @@ require (
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1
-	golang.org/x/net v0.0.0-20190311183353-d8887717615a
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
-	nhooyr.io/websocket v0.1.1-0.20190422021557-c7ee8af3eefd
+	golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5 // indirect
+	golang.org/x/net v0.0.0-20190603091049-60506f45cf65
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed // indirect
+	golang.org/x/tools v0.0.0-20190603231351-8aaa1484dc10 // indirect
+	nhooyr.io/websocket v1.1.1
 )

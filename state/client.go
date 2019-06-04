@@ -10,13 +10,13 @@ import (
 	"net/url"
 	"strings"
 
-	"golang.org/x/net/http2"
-
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
-	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
+
+	"github.com/tatsuworks/gateway/discordetf"
 )
 
 type Client struct {

@@ -3,16 +3,16 @@ package gatewayws
 import (
 	"context"
 	"fmt"
-	"github.com/tatsuworks/gateway/state"
-	"github.com/go-redis/redis"
-	"go.uber.org/zap"
 	"io"
-	"net/url"
 	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/go-redis/redis"
+	"github.com/tatsuworks/gateway/state"
+	"go.uber.org/zap"
 
 	"github.com/pkg/errors"
 	"github.com/valyala/bytebufferpool"
@@ -54,21 +54,12 @@ type Session struct {
 	rc *redis.Client
 }
 
-func NewSession(logger *zap.Logger, token string, shardID, shards int, stateURL string) (*Session, error) {
-	sc, err := state.NewClient(url.URL{
-		Scheme: "https",
-		Host:   stateURL,
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func NewSession(logger *zap.Logger, token string, shardID, shards int) (*Session, error) {
 	return &Session{
 		log:     logger,
 		token:   token,
 		shardID: shardID,
 		shards:  shards,
-		state:   sc,
 
 		bufs: &bytebufferpool.Pool{},
 	}, nil
@@ -93,15 +84,6 @@ func (s *Session) logTotalEvents() {
 
 func (s *Session) Open(ctx context.Context, token string) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
-
-	s.rc = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	err := s.rc.Ping().Err()
-	if err != nil {
-		return errors.Wrap(err, "failed to ping redis")
-	}
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
 	if err != nil {

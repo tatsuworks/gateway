@@ -2,6 +2,7 @@ package state
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+
 	"github.com/tatsuworks/gateway/discordetf"
 )
 

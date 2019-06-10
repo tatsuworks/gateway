@@ -83,6 +83,14 @@ func (s *Session) logTotalEvents() {
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
+	s.rc = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	if err := s.rc.Ping().Err(); err != nil {
+		return errors.Wrap(err, "failed to ping redis")
+	}
+
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})

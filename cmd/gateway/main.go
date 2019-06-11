@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,7 +33,7 @@ func main() {
 
 	err = m.Start(1)
 	if err != nil {
-		fmt.Println(err)
+		logger.Fatal(err.Error())
 	}
 
 	time.Sleep(5 * time.Second)

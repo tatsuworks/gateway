@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/state"
 	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 
 	"github.com/pkg/errors"
 	"github.com/valyala/bytebufferpool"
@@ -85,9 +85,7 @@ func (s *Session) logTotalEvents() {
 	}
 }
 
-func (s *Session) Open(ctx context.Context, token string) error {
-	fmt.Println("open")
-
+func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
@@ -113,6 +111,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			return errors.Wrap(err, "failed to send resume")
 		}
 	}
+
+	close(connected)
 
 	byt, err := s.readMessage()
 	if err != nil {
@@ -159,26 +159,28 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
-		} else {
-			// s.log.Info("0 seq received", zap.Int("shard", s.shardID), zap.String("type", ev.T), zap.Int("op", ev.Op))
 		}
 
-		start := time.Now()
 		err = s.state.HandleEvent(ev)
 		if err != nil {
 			s.log.Error("failed to send event to state", zap.Error(err))
-			os.Exit(0)
+			continue
 		}
 
-		done := time.Since(start)
-		_ = done
-		// s.log.Info("sent event", zap.String("type", ev.T), zap.String("since", done.String()))
+		_, err = s.rc.Pipelined(func(pipe redis.Pipeliner) error {
+			if err := pipe.Set(fmt.Sprintf("gateway:seq:%d", s.shardID), s.seq, 0).Err(); err != nil {
+				return xerrors.Errorf("failed to set seq in redis: %w", err)
+			}
 
-		_ = strings.ToLower
-		// err = s.rc.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err()
-		// if err != nil {
-		// 	s.log.Error("failed to push event to redis", zap.Error(err))
-		// }
+			if err := pipe.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err(); err != nil {
+				return xerrors.Errorf("failed to push event to redis: %w", err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			s.log.Error("failed to run event pipeline", zap.Error(err))
+		}
 
 		s.putRawBuf(byt)
 	}

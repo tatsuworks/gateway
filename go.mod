@@ -19,5 +19,6 @@ require (
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed // indirect
 	golang.org/x/tools v0.0.0-20190603231351-8aaa1484dc10 // indirect
+	golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522
 	nhooyr.io/websocket v1.1.1
 )

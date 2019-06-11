@@ -58,8 +58,8 @@ func (m *Manager) Start(stopAt int) error {
 		}
 
 		m.log.Info("starting shard", zap.Int("shard", i), zap.Int("total", m.shards))
-		go m.startShard(i)
-		time.Sleep(5100 * time.Millisecond)
+		<-m.startShard(i)
+		time.Sleep(5 * time.Second)
 	}
 
 	select {
@@ -68,27 +68,32 @@ func (m *Manager) Start(stopAt int) error {
 	return nil
 }
 
-func (m *Manager) startShard(shard int) {
+func (m *Manager) startShard(shard int) <-chan struct{} {
 	s, err := gatewayws.NewSession(m.log, m.rdb, m.token, shard, m.shards)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
-		return
+		return nil
 	}
 
-	for {
-		select {
-		case <-m.ctx.Done():
-			return
-		default:
+	ch := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-m.ctx.Done():
+				return
+			default:
+			}
+
+			m.log.Info("attempting shard connect", zap.Int("shard", shard))
+			err := s.Open(m.ctx, m.token, ch)
+			if err != nil {
+				m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
+			}
+
+			time.Sleep(5 * time.Second)
 		}
+	}()
 
-		m.log.Info("attempting shard connect", zap.Int("shard", shard))
-		err := s.Open(m.ctx, m.token)
-		if err != nil {
-			m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
-		}
-
-		time.Sleep(time.Second)
-	}
-
+	return ch
 }

@@ -30,7 +30,7 @@ func main() {
 		cancel()
 	}()
 
-	m := manager.New(ctx, logger, Token, 400, "localhost:8080")
+	m := manager.New(ctx, logger, Token, 1, "localhost:6380")
 
 	err = m.Start(1)
 	if err != nil {

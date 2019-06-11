@@ -18,6 +18,8 @@ type Manager struct {
 	shards int
 
 	up int
+
+	rdb *redis.Client
 }
 
 func New(
@@ -27,11 +29,11 @@ func New(
 	shards int,
 	redisAddr string,
 ) *Manager {
-	client := redis.NewClient(&redis.Options{
+	rc := redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
 
-	_, err := client.Ping().Result()
+	_, err := rc.Ping().Result()
 	if err != nil {
 		logger.Fatal("failed to ping redis", zap.Error(err))
 	}
@@ -42,6 +44,8 @@ func New(
 
 		token:  token,
 		shards: shards,
+
+		rdb: rc,
 	}
 }
 
@@ -65,7 +69,7 @@ func (m *Manager) Start(stopAt int) error {
 }
 
 func (m *Manager) startShard(shard int) {
-	s, err := gatewayws.NewSession(m.log, m.token, shard, m.shards)
+	s, err := gatewayws.NewSession(m.log, m.rdb, m.token, shard, m.shards)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
 		return

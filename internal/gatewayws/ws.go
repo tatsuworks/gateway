@@ -54,7 +54,7 @@ type Session struct {
 	rc *redis.Client
 }
 
-func NewSession(logger *zap.Logger, token string, shardID, shards int) (*Session, error) {
+func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, shards int) (*Session, error) {
 	return &Session{
 		log:     logger,
 		token:   token,
@@ -62,6 +62,9 @@ func NewSession(logger *zap.Logger, token string, shardID, shards int) (*Session
 		shards:  shards,
 
 		bufs: &bytebufferpool.Pool{},
+
+		state: state.NewClient(),
+		rc:    rdb,
 	}, nil
 }
 
@@ -83,13 +86,7 @@ func (s *Session) logTotalEvents() {
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
-	s.rc = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	if err := s.rc.Ping().Err(); err != nil {
-		return errors.Wrap(err, "failed to ping redis")
-	}
+	fmt.Println("open")
 
 	s.ctx, s.cancel = context.WithCancel(ctx)
 

@@ -1,81 +1,29 @@
 package state
 
 import (
-	"bytes"
-	"crypto/tls"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strings"
-
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
-	"github.com/pkg/errors"
-	"golang.org/x/net/http2"
-
-	"github.com/tatsuworks/gateway/discordetf"
 )
 
 type Client struct {
-	client *http.Client
-
-	url url.URL
-
-	fdb fdb.Database
-
+	fdb  fdb.Database
 	subs *Subspaces
 }
 
-func NewClient(url url.URL) (*Client, error) {
+func NewClient() *Client {
 	fdb.MustAPIVersion(600)
 	db := fdb.MustOpenDefault()
 
 	dir, err := directory.CreateOrOpen(db, []string{"etfstate"}, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open directory")
+		panic(err.Error())
 	}
 
 	return &Client{
-		client: &http.Client{
-			Transport: &http2.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		},
 		subs: NewSubspaces(dir),
 		fdb:  db,
-		url:  url,
-	}, nil
-}
-
-func (c *Client) fmtURL(event string) url.URL {
-	swp := c.url
-	swp.Path = fmt.Sprintf("/v1/events/%s", strings.ToLower(event))
-	return swp
-}
-
-func (c *Client) SendEvent(e *discordetf.Event, full []byte) error {
-	if e.T == "nil" {
-		return nil
 	}
-
-	u := c.fmtURL(e.T)
-
-	req, _ := http.NewRequest("POST", u.String(), bytes.NewReader(full))
-	res, err := c.client.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "failed to send state request")
-	}
-
-	defer res.Body.Close()
-	_, err = io.Copy(ioutil.Discard, res.Body)
-	if err != nil {
-		return errors.Wrap(err, "failed to discard body")
-	}
-
-	return nil
 }
 
 // Subspaces is a struct containing all of the different subspaces used.

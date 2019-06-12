@@ -10,16 +10,15 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-	"github.com/tatsuworks/gateway/state"
-	"go.uber.org/zap"
-	"golang.org/x/xerrors"
-
 	"github.com/pkg/errors"
 	"github.com/valyala/bytebufferpool"
+	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
 	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/tatsuworks/gateway/etf"
+	"github.com/tatsuworks/gateway/state"
 )
 
 var (
@@ -68,31 +67,16 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 	}, nil
 }
 
-func (s *Session) logTotalEvents() {
-	for {
-		time.Sleep(5 * time.Second)
-		seq := atomic.LoadInt64(&s.seq)
-
-		s.log.Info(
-			"event report",
-			zap.Int("shard", s.shardID),
-			zap.Int64("seq", seq),
-			zap.Int64("since", seq-s.last),
-			zap.Float64("/sec", float64(seq-s.last)/5),
-		)
-
-		s.last = seq
-	}
-}
-
 func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
+	defer s.cancel()
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to dial gateway")
 	}
 	s.wsConn = c
+	s.wsConn.SetReadLimit(999999999)
 
 	err = s.readHello()
 	if err != nil {
@@ -100,41 +84,18 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	}
 
 	if s.seq == 0 && s.sessID == "" {
+		s.log.Debug("sending ready")
 		err := s.writeIdentify()
 		if err != nil {
 			return errors.Wrap(err, "failed to send identify")
 		}
 
 	} else {
+		s.log.Debug("sending resume")
 		err := s.writeResume()
 		if err != nil {
 			return errors.Wrap(err, "failed to send resume")
 		}
-	}
-
-	close(connected)
-
-	byt, err := s.readMessage()
-	if err != nil {
-		return errors.Wrap(err, "failed to read message")
-	}
-
-	e, err := discordetf.DecodeT(byt)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode event")
-	}
-
-	if e.T == "READY" {
-		_, sess, err := discordetf.DecodeReady(e.D)
-		if err != nil {
-			return errors.Wrap(err, "failed to decode ready")
-		}
-
-		s.sessID = sess
-		s.log.Info("ready", zap.Int("shard", s.shardID))
-
-	} else if e.T == "RESUMED" {
-		s.log.Info("resumed", zap.Int("shard", s.shardID))
 	}
 
 	go s.sendHeartbeats()
@@ -159,6 +120,21 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
+		}
+
+		if handled, err := s.handleInternalEvent(ev); handled {
+			select {
+			case <-connected:
+			default:
+				close(connected)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			s.putRawBuf(byt)
+			continue
 		}
 
 		err = s.state.HandleEvent(ev)
@@ -187,6 +163,40 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 
 	c.Close(websocket.StatusNormalClosure, "")
 	return err
+}
+
+func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
+	switch ev.T {
+	case "READY":
+		_, sess, err := discordetf.DecodeReady(ev.D)
+		if err != nil {
+			return true, errors.Wrap(err, "failed to decode ready")
+		}
+
+		s.sessID = sess
+		s.log.Info("ready", zap.Int("shard", s.shardID))
+
+		return true, nil
+
+	case "RESUMED":
+		s.log.Info("resumed", zap.Int("shard", s.shardID))
+
+		return true, nil
+
+	case "INVALID_SESSION":
+		s.log.Info("invalid session, reconnecting", zap.Int("shard", s.shardID))
+		s.sessID = ""
+		s.seq = 0
+
+		return true, xerrors.New("invalid session")
+
+	case "RECONNECT":
+		s.log.Info("reconnect requested", zap.Int("shard", s.shardID))
+
+		return true, xerrors.New("reconnect")
+	}
+
+	return false, nil
 }
 
 func (s *Session) writeIdentify() error {
@@ -355,7 +365,11 @@ func (s *Session) heartbeat() error {
 }
 
 func (s *Session) sendHeartbeats() {
-	t := time.NewTicker(s.interval)
+	var (
+		t   = time.NewTicker(s.interval)
+		ctx = s.ctx
+	)
+	defer t.Stop()
 
 	for {
 		err := s.heartbeat()
@@ -364,10 +378,38 @@ func (s *Session) sendHeartbeats() {
 		}
 
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+	}
+}
+
+func (s *Session) logTotalEvents() {
+	var (
+		t   = time.NewTicker(15 * time.Second)
+		ctx = s.ctx
+	)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+
+		seq := atomic.LoadInt64(&s.seq)
+
+		s.log.Info(
+			"event report",
+			zap.Int("shard", s.shardID),
+			zap.Int64("seq", seq),
+			zap.Int64("since", seq-s.last),
+			zap.Float64("/sec", float64(seq-s.last)/15),
+		)
+
+		s.last = seq
 	}
 }
 

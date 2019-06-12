@@ -91,6 +91,7 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 				m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
 			}
 
+			ch = make(chan struct{})
 			time.Sleep(5 * time.Second)
 		}
 	}()

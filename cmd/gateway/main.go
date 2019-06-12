@@ -29,9 +29,9 @@ func main() {
 		cancel()
 	}()
 
-	m := manager.New(ctx, logger, Token, 1, "localhost:6380")
+	m := manager.New(ctx, logger, Token, 400, "localhost:6380")
 
-	err = m.Start(1)
+	err = m.Start(5)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}

@@ -91,14 +91,14 @@ func (s *Server) Init() {
 	s.router.POST(path.Join(base, strings.ToUpper("message_reaction_remove")), wrapHandler(s.handleMessageReactionRemove))
 	s.router.POST(path.Join(base, strings.ToUpper("message_reaction_remove_all")), wrapHandler(s.handleMessageReactionRemoveAll))
 
-	s.router.GET(path.Join(base, "channels"), wrapHandler(s.getChannels))
-	s.router.GET(path.Join(base, "channels", ":id"), wrapHandler(s.getChannel))
-	s.router.GET(path.Join(base, "guilds", ":id"), wrapHandler(s.getGuild))
+	s.router.GET(path.Join(base, "channels", ":guild"), wrapHandler(s.getChannels))
+	s.router.GET(path.Join(base, "channels", ":guild", ":channel"), wrapHandler(s.getChannel))
+	s.router.GET(path.Join(base, "guilds", ":guild"), wrapHandler(s.getGuild))
 	s.router.GET(path.Join(base, "roles", ":guild"), wrapHandler(s.getRoles))
-	s.router.GET(path.Join(base, "roles", ":guild", ":id"), wrapHandler(s.getRole))
-	s.router.GET(path.Join(base, "messages", ":channel", ":id"), wrapHandler(s.getMessage))
+	s.router.GET(path.Join(base, "roles", ":guild", ":role"), wrapHandler(s.getRole))
+	s.router.GET(path.Join(base, "messages", ":channel", ":message"), wrapHandler(s.getMessage))
 	s.router.GET(path.Join(base, "members", ":guild"), wrapHandler(s.getMembers))
-	s.router.GET(path.Join(base, "members", ":guild", ":id"), wrapHandler(s.getMember))
+	s.router.GET(path.Join(base, "members", ":guild", ":member"), wrapHandler(s.getMember))
 
 	// fn := func(m *nats.Msg) {
 	// 	termStart := time.Now()

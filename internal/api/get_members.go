@@ -30,7 +30,7 @@ func (s *Server) getMember(w http.ResponseWriter, r *http.Request, p httprouter.
 func (s *Server) getMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	var raws []fdb.KeyValue
 
-	pre, _ := fdb.PrefixRange(s.fmtMemberKey(guildParam(p), 0))
+	pre, _ := fdb.PrefixRange(s.fmtMembersKey(guildParam(p)))
 	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
 		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
 		return nil

@@ -98,6 +98,9 @@ func (s *Server) fmtGuildBanKey(guild, user int64) fdb.Key {
 	return s.subs.Guilds.Pack(tuple.Tuple{guild, "bans", user})
 }
 
+func (s *Server) fmtMembersKey(guild int64) fdb.Key {
+	return s.subs.Members.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
 	return s.subs.Members.Pack(tuple.Tuple{guild, id})
 }
@@ -114,6 +117,9 @@ func (s *Server) fmtPresenceKey(guild, id int64) fdb.Key {
 	return s.subs.Presences.Pack(tuple.Tuple{guild, id})
 }
 
+func (s *Server) fmtRolesKey(guild int64) fdb.Key {
+	return s.subs.Roles.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
 	return s.subs.Roles.Pack(tuple.Tuple{guild, id})
 }

@@ -86,7 +86,7 @@ func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
 	tup := tuple.Tuple{guild}
 	if id != 0 {
-		tup = append(tup)
+		tup = append(tup, id)
 	}
 
 	return s.subs.Channels.Pack(tup)
@@ -99,14 +99,14 @@ func (s *Server) fmtGuildKey(guild int64) fdb.Key {
 func (s *Server) fmtGuildBanKey(guild, user int64) fdb.Key {
 	tup := tuple.Tuple{guild, "bans"}
 	if user != 0 {
-		tup = append(tup)
+		tup = append(tup, user)
 	}
 
 	return s.subs.Guilds.Pack(tup)
 }
 
 func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild}
+	tup := tuple.Tuple{guild, id}
 	if id != 0 {
 		tup = append(tup, id)
 	}
@@ -115,7 +115,7 @@ func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
 }
 
 func (s *Server) fmtMessageKey(channel, id int64) fdb.Key {
-	tup := tuple.Tuple{channel}
+	tup := tuple.Tuple{channel, id}
 	if id != 0 {
 		tup = append(tup, id)
 	}
@@ -128,7 +128,7 @@ func (s *Server) fmtMessageReactionKey(channel, id, user int64, name interface{}
 }
 
 func (s *Server) fmtPresenceKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild}
+	tup := tuple.Tuple{guild, id}
 	if id != 0 {
 		tup = append(tup, id)
 	}
@@ -137,7 +137,7 @@ func (s *Server) fmtPresenceKey(guild, id int64) fdb.Key {
 }
 
 func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild}
+	tup := tuple.Tuple{guild, id}
 	if id != 0 {
 		tup = append(tup, id)
 	}
@@ -146,7 +146,7 @@ func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
 }
 
 func (s *Server) fmtVoiceStateKey(channel, id int64) fdb.Key {
-	tup := tuple.Tuple{channel}
+	tup := tuple.Tuple{channel, id}
 	if id != 0 {
 		tup = append(tup, id)
 	}

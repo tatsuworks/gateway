@@ -83,6 +83,9 @@ func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 	return eg.Wait()
 }
 
+func (s *Server) fmtChannelsKey(guild int64) fdb.Key {
+	return s.subs.Channels.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
 	return s.subs.Channels.Pack(tuple.Tuple{guild, id})
 }

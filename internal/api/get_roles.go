@@ -13,7 +13,8 @@ func (s *Server) getRole(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	var ro []byte
 
 	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		ro = t.Get(s.fmtMessageKey(guildParam(p), roleParam(p))).MustGet()
+		ro = t.Get(s.fmtRoleKey(guildParam(p), roleParam(p))).MustGet()
+
 		return nil
 	})
 	if err != nil {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/tatsuworks/state/internal/mwerr"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/tatsuworks/state/internal/mwerr"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -84,12 +84,7 @@ func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 }
 
 func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.Channels.Pack(tup)
+	return s.subs.Channels.Pack(tuple.Tuple{guild, id})
 }
 
 func (s *Server) fmtGuildKey(guild int64) fdb.Key {
@@ -97,30 +92,15 @@ func (s *Server) fmtGuildKey(guild int64) fdb.Key {
 }
 
 func (s *Server) fmtGuildBanKey(guild, user int64) fdb.Key {
-	tup := tuple.Tuple{guild, "bans"}
-	if user != 0 {
-		tup = append(tup, user)
-	}
-
-	return s.subs.Guilds.Pack(tup)
+	return s.subs.Guilds.Pack(tuple.Tuple{guild, "bans", user})
 }
 
 func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild, id}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.Members.Pack(tup)
+	return s.subs.Members.Pack(tuple.Tuple{guild, id})
 }
 
 func (s *Server) fmtMessageKey(channel, id int64) fdb.Key {
-	tup := tuple.Tuple{channel, id}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.Messages.Pack(tup)
+	return s.subs.Messages.Pack(tuple.Tuple{channel, id})
 }
 
 func (s *Server) fmtMessageReactionKey(channel, id, user int64, name interface{}) fdb.Key {
@@ -128,28 +108,13 @@ func (s *Server) fmtMessageReactionKey(channel, id, user int64, name interface{}
 }
 
 func (s *Server) fmtPresenceKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild, id}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.Presences.Pack(tup)
+	return s.subs.Presences.Pack(tuple.Tuple{guild, id})
 }
 
 func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
-	tup := tuple.Tuple{guild, id}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.Roles.Pack(tup)
+	return s.subs.Roles.Pack(tuple.Tuple{guild, id})
 }
 
 func (s *Server) fmtVoiceStateKey(channel, id int64) fdb.Key {
-	tup := tuple.Tuple{channel, id}
-	if id != 0 {
-		tup = append(tup, id)
-	}
-
-	return s.subs.VoiceStates.Pack(tup)
+	return s.subs.VoiceStates.Pack(tuple.Tuple{channel, id})
 }

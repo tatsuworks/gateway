@@ -42,7 +42,7 @@ func channelParam(p httprouter.Params) int64 {
 func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	var raws []fdb.KeyValue
 
-	pre, _ := fdb.PrefixRange(s.fmtChannelKey(guildParam(p), 0))
+	pre, _ := fdb.PrefixRange(s.fmtChannelsKey(guildParam(p)))
 	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
 		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
 		return nil

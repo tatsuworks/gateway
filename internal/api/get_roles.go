@@ -30,7 +30,7 @@ func (s *Server) getRole(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 func (s *Server) getRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	var raws []fdb.KeyValue
 
-	pre, _ := fdb.PrefixRange(s.fmtRoleKey(guildParam(p), 0))
+	pre, _ := fdb.PrefixRange(s.fmtRolesKey(guildParam(p)))
 	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
 		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
 		return nil

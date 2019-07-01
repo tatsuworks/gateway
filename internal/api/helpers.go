@@ -83,6 +83,9 @@ func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 	return eg.Wait()
 }
 
+func (s *Server) fmtChannelsKey(guild int64) fdb.Key {
+	return s.subs.Channels.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtChannelKey(guild, id int64) fdb.Key {
 	return s.subs.Channels.Pack(tuple.Tuple{guild, id})
 }
@@ -95,6 +98,9 @@ func (s *Server) fmtGuildBanKey(guild, user int64) fdb.Key {
 	return s.subs.Guilds.Pack(tuple.Tuple{guild, "bans", user})
 }
 
+func (s *Server) fmtMembersKey(guild int64) fdb.Key {
+	return s.subs.Members.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtMemberKey(guild, id int64) fdb.Key {
 	return s.subs.Members.Pack(tuple.Tuple{guild, id})
 }
@@ -111,6 +117,9 @@ func (s *Server) fmtPresenceKey(guild, id int64) fdb.Key {
 	return s.subs.Presences.Pack(tuple.Tuple{guild, id})
 }
 
+func (s *Server) fmtRolesKey(guild int64) fdb.Key {
+	return s.subs.Roles.Pack(tuple.Tuple{guild})
+}
 func (s *Server) fmtRoleKey(guild, id int64) fdb.Key {
 	return s.subs.Roles.Pack(tuple.Tuple{guild, id})
 }

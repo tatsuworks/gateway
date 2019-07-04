@@ -20,7 +20,7 @@ type GuildCreate struct {
 func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	var (
 		d     = &decoder{buf: buf}
-		gBuf  = []byte{}
+		gBuf  = []byte{116, 0, 0, 0, 0}
 		gKeys uint32
 		gc    = &GuildCreate{}
 	)

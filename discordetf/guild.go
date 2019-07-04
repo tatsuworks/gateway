@@ -19,11 +19,10 @@ type GuildCreate struct {
 
 func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	var (
-		d        = &decoder{buf: buf}
-		gBuf     = []byte{}
-		gKeys    uint32
-		gc       = &GuildCreate{}
-		mapStart = d.off
+		d     = &decoder{buf: buf}
+		gBuf  = []byte{}
+		gKeys uint32
+		gc    = &GuildCreate{}
 	)
 
 	err := d.checkByte(ettMap)
@@ -32,9 +31,6 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	}
 
 	left := d.readMapLen()
-
-	mapEnd := d.off
-	gBuf = append(gBuf, d.buf[mapStart:mapEnd]...)
 
 	for ; left > 0; left-- {
 		start := d.off
@@ -103,7 +99,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	}
 
 	// fix length
-	binary.LittleEndian.PutUint32(gBuf[1:5], gKeys)
+	binary.BigEndian.PutUint32(gBuf[1:5], gKeys)
 	gc.Guild = gBuf
 
 	return gc, nil

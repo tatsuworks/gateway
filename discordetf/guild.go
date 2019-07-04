@@ -103,7 +103,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	}
 
 	// fix length
-	binary.LittleEndian.PutUint32(gBuf[1:4], gKeys)
+	binary.LittleEndian.PutUint32(gBuf[1:5], gKeys)
 	gc.Guild = gBuf
 
 	return gc, nil

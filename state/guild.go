@@ -15,6 +15,13 @@ func (c *Client) GuildCreate(d []byte) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
+		return c.Transact(func(t fdb.Transaction) error {
+			t.Set(c.fmtGuildKey(gc.Id), gc.Guild)
+			return nil
+		})
+	})
+
+	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
 			return c.setETFs(gc.Id, gc.Roles, c.fmtRoleKey)
 		}
@@ -43,6 +50,13 @@ func (c *Client) GuildDelete(d []byte) error {
 	}
 
 	eg := new(errgroup.Group)
+
+	eg.Go(func() error {
+		return c.Transact(func(t fdb.Transaction) error {
+			t.Clear(c.fmtGuildKey(gc.Id))
+			return nil
+		})
+	})
 
 	eg.Go(func() error {
 		return c.Transact(func(t fdb.Transaction) error {

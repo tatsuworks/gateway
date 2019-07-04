@@ -1,7 +1,7 @@
 package discordetf
 
 import (
-	"bytes"
+	"encoding/binary"
 
 	"github.com/pkg/errors"
 )
@@ -20,7 +20,8 @@ type GuildCreate struct {
 func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	var (
 		d        = &decoder{buf: buf}
-		gBuf     = new(bytes.Buffer)
+		gBuf     = []byte{}
+		gKeys    uint32
 		gc       = &GuildCreate{}
 		mapStart = d.off
 	)
@@ -33,10 +34,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	left := d.readMapLen()
 
 	mapEnd := d.off
-	_, err = gBuf.Write(d.buf[mapStart:mapEnd])
-	if err != nil {
-		return gc, err
-	}
+	gBuf = append(gBuf, d.buf[mapStart:mapEnd]...)
 
 	for ; left > 0; left-- {
 		start := d.off
@@ -49,42 +47,36 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 		key := string(d.buf[d.off-l : d.off])
 		switch key {
 		case "channels":
-			//fmt.Println("channels")
 			gc.Channels, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild channels")
 			}
 
 		case "emojis":
-			//fmt.Println("emoji")
 			gc.Emojis, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild emojis")
 			}
 
 		case "members":
-			//fmt.Println("members")
 			gc.Members, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild members")
 			}
 
 		case "presences":
-			//fmt.Println("presences")
 			gc.Presences, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild presences")
 			}
 
 		case "roles":
-			//fmt.Println("roles")
 			gc.Roles, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild roles")
 			}
 
 		case "voice_states":
-			//fmt.Println("voice_states")
 			gc.VoiceStates, err = d.readListIntoMapByID()
 			if err != nil {
 				return gc, errors.Wrap(err, "failed to read guild voice states")
@@ -96,25 +88,23 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 				return gc, errors.Wrap(err, "failed to read guild id")
 			}
 
-			_, err = gBuf.Write(d.buf[start:d.off])
-			if err != nil {
-				return gc, errors.Wrap(err, "failed to write guild data to buf")
-			}
+			gBuf = append(gBuf, d.buf[start:d.off]...)
+			gKeys++
 
 		default:
-			//fmt.Println("default")
 			err := d.readTerm()
 			if err != nil {
 				return gc, err
 			}
-			_, err = gBuf.Write(d.buf[start:d.off])
-			if err != nil {
-				return gc, err
-			}
+
+			gBuf = append(gBuf, d.buf[start:d.off]...)
+			gKeys++
 		}
 	}
 
-	gc.Guild = gBuf.Bytes()
+	// fix length
+	binary.LittleEndian.PutUint32(gBuf[1:4], gKeys)
+	gc.Guild = gBuf
 
 	return gc, nil
 }

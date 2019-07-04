@@ -34,11 +34,6 @@ func DecodeT(buf []byte) (*Event, error) {
 		return e, errors.Wrap(err, "failed to verify etf starting byte")
 	}
 
-	//err = D.readTerm()
-	//if err != nil {
-	//	return T, data, err
-	//}
-
 	// verify map byte
 	err = d.checkByte(ettMap)
 	if err != nil {

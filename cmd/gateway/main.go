@@ -29,8 +29,12 @@ func main() {
 		cancel()
 	}()
 
+	// change 5 to the total number of shards you want
 	m := manager.New(ctx, logger, Token, 5, "localhost:6380")
 
+	// change 5 to the number of shards you want to start up
+	// for example, your bot may require 400 shards but you only want
+	// to start up 5
 	err = m.Start(5)
 	if err != nil {
 		logger.Fatal(err.Error())

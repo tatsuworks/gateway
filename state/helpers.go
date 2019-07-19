@@ -105,6 +105,9 @@ func (c *Client) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 	}
 
 	bufMap := etfs
+
+	// FDB recommends 10KB per transaction. If we limit transactions to
+	// 100 keys each, we allow an average of 100 bytes per k/v pair.
 	if len(etfs) > 100 {
 		bufMap = make(map[int64][]byte, 100)
 

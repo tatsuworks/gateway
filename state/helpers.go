@@ -91,26 +91,29 @@ func (c *Client) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id 
 	send := func(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) {
 		eg.Go(func() error {
 			return c.Transact(func(t fdb.Transaction) error {
+				opts := t.Options()
+				opts.SetReadYourWritesDisable()
+
 				for id, e := range etfs {
+					opts.SetNextWriteNoWriteConflictRange()
 					t.Set(key(guild, id), e)
 				}
 
 				return nil
 			})
 		})
-
 	}
 
 	bufMap := etfs
-	if len(etfs) > 1000 {
-		bufMap = make(map[int64][]byte, 1000)
+	if len(etfs) > 100 {
+		bufMap = make(map[int64][]byte, 100)
 
 		for i, e := range etfs {
 			bufMap[i] = e
 
-			if len(bufMap) >= 1000 {
+			if len(bufMap) >= 100 {
 				send(guild, bufMap, key)
-				bufMap = make(map[int64][]byte, 1000)
+				bufMap = make(map[int64][]byte, 100)
 			}
 		}
 	}

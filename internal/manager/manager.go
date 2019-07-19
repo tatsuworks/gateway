@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-redis/redis"
 	"go.uber.org/zap"
+	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 )
@@ -58,13 +59,15 @@ func (m *Manager) Start(stopAt int) error {
 		}
 
 		m.log.Info("starting shard", zap.Int("shard", i), zap.Int("total", m.shards))
-		<-m.startShard(i)
+
+		select {
+		case <-m.ctx.Done():
+		case <-m.startShard(i):
+		}
+
 		time.Sleep(5 * time.Second)
 	}
 
-	select {
-	case <-m.ctx.Done():
-	}
 	return nil
 }
 
@@ -88,7 +91,9 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 			m.log.Info("attempting shard connect", zap.Int("shard", shard))
 			err := s.Open(m.ctx, m.token, ch)
 			if err != nil {
-				m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
+				if !xerrors.Is(err, context.Canceled) {
+					m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
+				}
 			}
 
 			ch = make(chan struct{})

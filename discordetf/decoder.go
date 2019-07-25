@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 // Erlang external term tags.
@@ -227,7 +228,7 @@ func (d *decoder) idFromMap(name string) (int64, error) {
 					return 0, errors.WithStack(err)
 				}
 
-				break
+				continue
 			}
 		}
 
@@ -238,6 +239,44 @@ func (d *decoder) idFromMap(name string) (int64, error) {
 	}
 
 	return id, nil
+}
+
+// stringFromMap extracts a string at the given key from a map at the current location.
+func (d *decoder) stringFromMap(name string) (string, error) {
+	var val string
+
+	err := d.checkByte(ettMap)
+	if err != nil {
+		return "", xerrors.Errorf("failed to verify map byte: %w", err)
+	}
+
+	left := d.readMapLen()
+	for ; left > 0; left-- {
+		l, err := d.readAtomWithTag()
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+
+		// instead of checking the string every time, check the length first
+		if l == len(name) {
+			if string(d.buf[d.off-l:d.off]) == name {
+				ll, err := d.readAtomWithTag()
+				if err != nil {
+					return "", xerrors.Errorf("failed to read value at specified key: %w", err)
+				}
+
+				val = string(d.buf[d.off-ll : d.off])
+				continue
+			}
+		}
+
+		err = d.readTerm()
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+	}
+
+	return val, nil
 }
 
 // guildIDFromMap extracts a guild id from an ETF map.
@@ -264,7 +303,7 @@ func (d *decoder) guildIDFromMap() (int64, error) {
 					return 0, errors.WithStack(err)
 				}
 
-				break
+				continue
 			}
 		}
 

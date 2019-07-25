@@ -289,9 +289,10 @@ func (s *Session) identifyPayload() ([]byte, error) {
 				Browser: "https://github.com/tatsuworks/gateway",
 				Device:  "Go",
 			},
-			Compress:       false,
-			LargeThreshold: 250,
-			Shard:          []int{s.shardID, s.shards},
+			Compress:           false,
+			LargeThreshold:     250,
+			GuildSubscriptions: true,
+			Shard:              []int{s.shardID, s.shards},
 		},
 	})
 
@@ -424,11 +425,12 @@ type identifyOp struct {
 }
 
 type identify struct {
-	Token          string `json:"token"`
-	Properties     props  `json:"properties"`
-	Compress       bool   `json:"compress"`
-	LargeThreshold int    `json:"large_threshold"`
-	Shard          []int  `json:"shard"`
+	Token              string `json:"token"`
+	Properties         props  `json:"properties"`
+	Compress           bool   `json:"compress"`
+	LargeThreshold     int    `json:"large_threshold"`
+	GuildSubscriptions bool   `json:"guild_subscriptions"`
+	Shard              []int  `json:"shard"`
 }
 
 type resumeOp struct {

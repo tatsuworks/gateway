@@ -247,7 +247,9 @@ func (d *decoder) stringFromMap(name string) (string, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return "", xerrors.Errorf("failed to verify map byte: %w", err)
+
+		return "", nil
+		// return "", xerrors.Errorf("failed to verify map byte: %w", err)
 	}
 
 	left := d.readMapLen()

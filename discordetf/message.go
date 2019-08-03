@@ -1,7 +1,6 @@
 package discordetf
 
 import (
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 )
 
@@ -20,13 +19,13 @@ func DecodeMessage(buf []byte) (*Message, error) {
 
 	m.Id, m.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return m, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read id: %w", err)
 	}
 
 	d.reset()
 	m.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return m, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read channel id: %w", err)
 	}
 
 	return m, err

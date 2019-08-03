@@ -1,7 +1,6 @@
 package discordetf
 
 import (
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 )
 
@@ -18,14 +17,14 @@ func DecodeMemberChunk(buf []byte) (*MemberChunk, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return mc, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to verify map byte: %w", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return mc, err
+			return nil, xerrors.Errorf("failed to read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])

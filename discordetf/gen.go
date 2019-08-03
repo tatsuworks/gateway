@@ -1,7 +1,6 @@
 package discordetf
 
 import (
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 )
 
@@ -106,7 +105,7 @@ func (d *decoder) readIntWithTagIntoInt() (int, error) {
 func (d *decoder) readUntilData() error {
 	err := d.checkByte(etfStartingByte)
 	if err != nil {
-		return errors.Wrap(err, "failed to verify etf starting byte")
+		return xerrors.Errorf("failed to verify starting etf byte: %w", err)
 	}
 
 	err = d.checkByte(ettMap)

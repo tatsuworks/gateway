@@ -500,7 +500,7 @@ func (d *decoder) checkByte(expected byte) error {
 	b := d.read(1)
 
 	if b[0] != expected {
-		return errors.Errorf("expected byte %v, got byte %v", expected, b[0])
+		return xerrors.Errorf("expected byte %v, got byte %v", expected, b[0])
 	}
 
 	return nil

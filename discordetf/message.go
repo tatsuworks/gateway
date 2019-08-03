@@ -2,6 +2,7 @@ package discordetf
 
 import (
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Message struct {
@@ -48,30 +49,30 @@ func DecodeMessageReaction(buf []byte) (*MessageReaction, error) {
 
 	mr.Message, err = d.idFromMap("message_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get message_id from reaction")
+		return nil, xerrors.Errorf("failed to read message id: %w", err)
 	}
 	d.reset()
 
 	mr.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get channel_id from reaction")
+		return nil, xerrors.Errorf("failed to read channel id: %w", err)
 	}
 	d.reset()
 
 	mr.User, err = d.idFromMap("user_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get user_id from reaction")
+		return nil, xerrors.Errorf("failed to read user id: %w", err)
 	}
 	d.reset()
 
 	err = d.readUntilKey("emoji")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to read until emoji key")
+		return nil, xerrors.Errorf("failed to read until emoji: %w", err)
 	}
 
 	mr.Name, err = d.readEmojiID()
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to read emoji id")
+		return nil, xerrors.Errorf("failed to read emoji id: %w", err)
 	}
 
 	mr.Raw = buf
@@ -94,19 +95,19 @@ func DecodeMessageReactionRemoveAll(buf []byte) (*MessageReactionRemoveAll, erro
 
 	mr.Message, err = d.idFromMap("message_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get message_id from reaction remove all")
+		return nil, xerrors.Errorf("failed to read message id: %w", err)
 	}
 	d.reset()
 
 	mr.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get channel_id from reaction remove all")
+		return nil, xerrors.Errorf("failed to read channel id: %w", err)
 	}
 	d.reset()
 
 	mr.User, err = d.idFromMap("user_id")
 	if err != nil {
-		return mr, errors.Wrap(err, "failed to get user_id from reaction remove all")
+		return nil, xerrors.Errorf("failed to read user id: %w", err)
 	}
 
 	return mr, err

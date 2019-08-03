@@ -12,7 +12,7 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	fdb.MustAPIVersion(600)
+	fdb.MustAPIVersion(610)
 	db := fdb.MustOpenDefault()
 
 	dir, err := directory.CreateOrOpen(db, []string{"etfstate"}, nil)

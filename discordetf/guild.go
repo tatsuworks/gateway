@@ -3,7 +3,7 @@ package discordetf
 import (
 	"encoding/binary"
 
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type GuildCreate struct {
@@ -27,7 +27,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return gc, errors.Wrap(err, "failed to verify guild map byte")
+		return nil, xerrors.Errorf("failed to verify map byte: %w", err)
 	}
 
 	left := d.readMapLen()
@@ -37,7 +37,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return gc, errors.Wrap(err, "failed to read guild map key")
+			return nil, xerrors.Errorf("failed to read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -45,43 +45,43 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 		case "channels":
 			gc.Channels, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild channels")
+				return nil, xerrors.Errorf("failed to read channels: %w", err)
 			}
 
 		case "emojis":
 			gc.Emojis, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild emojis")
+				return nil, xerrors.Errorf("failed to read emojis: %w", err)
 			}
 
 		case "members":
 			gc.Members, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild members")
+				return nil, xerrors.Errorf("failed to read members: %w", err)
 			}
 
 		case "presences":
 			gc.Presences, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild presences")
+				return nil, xerrors.Errorf("failed to read presences: %w", err)
 			}
 
 		case "roles":
 			gc.Roles, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild roles")
+				return nil, xerrors.Errorf("failed to read roles: %w", err)
 			}
 
 		case "voice_states":
 			gc.VoiceStates, err = d.readListIntoMapByID()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild voice states")
+				return nil, xerrors.Errorf("failed to read voice states: %w", err)
 			}
 
 		case "id":
 			gc.Id, err = d.readSmallBigWithTagToInt64()
 			if err != nil {
-				return gc, errors.Wrap(err, "failed to read guild id")
+				return nil, xerrors.Errorf("failed to read id: %w", err)
 			}
 
 			gBuf = append(gBuf, d.buf[start:d.off]...)
@@ -120,13 +120,13 @@ func DecodeGuildBan(buf []byte) (*GuildBan, error) {
 
 	gb.User, gb.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return gb, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read user id: %w", err)
 	}
 
 	d.reset()
 	gb.Guild, err = d.idFromMap("guild_id")
 	if err != nil {
-		return gb, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read guild id: %w", err)
 	}
 
 	return gb, err

@@ -43,7 +43,7 @@ func DecodeMemberChunk(buf []byte) (*MemberChunk, error) {
 			}
 
 		default:
-			return mc, xerrors.Errorf("unknown key found in member chunk: %s", key)
+			return nil, xerrors.Errorf("unknown key found in member chunk: %s", key)
 		}
 
 	}
@@ -66,13 +66,13 @@ func DecodeMember(buf []byte) (*Member, error) {
 
 	m.Id, m.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return m, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read id: %wait", err)
 	}
 
 	d.reset()
 	m.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return m, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read guild id: %wait", err)
 	}
 
 	return m, err
@@ -93,13 +93,13 @@ func DecodePresence(buf []byte) (*Presence, error) {
 
 	p.Id, p.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return p, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read id: %wait", err)
 	}
 
 	d.reset()
 	p.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return p, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read guild id: %wait", err)
 	}
 
 	return p, err
@@ -150,9 +150,9 @@ func DecodePlayedPresence(buf []byte) (*PlayedPresence, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, xerrors.Errorf("failed to read term: %w", err)
 		}
 	}
 
-	return p, err
+	return p, nil
 }

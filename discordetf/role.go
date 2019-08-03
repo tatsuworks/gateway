@@ -1,6 +1,8 @@
 package discordetf
 
-import "github.com/pkg/errors"
+import (
+	"golang.org/x/xerrors"
+)
 
 type Role struct {
 	Id    int64
@@ -17,13 +19,13 @@ func DecodeRole(buf []byte) (*Role, error) {
 
 	r.Id, r.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return r, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read id: %w", err)
 	}
 
 	d.reset()
 	r.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return r, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read guild id: %w", err)
 	}
 
 	return r, err
@@ -43,14 +45,14 @@ func DecodeRoleDelete(buf []byte) (*RoleDelete, error) {
 
 	r.Id, err = d.idFromMap("role_id")
 	if err != nil {
-		return r, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read role id: %w", err)
 	}
 	d.reset()
 
 	r.Guild, err = d.idFromMap("guild_id")
 	if err != nil {
-		return r, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to read guild id: %w", err)
 	}
 
-	return r, err
+	return r, nil
 }

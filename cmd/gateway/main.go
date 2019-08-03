@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +12,22 @@ import (
 
 	"github.com/tatsuworks/gateway/internal/manager"
 )
+
+var (
+	redisHost           string
+	shards, start, stop int
+)
+
+func init() {
+	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
+	flag.IntVar(&shards, "shards", 1, "1")
+
+	// both do not work
+	flag.IntVar(&shards, "start", 0, "1")
+	flag.IntVar(&shards, "stop", 1, "1")
+
+	flag.Parse()
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,12 +47,9 @@ func main() {
 	}()
 
 	// change 5 to the total number of shards you want
-	m := manager.New(ctx, logger, Token, 1, "localhost:6380")
+	m := manager.New(ctx, logger, Token, shards, redisHost)
 
-	// change 5 to the number of shards you want to start up
-	// for example, your bot may require 400 shards but you only want
-	// to start up 5
-	err = m.Start(1)
+	err = m.Start(shards)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}

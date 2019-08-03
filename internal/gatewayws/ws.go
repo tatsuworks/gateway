@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,8 +22,7 @@ import (
 )
 
 var (
-	GatewayETF  = "wss://gateway.discord.gg?encoding=etf"
-	GatewayJSON = "wss://gateway.discord.gg?encoding=json&compress=zlib-stream"
+	GatewayETF = "wss://gateway.discord.gg?encoding=etf"
 )
 
 type Session struct {
@@ -32,8 +31,9 @@ type Session struct {
 
 	log *zap.Logger
 
-	token           string
-	shardID, shards int
+	token   string
+	shardID int
+	shards  int
 
 	seq    int64
 	sessID string
@@ -71,7 +71,11 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
-	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
+	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{
+		HTTPHeader: http.Header{
+			"Accept-Encoding": []string{"zlib"},
+		},
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to dial gateway")
 	}
@@ -148,7 +152,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 				return xerrors.Errorf("failed to set seq in redis: %w", err)
 			}
 
-			if err := pipe.RPush("gateway:events:"+strings.ToLower(ev.T), ev.D).Err(); err != nil {
+			if err := pipe.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
 				return xerrors.Errorf("failed to push event to redis: %w", err)
 			}
 
@@ -161,7 +165,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		s.putRawBuf(byt)
 	}
 
-	c.Close(websocket.StatusNormalClosure, "")
+	_ = c.Close(websocket.StatusNormalClosure, "")
 	return err
 }
 
@@ -227,6 +231,7 @@ func (s *Session) readHello() error {
 	raw := s.bufs.Get()
 	_, err = io.Copy(raw, r)
 	if err != nil {
+		s.bufs.Put(raw)
 		return errors.Wrap(err, "failed to copy hello")
 	}
 
@@ -248,23 +253,11 @@ func (s *Session) readMessage() ([]byte, error) {
 		return nil, errors.Wrap(err, "failed to get reader")
 	}
 
-	// if s.zlr == nil {
-	// 	s.zlr, err = zlib.NewReader(r)
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "failed to create zlib reader")
-	// 	}
-	// } else {
-	// 	err = s.zlr.(zlib.Resetter).Reset(r, nil)
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "failed to reset zlib reader")
-	// 	}
-	// }
-
 	raw := s.bufs.Get()
 	_, err = io.Copy(raw, r)
 	if err != nil {
 		s.bufs.Put(raw)
-		return nil, errors.Wrap(err, "failed to copy hello")
+		return nil, errors.Wrap(err, "failed to copy message")
 	}
 
 	return raw.B, nil

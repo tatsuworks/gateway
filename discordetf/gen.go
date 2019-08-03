@@ -1,9 +1,8 @@
 package discordetf
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 const etfStartingByte byte = 131
@@ -28,41 +27,36 @@ func DecodeT(buf []byte) (*Event, error) {
 		e = &Event{}
 	)
 
-	// verify distribution header
 	err := d.checkByte(etfStartingByte)
 	if err != nil {
-		return e, errors.Wrap(err, "failed to verify etf starting byte")
+		return e, xerrors.Errorf("failed to verify etf starting byte: %w", err)
 	}
 
-	// verify map byte
 	err = d.checkByte(ettMap)
 	if err != nil {
-		return e, errors.Wrap(err, "failed to verify starting map byte")
+		return e, xerrors.Errorf("failed to verify starting map byte: %w", err)
 	}
 
 	fields := d.readMapLen()
-
 	for ; fields > 0; fields-- {
-		// key
-		err := d.checkByte(ettAtom)
+		l, err := d.readAtomWithTag()
 		if err != nil {
-			return e, errors.Wrap(err, "failed to verify map key byte")
+			return e, xerrors.Errorf("failed to map key: %w", err)
 		}
 
-		l := d.readRawAtom()
 		key := string(d.buf[d.off-l : d.off])
 
 		switch key {
 		case "op":
 			e.Op, err = d.readSmallIntWithTagIntoInt()
 			if err != nil {
-				return e, errors.Wrap(err, "failed to read OP value")
+				return e, xerrors.Errorf("failed to read OP value: %w", err)
 			}
 
 		case "d":
 			raw, err := d.readTermIntoSlice()
 			if err != nil {
-				return e, errors.Wrap(err, "failed to read D value")
+				return e, xerrors.Errorf("failed to read D value: %w", err)
 			}
 			e.D = raw
 
@@ -75,22 +69,26 @@ func DecodeT(buf []byte) (*Event, error) {
 					continue
 				}
 
-				return e, errors.Wrap(err, "failed to read s value")
+				return e, xerrors.Errorf("failed to read s value: %w", err)
 			}
 			e.S = int64(i)
 		case "t":
 			l, err := d.readAtomWithTag()
 			if err != nil {
-				return e, errors.Wrap(err, "failed to read event type")
+				return e, xerrors.Errorf("failed to read event type: %w", err)
 			}
 			e.T = string(d.buf[d.off-l : d.off])
 
 		default:
-			return e, errors.Errorf("unknown map key %s", string(key))
+			return e, xerrors.Errorf("unknown map key %s", string(key))
 		}
 	}
 
 	return e, nil
+}
+
+func (d *decoder) iterateMap(fn func(key string) error) error {
+	return nil
 }
 
 func (d *decoder) readIntWithTagIntoInt() (int, error) {
@@ -101,33 +99,28 @@ func (d *decoder) readIntWithTagIntoInt() (int, error) {
 	case ettInteger:
 		return d.readRawIntIntoInt(), nil
 	default:
-		return 0, errors.Errorf("expected bytes 97/98, got %v", t)
+		return 0, xerrors.Errorf("expected bytes %d/%d, got %v", ettSmallInteger, ettInteger, t)
 	}
 }
 
 func (d *decoder) readUntilData() error {
-	// verify distribution header
 	err := d.checkByte(etfStartingByte)
 	if err != nil {
 		return errors.Wrap(err, "failed to verify etf starting byte")
 	}
 
-	// verify map byte
 	err = d.checkByte(ettMap)
 	if err != nil {
-		return errors.Wrap(err, "failed to verify starting map byte")
+		return xerrors.Errorf("failed to verify starting map byte: %w", err)
 	}
 
 	fields := d.readMapLen()
-
 	for ; fields > 0; fields-- {
-		// key
-		err := d.checkByte(ettAtom)
+		l, err := d.readAtomWithTag()
 		if err != nil {
-			return errors.Wrap(err, "failed to verify map key byte")
+			return xerrors.Errorf("failed to read map keyleveledrolesbyscore: %w", err)
 		}
 
-		l := d.readRawAtom()
 		key := string(d.buf[d.off-l : d.off])
 		if key == "d" {
 			return nil
@@ -139,7 +132,7 @@ func (d *decoder) readUntilData() error {
 		}
 	}
 
-	return errors.New("couldn't find data key")
+	return xerrors.New("couldn't find data key")
 }
 
 func (d *decoder) readSmallIntWithTagIntoInt() (int, error) {
@@ -157,17 +150,15 @@ func (d *decoder) readSmallIntIntoInt() int {
 }
 
 func (d *decoder) readAtomWithTag() (int, error) {
-	err := d.checkByte(ettAtom)
-	if err != nil {
-		d.inc(-1)
-		if err := d.checkByte(ettBinary); err == nil {
-			return d.readRawBinary(), nil
-		}
-
-		return 0, err
+	t := d.read(1)[0]
+	switch t {
+	case ettAtom:
+		return d.readRawAtom(), nil
+	case ettBinary:
+		return d.readRawBinary(), nil
+	default:
+		return 0, xerrors.Errorf("expected bytes %d/%d, got %v", ettAtom, ettBinary, t)
 	}
-
-	return d.readRawAtom(), nil
 }
 
 func (d *decoder) readEmojiID() (interface{}, error) {
@@ -177,18 +168,15 @@ func (d *decoder) readEmojiID() (interface{}, error) {
 	)
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to verify emoji map byte")
+		return nil, xerrors.Errorf("failed to verify map byte: %w", err)
 	}
 
 	arity := d.readMapLen()
 
 	for ; arity > 0; arity-- {
-		start := d.off
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			fmt.Println(d.buf)
-			fmt.Println(d.buf[start-5:])
-			return nil, errors.Wrap(err, "failed to read emoji map key")
+			return nil, xerrors.Errorf("failed to read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -196,13 +184,13 @@ func (d *decoder) readEmojiID() (interface{}, error) {
 		case "id":
 			id, err = d.readSmallBigWithTagToInt64()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to read emoji id")
+				return nil, xerrors.Errorf("failed to read id: %w", err)
 			}
 			continue
 		case "name":
 			l, err := d.readAtomWithTag()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to read emoji name")
+				return nil, xerrors.Errorf("failed to read name: %w", err)
 			}
 
 			name = string(d.buf[d.off-l : d.off])
@@ -211,7 +199,7 @@ func (d *decoder) readEmojiID() (interface{}, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to read emoji value")
+			return nil, xerrors.Errorf("failed to read value: %w", err)
 		}
 	}
 
@@ -225,14 +213,14 @@ func (d *decoder) readEmojiID() (interface{}, error) {
 func (d *decoder) readUntilKey(name string) error {
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return errors.Wrap(err, "failed to verify map byte")
+		return xerrors.Errorf("failed to verify map byte: %w", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return errors.Wrap(err, "failed to read map key")
+			return xerrors.Errorf("failed to read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -242,9 +230,9 @@ func (d *decoder) readUntilKey(name string) error {
 
 		err = d.readTerm()
 		if err != nil {
-			return errors.Wrap(err, "failed to read map value")
+			return xerrors.Errorf("failed to read map value: %w", err)
 		}
 	}
 
-	return errors.Errorf("couldn't find key %s", name)
+	return xerrors.Errorf("couldn't find key %s", name)
 }

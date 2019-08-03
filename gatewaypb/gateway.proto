@@ -1,0 +1,29 @@
+syntax = "proto3";
+package gateway;
+option go_package = "gatewaypb";
+
+service Gateway {
+    rpc Version(EmptyRequest) returns (VersionResponse);
+
+    rpc RestartShard(RestartShardRequest) returns (EmptyResponse);
+    rpc ShardStats(ShardStatsRequest) returns (ShardStatsResponse);
+}
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+message VersionResponse {
+    string version = 1;
+}
+
+message RestartShardRequest {
+    int32 shard = 1;
+}
+
+message ShardStatsRequest {
+    int32 shard = 1;
+}
+
+message ShardStatsResponse {
+    
+}

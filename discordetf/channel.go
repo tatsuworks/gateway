@@ -1,7 +1,7 @@
 package discordetf
 
 import (
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Channel struct {
@@ -19,13 +19,13 @@ func DecodeChannel(buf []byte) (*Channel, error) {
 
 	ch.Id, ch.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return ch, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to extract id: %w", err)
 	}
 
 	d.reset()
 	ch.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return ch, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to extract guild_id: %w", err)
 	}
 
 	return ch, err
@@ -46,13 +46,13 @@ func DecodeVoiceState(buf []byte) (*VoiceState, error) {
 
 	vs.User, vs.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return vs, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to extract user_id: %w", err)
 	}
 
 	d.reset()
 	vs.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return vs, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to extract channel_id: %w", err)
 	}
 
 	return vs, err

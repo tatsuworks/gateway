@@ -283,6 +283,7 @@ func (d *decoder) stringFromMap(name string) (string, error) {
 }
 
 // guildIDFromMap extracts a guild id from an ETF map.
+// If guild id doesn't exist in the map it will return 0.
 func (d *decoder) guildIDFromMap() (int64, error) {
 	var id int64
 

@@ -12,7 +12,7 @@ func (c *Client) RoleCreate(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtRoleKey(rc.Guild, rc.Id), rc.Raw)
+		t.Set(c.fmtGuildRoleKey(rc.Guild, rc.Id), rc.Raw)
 		return nil
 	})
 }
@@ -23,7 +23,7 @@ func (c *Client) RoleDelete(d []byte) error {
 		return err
 	}
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtRoleKey(rc.Guild, rc.Id))
+		t.Clear(c.fmtGuildRoleKey(rc.Guild, rc.Id))
 		return nil
 	})
 }

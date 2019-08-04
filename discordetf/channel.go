@@ -32,9 +32,9 @@ func DecodeChannel(buf []byte) (*Channel, error) {
 }
 
 type VoiceState struct {
-	User    int64
-	Channel int64
-	Raw     []byte
+	User  int64
+	Guild int64
+	Raw   []byte
 }
 
 func DecodeVoiceState(buf []byte) (*VoiceState, error) {
@@ -50,9 +50,9 @@ func DecodeVoiceState(buf []byte) (*VoiceState, error) {
 	}
 
 	d.reset()
-	vs.Channel, err = d.idFromMap("channel_id")
+	vs.Guild, err = d.idFromMap("guild_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to extract channel_id: %w", err)
+		return nil, xerrors.Errorf("failed to extract guild_id: %w", err)
 	}
 
 	return vs, err

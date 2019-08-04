@@ -13,7 +13,8 @@ func (s *Client) ChannelCreate(d []byte) error {
 	}
 
 	err = s.Transact(func(t fdb.Transaction) error {
-		t.Set(s.fmtChannelKey(ch.Guild, ch.Id), ch.Raw)
+		t.Set(s.fmtChannelKey(ch.Id), ch.Raw)
+		t.Set(s.fmtGuildChannelKey(ch.Guild, ch.Id), ch.Raw)
 		return nil
 	})
 	if err != nil {
@@ -30,7 +31,8 @@ func (c *Client) ChannelDelete(d []byte) error {
 	}
 
 	err = c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtChannelKey(ch.Guild, ch.Id))
+		t.Clear(c.fmtChannelKey(ch.Id))
+		t.Clear(c.fmtGuildChannelKey(ch.Guild, ch.Id))
 		return nil
 	})
 	if err != nil {
@@ -47,7 +49,7 @@ func (c *Client) VoiceStateUpdate(d []byte) error {
 	}
 
 	err = c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtVoiceStateKey(vs.Channel, vs.User), vs.Raw)
+		t.Set(c.fmtGuildVoiceStateKey(vs.Guild, vs.User), vs.Raw)
 		return nil
 	})
 	if err != nil {

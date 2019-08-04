@@ -11,7 +11,7 @@ func (c *Client) MemberChunk(d []byte) error {
 		return err
 	}
 
-	return c.setETFs(mc.Guild, mc.Members, c.fmtChannelKey)
+	return c.setGuildETFs(mc.Guild, mc.Members, c.fmtGuildMemberKey)
 }
 
 func (c *Client) MemberAdd(d []byte) error {
@@ -21,7 +21,7 @@ func (c *Client) MemberAdd(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtMemberKey(mc.Guild, mc.Id), mc.Raw)
+		t.Set(c.fmtGuildMemberKey(mc.Guild, mc.Id), mc.Raw)
 		return nil
 	})
 }
@@ -33,7 +33,7 @@ func (c *Client) MemberRemove(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtMemberKey(mc.Guild, mc.Id))
+		t.Clear(c.fmtGuildMemberKey(mc.Guild, mc.Id))
 		return nil
 	})
 }
@@ -49,7 +49,7 @@ func (c *Client) PresenceUpdate(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtPresenceKey(p.Guild, p.Id), p.Raw)
+		t.Set(c.fmtGuildPresenceKey(p.Guild, p.Id), p.Raw)
 		return nil
 	})
 }

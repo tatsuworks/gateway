@@ -4,7 +4,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-const etfStartingByte byte = 131
+const etfStartingByte = byte(131)
 
 var (
 	dRaw  = []byte("d")

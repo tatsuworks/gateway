@@ -2,8 +2,8 @@ package state
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/pkg/errors"
+	"github.com/tatsuworks/gateway/discordetf"
 )
 
 func (c *Client) MessageCreate(d []byte) error {
@@ -13,7 +13,7 @@ func (c *Client) MessageCreate(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtMessageKey(mc.Channel, mc.Id), mc.Raw)
+		t.Set(c.fmtChannelMessageKey(mc.Channel, mc.Id), mc.Raw)
 		return nil
 	})
 }
@@ -25,7 +25,7 @@ func (c *Client) MessageDelete(d []byte) error {
 	}
 
 	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtMessageKey(mc.Channel, mc.Id))
+		t.Clear(c.fmtChannelMessageKey(mc.Channel, mc.Id))
 		return nil
 	})
 }

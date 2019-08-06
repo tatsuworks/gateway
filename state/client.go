@@ -15,7 +15,7 @@ func NewClient() *Client {
 	fdb.MustAPIVersion(610)
 	db := fdb.MustOpenDefault()
 
-	dir, err := directory.CreateOrOpen(db, []string{"etfstate"}, nil)
+	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
 	if err != nil {
 		panic(err.Error())
 	}

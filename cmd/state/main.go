@@ -50,7 +50,7 @@ func main() {
 
 	state, err := api.NewServer(logger, Version)
 	if err != nil {
-		logger.Panic("failed to create etfstate", zap.Error(err))
+		logger.Panic("failed to create state", zap.Error(err))
 	}
 
 	state.Init()

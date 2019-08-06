@@ -1,15 +1,12 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/tatsuworks/gateway/internal/state/mwerr"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
 
@@ -42,48 +39,13 @@ func wrapHandler(fn func(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 				code = http.StatusInternalServerError
 			)
 
-			if perr, ok := err.(mwerr.Public); ok {
-				msg, code = perr.Public()
+			if xerrors.Is(err, ErrNotFound) {
+				code = http.StatusNotFound
 			}
 
-			fmt.Println(msg)
 			http.Error(w, msg, code)
 		}
 	})
-}
-
-func (s *Server) setETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {
-	eg := new(errgroup.Group)
-
-	send := func(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) {
-		eg.Go(func() error {
-			return s.Transact(func(t fdb.Transaction) error {
-				for id, e := range etfs {
-					t.Set(key(guild, id), e)
-				}
-
-				return nil
-			})
-		})
-
-	}
-
-	bufMap := etfs
-	if len(etfs) > 1000 {
-		bufMap = make(map[int64][]byte, 1000)
-
-		for i, e := range etfs {
-			bufMap[i] = e
-
-			if len(bufMap) >= 1000 {
-				send(guild, bufMap, key)
-				bufMap = make(map[int64][]byte, 1000)
-			}
-		}
-	}
-
-	send(guild, bufMap, key)
-	return eg.Wait()
 }
 
 func (s *Server) fmtChannelKey(id int64) fdb.Key {

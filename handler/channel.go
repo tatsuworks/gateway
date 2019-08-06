@@ -1,4 +1,4 @@
-package state
+package handler
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"

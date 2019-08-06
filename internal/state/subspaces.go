@@ -1,30 +1,9 @@
 package state
 
 import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/subspace"
 )
-
-type Client struct {
-	fdb  fdb.Database
-	subs *Subspaces
-}
-
-func NewClient() *Client {
-	fdb.MustAPIVersion(610)
-	db := fdb.MustOpenDefault()
-
-	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return &Client{
-		subs: NewSubspaces(dir),
-		fdb:  db,
-	}
-}
 
 // Subspaces is a struct containing all of the different subspaces used.
 type Subspaces struct {
@@ -41,7 +20,7 @@ type Subspaces struct {
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
 const (
 	// ChannelSubspaceName is the enum for the channel subspace.
-	ChannelSubspaceName = iota
+	ChannelSubspaceName uint8 = iota
 	// GuildSubspaceName is the enum for the guild subspace.
 	GuildSubspaceName
 	// MemberSubspaceName is the enum for the member subspace.

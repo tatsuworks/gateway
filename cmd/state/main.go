@@ -1,20 +1,15 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 
-	"github.com/go-redis/redis"
 	"github.com/google/gops/agent"
 	_ "github.com/lib/pq"
-	"github.com/olivere/elastic"
 	"github.com/tatsuworks/state/internal/api"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var (

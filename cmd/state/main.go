@@ -7,8 +7,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/google/gops/agent"
-	_ "github.com/lib/pq"
-	"github.com/tatsuworks/state/internal/api"
+	"github.com/tatsuworks/gateway/internal/state/api"
 	"go.uber.org/zap"
 )
 

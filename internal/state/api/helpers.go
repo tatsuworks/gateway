@@ -8,7 +8,7 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/tatsuworks/state/internal/mwerr"
+	"github.com/tatsuworks/gateway/internal/state/mwerr"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )

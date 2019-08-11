@@ -38,7 +38,7 @@ func (db *DB) Transact(fn func(t fdb.Transaction) error) error {
 
 // ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a function that doesn't require a return value.
 func (db *DB) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
-	_, err := c.fdb.ReadTransact(func(t fdb.ReadTransaction) (ret interface{}, err error) {
+	_, err := db.fdb.ReadTransact(func(t fdb.ReadTransaction) (ret interface{}, err error) {
 		return nil, fn(t)
 	})
 
@@ -99,6 +99,10 @@ func (db *DB) fmtMessagePrefix() fdb.Key {
 
 func (db *DB) fmtMessageReactionKey(channel, id, user int64, name interface{}) fdb.Key {
 	return db.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns", user, name})
+}
+
+func (db *DB) fmtMessageReactionPrefix(channel, id int64) fdb.Key {
+	return db.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns"})
 }
 
 func (db *DB) fmtGuildPresenceKey(guild, id int64) fdb.Key {

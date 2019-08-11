@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/discordetf"
 )
@@ -12,13 +12,9 @@ func (s *Client) ChannelCreate(d []byte) error {
 		return err
 	}
 
-	err = s.Transact(func(t fdb.Transaction) error {
-		t.Set(s.fmtChannelKey(ch.Id), ch.Raw)
-		t.Set(s.fmtGuildChannelKey(ch.Guild, ch.Id), ch.Raw)
-		return nil
-	})
+	err = s.db.SetChannel(ch.Guild, ch.Id, ch.Raw)
 	if err != nil {
-		return err
+		return xerrors.Errorf("failed to set channel: %w", err)
 	}
 
 	return nil
@@ -30,13 +26,9 @@ func (c *Client) ChannelDelete(d []byte) error {
 		return err
 	}
 
-	err = c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtChannelKey(ch.Id))
-		t.Clear(c.fmtGuildChannelKey(ch.Guild, ch.Id))
-		return nil
-	})
+	err = c.db.DeleteChannel(ch.Guild, ch.Id, ch.Raw)
 	if err != nil {
-		return err
+		return xerrors.Errorf("failed to delete channel: %w", err)
 	}
 
 	return nil
@@ -48,12 +40,9 @@ func (c *Client) VoiceStateUpdate(d []byte) error {
 		return err
 	}
 
-	err = c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtGuildVoiceStateKey(vs.Guild, vs.User), vs.Raw)
-		return nil
-	})
+	err = c.db.SetVoiceState(vs.Guild, vs.User, vs.Raw)
 	if err != nil {
-		return err
+		return xerrors.Errorf("failed to set voice state: %w", err)
 	}
 
 	return nil

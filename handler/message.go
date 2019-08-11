@@ -1,9 +1,8 @@
 package handler
 
 import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"github.com/pkg/errors"
 	"github.com/tatsuworks/gateway/discordetf"
+	"golang.org/x/xerrors"
 )
 
 func (c *Client) MessageCreate(d []byte) error {
@@ -12,10 +11,12 @@ func (c *Client) MessageCreate(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtChannelMessageKey(mc.Channel, mc.Id), mc.Raw)
-		return nil
-	})
+	err = c.db.SetChannelMessage(mc.Channel, mc.Id, mc.Raw)
+	if err != nil {
+		return xerrors.Errorf("failed to set channel message: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MessageDelete(d []byte) error {
@@ -24,10 +25,12 @@ func (c *Client) MessageDelete(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtChannelMessageKey(mc.Channel, mc.Id))
-		return nil
-	})
+	err = c.db.DeleteChannelMessage(mc.Channel, mc.Id)
+	if err != nil {
+		return xerrors.Errorf("failed to delete channel message: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MessageReactionAdd(d []byte) error {
@@ -36,10 +39,12 @@ func (c *Client) MessageReactionAdd(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, rc.Name), rc.Raw)
-		return nil
-	})
+	err = c.db.SetChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name, rc.Raw)
+	if err != nil {
+		return xerrors.Errorf("failed to set channel message reaction: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MessageReactionRemove(d []byte) error {
@@ -47,10 +52,13 @@ func (c *Client) MessageReactionRemove(d []byte) error {
 	if err != nil {
 		return err
 	}
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, rc.Name))
-		return nil
-	})
+
+	err = c.db.DeleteChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name)
+	if err != nil {
+		return xerrors.Errorf("failed to delete channel message reaction: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MessageReactionRemoveAll(d []byte) error {
@@ -59,13 +67,10 @@ func (c *Client) MessageReactionRemoveAll(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		pre, err := fdb.PrefixRange(c.fmtMessageReactionKey(rc.Channel, rc.Message, rc.User, ""))
-		if err != nil {
-			return errors.Wrap(err, "failed to make message reaction prefixrange")
-		}
+	err = c.db.DeleteChannelMessageReactions(rc.Message, rc.Message, rc.User)
+	if err != nil {
+		return xerrors.Errorf("failed to remove channel message reactions: %w", err)
+	}
 
-		t.ClearRange(pre)
-		return nil
-	})
+	return nil
 }

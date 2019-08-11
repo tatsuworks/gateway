@@ -18,7 +18,7 @@ import (
 
 	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/tatsuworks/gateway/etf"
-	"github.com/tatsuworks/gateway/state"
+	"github.com/tatsuworks/gateway/handler"
 )
 
 var (
@@ -48,7 +48,7 @@ type Session struct {
 
 	zlr io.ReadCloser
 
-	state *state.Client
+	state *handler.Client
 
 	rc *redis.Client
 }
@@ -62,7 +62,7 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 
 		bufs: &bytebufferpool.Pool{},
 
-		state: state.NewClient(),
+		state: handler.NewClient(),
 		rc:    rdb,
 	}, nil
 }

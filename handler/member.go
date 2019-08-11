@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/tatsuworks/gateway/discordetf"
+	"golang.org/x/xerrors"
 )
 
 func (c *Client) MemberChunk(d []byte) error {
@@ -11,7 +11,12 @@ func (c *Client) MemberChunk(d []byte) error {
 		return err
 	}
 
-	return c.setGuildETFs(mc.Guild, mc.Members, c.fmtGuildMemberKey)
+	err = c.db.SetGuildMembers(mc.Guild, mc.Members)
+	if err != nil {
+		return xerrors.Errorf("failed to set guild members: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MemberAdd(d []byte) error {
@@ -20,10 +25,12 @@ func (c *Client) MemberAdd(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtGuildMemberKey(mc.Guild, mc.Id), mc.Raw)
-		return nil
-	})
+	err = c.db.SetGuildMember(mc.Guild, mc.Id, mc.Raw)
+	if err != nil {
+		return xerrors.Errorf("failed to set guild member: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) MemberRemove(d []byte) error {
@@ -32,24 +39,10 @@ func (c *Client) MemberRemove(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtGuildMemberKey(mc.Guild, mc.Id))
-		return nil
-	})
-}
-
-func (c *Client) PresenceUpdate(d []byte) error {
-	if true {
-		return nil
-	}
-
-	p, err := discordetf.DecodePresence(d)
+	err = c.db.DeleteGuildMember(mc.Guild, mc.Id)
 	if err != nil {
-		return err
+		return xerrors.Errorf("failed to delete guild member: %w", err)
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtGuildPresenceKey(p.Guild, p.Id), p.Raw)
-		return nil
-	})
+	return nil
 }

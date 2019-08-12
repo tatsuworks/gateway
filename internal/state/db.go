@@ -101,8 +101,8 @@ func (db *DB) fmtMessageReactionKey(channel, id, user int64, name interface{}) f
 	return db.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns", user, name})
 }
 
-func (db *DB) fmtMessageReactionPrefix(channel, id int64) fdb.Key {
-	return db.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns"})
+func (db *DB) fmtMessageReactionPrefix(channel, id, user int64) fdb.Key {
+	return db.subs.Messages.Pack(tuple.Tuple{channel, id, "rxns", user})
 }
 
 func (db *DB) fmtGuildPresenceKey(guild, id int64) fdb.Key {

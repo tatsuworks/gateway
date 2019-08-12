@@ -30,9 +30,9 @@ func (db *DB) DeleteChannelMessageReaction(channel, id, user int64, name interfa
 	})
 }
 
-func (db *DB) DeleteChannelMessageReactions(channel, id int64) error {
+func (db *DB) DeleteChannelMessageReactions(channel, id, user int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
-		pre, _ := fdb.PrefixRange(db.fmtMessageReactionPrefix(channel, id))
+		pre, _ := fdb.PrefixRange(db.fmtMessageReactionPrefix(channel, id, user))
 
 		t.ClearRange(pre)
 		return nil

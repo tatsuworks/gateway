@@ -24,7 +24,7 @@ func (c *Client) GuildCreate(d []byte) error {
 
 	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
-			err := (error)(nil)
+			err := c.db.SetGuildRoles(gc.Id, gc.Roles)
 			if err != nil {
 				return xerrors.Errorf("failed to set guild roles: %w", err)
 			}

@@ -32,8 +32,12 @@ func (db *DB) Transact(fn func(t fdb.Transaction) error) error {
 	_, err := db.fdb.Transact(func(t fdb.Transaction) (ret interface{}, err error) {
 		return nil, fn(t)
 	})
+	if err != nil {
+		return xerrors.Errorf("failed to commit fdb txn: %w", err)
 
-	return xerrors.Errorf("failed to commit fdb txn: %w", err)
+	}
+
+	return nil
 }
 
 // ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a function that doesn't require a return value.
@@ -41,8 +45,11 @@ func (db *DB) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
 	_, err := db.fdb.ReadTransact(func(t fdb.ReadTransaction) (ret interface{}, err error) {
 		return nil, fn(t)
 	})
+	if err != nil {
+		return xerrors.Errorf("failed to commit fdb read txn: %w", err)
+	}
 
-	return xerrors.Errorf("failed to commit fdb read txn: %w", err)
+	return nil
 }
 
 func (db *DB) fmtChannelKey(id int64) fdb.Key {

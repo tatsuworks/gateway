@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/tatsuworks/gateway/discordetf"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
@@ -10,40 +9,42 @@ import (
 func (c *Client) GuildCreate(d []byte) error {
 	gc, err := discordetf.DecodeGuildCreate(d)
 	if err != nil {
-		return err
+		return xerrors.Errorf("failed to parse guild create: %w", err)
 	}
 
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		return c.Transact(func(t fdb.Transaction) error {
-			t.Set(c.fmtGuildKey(gc.Id), gc.Guild)
-			return nil
-		})
+		err := c.db.SetGuild(gc.Id, gc.Guild)
+		if err != nil {
+			return xerrors.Errorf("failed to set guild: %w", err)
+		}
+		return nil
 	})
 
 	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
-			return c.setGuildETFs(gc.Id, gc.Roles, c.fmtGuildRoleKey)
+			err := (error)(nil)
+			if err != nil {
+				return xerrors.Errorf("failed to set guild roles: %w", err)
+			}
 		}
 		return nil
 	})
 	eg.Go(func() error {
 		if len(gc.Members) > 0 {
-			return c.setGuildETFs(gc.Id, gc.Members, c.fmtGuildMemberKey)
+			err := c.db.SetGuildMembers(gc.Id, gc.Members)
+			if err != nil {
+				return xerrors.Errorf("failed to set guild member: %w", err)
+			}
 		}
 		return nil
 	})
 	eg.Go(func() error {
 		if len(gc.Channels) > 0 {
-			err := c.setGuildETFs(gc.Id, gc.Channels, c.fmtGuildChannelKey)
+			err := c.db.SetChannels(gc.Id, gc.Channels)
 			if err != nil {
-				return xerrors.Errorf("failed to set guild channel keys: %w", err)
-			}
-
-			err = c.setETFs(gc.Id, gc.Channels, c.fmtChannelKey)
-			if err != nil {
-				return xerrors.Errorf("failed to set channel keys: %w", err)
+				return xerrors.Errorf("failed to set guild channels: %w", err)
 			}
 
 		}
@@ -62,44 +63,37 @@ func (c *Client) GuildDelete(d []byte) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		return c.Transact(func(t fdb.Transaction) error {
-			t.Clear(c.fmtGuildKey(gc.Id))
-			return nil
-		})
+		err := c.db.DeleteGuild(gc.Id)
+		if err != nil {
+			return xerrors.Errorf("failed to delete guild: %w", err)
+		}
+
+		return nil
 	})
 
 	eg.Go(func() error {
-		return c.Transact(func(t fdb.Transaction) error {
-			rg, err := fdb.PrefixRange(c.fmtGuildRolePrefix(gc.Id))
-			if err != nil {
-				return err
-			}
+		err := c.db.DeleteGuildRoles(gc.Id)
+		if err != nil {
+			return xerrors.Errorf("failed to delete guild roles: %w", err)
+		}
 
-			t.ClearRange(rg)
-			return nil
-		})
+		return nil
 	})
 	eg.Go(func() error {
-		return c.Transact(func(t fdb.Transaction) error {
-			rg, err := fdb.PrefixRange(c.fmtGuildMemberPrefix(gc.Id))
-			if err != nil {
-				return err
-			}
+		err := c.db.DeleteGuildMembers(gc.Id)
+		if err != nil {
+			return xerrors.Errorf("failed to delete guild members: %w", err)
+		}
 
-			t.ClearRange(rg)
-			return nil
-		})
+		return nil
 	})
 	eg.Go(func() error {
-		return c.Transact(func(t fdb.Transaction) error {
-			rg, err := fdb.PrefixRange(c.fmtGuildChannelPrefix(gc.Id))
-			if err != nil {
-				return err
-			}
+		err := c.db.DeleteChannels(gc.Id)
+		if err != nil {
+			return xerrors.Errorf("failed to delete channels: %w", err)
+		}
 
-			t.ClearRange(rg)
-			return nil
-		})
+		return nil
 	})
 
 	return eg.Wait()
@@ -111,10 +105,11 @@ func (c *Client) GuildBanAdd(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Set(c.fmtGuildBanKey(gb.Guild, gb.User), gb.Raw)
-		return nil
-	})
+	err = c.db.SetGuildBan(gb.Guild, gb.User, gb.Raw)
+	if err != nil {
+		return xerrors.Errorf("failed to set guild ban: %w", err)
+	}
+	return nil
 }
 
 func (c *Client) GuildBanRemove(d []byte) error {
@@ -123,8 +118,9 @@ func (c *Client) GuildBanRemove(d []byte) error {
 		return err
 	}
 
-	return c.Transact(func(t fdb.Transaction) error {
-		t.Clear(c.fmtGuildBanKey(gb.Guild, gb.User))
-		return nil
-	})
+	err = c.db.DeleteGuildBan(gb.Guild, gb.User)
+	if err != nil {
+		return xerrors.Errorf("failed to delete guild ban: %w", err)
+	}
+	return nil
 }

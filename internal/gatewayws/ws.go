@@ -54,6 +54,11 @@ type Session struct {
 }
 
 func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, shards int) (*Session, error) {
+	c, err := handler.NewClient()
+	if err != nil {
+		return nil, xerrors.Errorf("failed to create state handler: %w", err)
+	}
+
 	return &Session{
 		log:     logger,
 		token:   token,
@@ -62,7 +67,7 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 
 		bufs: &bytebufferpool.Pool{},
 
-		state: handler.NewClient(),
+		state: c,
 		rc:    rdb,
 	}, nil
 }

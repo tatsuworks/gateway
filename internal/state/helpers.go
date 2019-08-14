@@ -5,10 +5,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (db *DB) setETFs(guild int64, etfs map[int64][]byte, key func(id int64) fdb.Key) error {
+func (db *DB) setETFs(etfs map[int64][]byte, key func(id int64) fdb.Key) error {
 	eg := new(errgroup.Group)
 
-	send := func(guild int64, etfs map[int64][]byte, key func(id int64) fdb.Key) {
+	send := func(etfs map[int64][]byte, key func(id int64) fdb.Key) {
 		eg.Go(func() error {
 			return db.Transact(func(t fdb.Transaction) error {
 				opts := t.Options()
@@ -35,13 +35,13 @@ func (db *DB) setETFs(guild int64, etfs map[int64][]byte, key func(id int64) fdb
 			bufMap[i] = e
 
 			if len(bufMap) >= 100 {
-				send(guild, bufMap, key)
+				send(bufMap, key)
 				bufMap = make(map[int64][]byte, 100)
 			}
 		}
 	}
 
-	send(guild, bufMap, key)
+	send(bufMap, key)
 	return eg.Wait()
 }
 

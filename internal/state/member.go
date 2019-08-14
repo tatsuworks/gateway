@@ -6,6 +6,15 @@ func (db *DB) SetGuildMembers(guild int64, raws map[int64][]byte) error {
 	return db.setGuildETFs(guild, raws, db.fmtGuildMemberKey)
 }
 
+func (db *DB) DeleteGuildMembers(guild int64) error {
+	pre, _ := fdb.PrefixRange(db.fmtGuildMemberPrefix(guild))
+
+	return db.Transact(func(t fdb.Transaction) error {
+		t.ClearRange(pre)
+		return nil
+	})
+}
+
 func (db *DB) SetGuildMember(guild, user int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildMemberKey(guild, user), raw)

@@ -5,6 +5,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	FDBRangeWantAll = fdb.RangeOptions{Mode: fdb.StreamingModeWantAll}
+)
+
 func (db *DB) setETFs(etfs map[int64][]byte, key func(id int64) fdb.Key) error {
 	eg := new(errgroup.Group)
 

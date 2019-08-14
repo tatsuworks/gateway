@@ -4,20 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 func (s *Server) getGuild(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var g []byte
-
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		g = t.Get(s.fmtGuildKey(guildParam(p))).MustGet()
-		return nil
-	})
+	g, err := s.db.GetGuild(guildParam(p))
 	if err != nil {
-		return errors.Wrap(err, "failed to transact channel")
+		return xerrors.Errorf("failed to read guild: %w", err)
 	}
 
 	if g == nil {

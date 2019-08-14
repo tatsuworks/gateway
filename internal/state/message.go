@@ -9,6 +9,20 @@ func (db *DB) SetChannelMessage(channel, id int64, raw []byte) error {
 	})
 }
 
+func (db *DB) GetChannelMessage(channel, id int64) ([]byte, error) {
+	var m []byte
+
+	err := db.Transact(func(t fdb.Transaction) error {
+		m = t.Get(db.fmtChannelMessageKey(channel, id)).MustGet()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return m, err
+}
+
 func (db *DB) DeleteChannelMessage(channel, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtChannelMessageKey(channel, id))

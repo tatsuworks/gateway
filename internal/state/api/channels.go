@@ -13,14 +13,9 @@ import (
 )
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var c []byte
-
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		c = t.Get(s.fmtChannelKey(channelParam(p))).MustGet()
-		return nil
-	})
+	c, err := s.db.GetChannel(channelParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to transact channel: %w", err)
+		return xerrors.Errorf("failed to read channel: %w", err)
 	}
 
 	if c == nil {
@@ -41,33 +36,21 @@ func channelParam(p httprouter.Params) int64 {
 }
 
 func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var raws []fdb.KeyValue
-
-	pre, _ := fdb.PrefixRange(s.fmtChannelPrefix())
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
-		return nil
-	})
+	cs, err := s.db.GetChannels()
 	if err != nil {
 		return xerrors.Errorf("failed to read channels: %w", err)
 	}
 
-	return writeTerms(w, raws)
+	return writeTerms(w, cs)
 }
 
 func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var raws []fdb.KeyValue
-
-	pre, _ := fdb.PrefixRange(s.fmtGuildChannelPrefix(guildParam(p)))
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
-		return nil
-	})
+	cs, err := s.db.GetGuildChannels(guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("failed to read guild channels: %w", err)
 	}
 
-	return writeTerms(w, raws)
+	return writeTerms(w, cs)
 }
 
 // Erlang external term tags.

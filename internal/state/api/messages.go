@@ -4,18 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
 
 func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var m []byte
-
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		m = t.Get(s.fmtChannelMessageKey(channelParam(p), messageParam(p))).MustGet()
-		return nil
-	})
+	m, err := s.db.GetChannelMessage(channelParam(p), messageParam(p))
 	if err != nil {
 		return xerrors.Errorf("failed to transact message: %w", err)
 	}

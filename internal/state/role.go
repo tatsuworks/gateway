@@ -9,8 +9,39 @@ func (db *DB) SetGuildRole(guild, role int64, raw []byte) error {
 	})
 }
 
+func (db *DB) GetGuildRole(guild, role int64) ([]byte, error) {
+	var r []byte
+
+	err := db.Transact(func(t fdb.Transaction) error {
+		r = t.Get(db.fmtGuildRoleKey(guild, role)).MustGet()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
 func (db *DB) SetGuildRoles(guild int64, roles map[int64][]byte) error {
 	return db.setGuildETFs(guild, roles, db.fmtGuildRoleKey)
+}
+
+func (db *DB) GetGuildRoles(guild int64) ([]fdb.KeyValue, error) {
+	var (
+		raws   []fdb.KeyValue
+		pre, _ = fdb.PrefixRange(db.fmtGuildRolePrefix(guild))
+	)
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return raws, nil
 }
 
 func (db *DB) DeleteGuildRoles(guild int64) error {

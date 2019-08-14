@@ -1,6 +1,9 @@
 package state
 
-import "github.com/apple/foundationdb/bindings/go/src/fdb"
+import (
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"golang.org/x/xerrors"
+)
 
 func (db *DB) SetChannel(guild, id int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
@@ -10,7 +13,7 @@ func (db *DB) SetChannel(guild, id int64, raw []byte) error {
 	})
 }
 
-func (db *DB) GetChannel(id int64, raw []byte) ([]byte, error) {
+func (db *DB) GetChannel(id int64) ([]byte, error) {
 	var c []byte
 
 	err := db.Transact(func(t fdb.Transaction) error {
@@ -22,6 +25,40 @@ func (db *DB) GetChannel(id int64, raw []byte) ([]byte, error) {
 	}
 
 	return c, nil
+}
+
+func (db *DB) GetChannels() ([]fdb.KeyValue, error) {
+	var (
+		raws   []fdb.KeyValue
+		pre, _ = fdb.PrefixRange(db.fmtChannelPrefix())
+	)
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("failed to read channels: %w", err)
+	}
+
+	return raws, err
+}
+
+func (db *DB) GetGuildChannels(guild int64) ([]fdb.KeyValue, error) {
+	var (
+		raws   []fdb.KeyValue
+		pre, _ = fdb.PrefixRange(db.fmtGuildChannelPrefix(guild))
+	)
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("failed to read channels: %w", err)
+	}
+
+	return raws, err
 }
 
 func (db *DB) DeleteChannel(guild, id int64, raw []byte) error {

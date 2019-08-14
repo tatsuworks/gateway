@@ -22,6 +22,37 @@ func (db *DB) SetGuildMember(guild, user int64, raw []byte) error {
 	})
 }
 
+func (db *DB) GetGuildMember(guild, user int64) ([]byte, error) {
+	var m []byte
+
+	err := db.Transact(func(t fdb.Transaction) error {
+		m = t.Get(db.fmtGuildMemberKey(guild, user)).MustGet()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func (db *DB) GetGuildMembers(guild int64) ([]fdb.KeyValue, error) {
+	var (
+		raws   []fdb.KeyValue
+		pre, _ = fdb.PrefixRange(db.fmtGuildMemberPrefix(guild))
+	)
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return raws, nil
+}
+
 func (db *DB) DeleteGuildMember(guild, user int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildMemberKey(guild, user))

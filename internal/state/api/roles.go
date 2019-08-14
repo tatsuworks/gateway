@@ -4,21 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
 
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var ro []byte
-
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		ro = t.Get(s.fmtGuildRoleKey(guildParam(p), roleParam(p))).MustGet()
-
-		return nil
-	})
+	ro, err := s.db.GetGuildRole(guildParam(p), roleParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to transact role: %w", err)
+		return xerrors.Errorf("failed to read role: %w", err)
 	}
 
 	if ro == nil {
@@ -29,18 +22,12 @@ func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprout
 }
 
 func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var raws []fdb.KeyValue
-
-	pre, _ := fdb.PrefixRange(s.fmtGuildRolePrefix(guildParam(p)))
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
-		return nil
-	})
+	ros, err := s.db.GetGuildRoles(guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("failed to read roles: %w", err)
 	}
 
-	return writeTerms(w, raws)
+	return writeTerms(w, ros)
 }
 
 func roleParam(p httprouter.Params) int64 {

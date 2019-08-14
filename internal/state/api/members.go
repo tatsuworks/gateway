@@ -4,20 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var m []byte
-
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		m = t.Get(s.fmtGuildMemberKey(guildParam(p), memberParam(p))).MustGet()
-		return nil
-	})
+	m, err := s.db.GetGuildMember(guildParam(p), memberParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to transact member: %w", err)
+		return xerrors.Errorf("failed to read member: %w", err)
 	}
 
 	if m == nil {
@@ -28,18 +22,12 @@ func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httpro
 }
 
 func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var raws []fdb.KeyValue
-
-	pre, _ := fdb.PrefixRange(s.fmtGuildMemberPrefix(guildParam(p)))
-	err := s.ReadTransact(func(t fdb.ReadTransaction) error {
-		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
-		return nil
-	})
+	ms, err := s.db.GetGuildMembers(guildParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to transact members: %w", err)
+		return xerrors.Errorf("failed to read members: %w", err)
 	}
 
-	return writeTerms(w, raws)
+	return writeTerms(w, ms)
 }
 
 func memberParam(p httprouter.Params) int64 {

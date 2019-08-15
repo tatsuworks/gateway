@@ -20,11 +20,11 @@ var (
 
 func init() {
 	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
-	flag.IntVar(&shards, "shards", 1, "1")
+	flag.IntVar(&shards, "shards", 5, "1")
 
 	// both do not work
-	flag.IntVar(&shards, "start", 0, "1")
-	flag.IntVar(&shards, "stop", 1, "1")
+	flag.IntVar(&start, "start", 0, "1")
+	flag.IntVar(&stop, "stop", 1, "1")
 
 	flag.Parse()
 }

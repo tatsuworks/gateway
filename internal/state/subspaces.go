@@ -20,7 +20,7 @@ type Subspaces struct {
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
 const (
 	// ChannelSubspaceName is the enum for the channel subspace.
-	ChannelSubspaceName byte = iota
+	ChannelSubspaceName = iota
 	// GuildSubspaceName is the enum for the guild subspace.
 	GuildSubspaceName
 	// MemberSubspaceName is the enum for the member subspace.

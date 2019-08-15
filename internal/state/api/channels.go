@@ -55,35 +55,9 @@ func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p http
 
 // Erlang external term tags.
 const (
-	ettStart         = byte(131)
-	ettAtom          = byte(100)
-	ettAtomUTF8      = byte(118) // this is beyond retarded
-	ettBinary        = byte(109)
-	ettBitBinary     = byte(77)
-	ettCachedAtom    = byte(67)
-	ettCacheRef      = byte(82)
-	ettExport        = byte(113)
-	ettFloat         = byte(99)
-	ettFun           = byte(117)
-	ettInteger       = byte(98)
-	ettLargeBig      = byte(111)
-	ettLargeTuple    = byte(105)
-	ettList          = byte(108)
-	ettNewCache      = byte(78)
-	ettNewFloat      = byte(70)
-	ettNewFun        = byte(112)
-	ettNewRef        = byte(114)
-	ettNil           = byte(106)
-	ettPid           = byte(103)
-	ettPort          = byte(102)
-	ettRef           = byte(101)
-	ettSmallAtom     = byte(115)
-	ettSmallAtomUTF8 = byte(119) // this is beyond retarded
-	ettSmallBig      = byte(110)
-	ettSmallInteger  = byte(97)
-	ettSmallTuple    = byte(104)
-	ettString        = byte(107)
-	ettMap           = byte(116)
+	ettStart = byte(131)
+	ettList  = byte(108)
+	ettNil   = byte(106)
 )
 
 func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
@@ -94,7 +68,7 @@ func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
 	for _, e := range raws {
 		_, err := w.Write(e.Value)
 		if err != nil {
-			return errors.Wrap(err, "failed to write term")
+			return xerrors.Errorf("failed to write term: %w", err)
 		}
 	}
 
@@ -117,10 +91,18 @@ func writeSliceHeader(w io.Writer, len int) error {
 	binary.BigEndian.PutUint32(h[2:], uint32(len))
 
 	_, err := w.Write(h[:])
-	return xerrors.Errorf("failed to write slice header: %w", err)
+	if err != nil {
+		return xerrors.Errorf("failed to write slice header: %w", err)
+	}
+
+	return nil
 }
 
 func writeETFHeader(w io.Writer) error {
 	_, err := w.Write([]byte{131})
-	return xerrors.Errorf("failed to write etf starting byte: %w", err)
+	if err != nil {
+		return xerrors.Errorf("failed to write etf starting byte: %w", err)
+	}
+
+	return nil
 }

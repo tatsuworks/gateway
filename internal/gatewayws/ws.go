@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -76,11 +75,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
-	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{
-		HTTPHeader: http.Header{
-			"Accept-Encoding": []string{"zlib"},
-		},
-	})
+	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to dial gateway")
 	}

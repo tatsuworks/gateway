@@ -68,7 +68,7 @@ func (s *Server) Start(addr string) error {
 	srv := new(http.Server)
 	http2.ConfigureServer(srv, nil)
 
-	ln, err := reuseport.Listen("tcp4", "0.0.0.0:8080")
+	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
 		return err
 	}

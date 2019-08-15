@@ -96,7 +96,6 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 				}
 			}
 
-			ch = make(chan struct{})
 			time.Sleep(5 * time.Second)
 		}
 	}()

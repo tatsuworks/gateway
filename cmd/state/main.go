@@ -16,7 +16,7 @@ var (
 	usePsql   bool
 	useEs     bool
 	usePprof  bool
-	port      string
+	addr      string
 	redisAddr string
 
 	Version string
@@ -27,7 +27,7 @@ func init() {
 	flag.BoolVar(&usePsql, "psql", false, "use postgres")
 	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
-	flag.StringVar(&port, "port", ":80", ":80")
+	flag.StringVar(&addr, "addr", "0.0.0.0:8080", "0.0.0.0:80")
 	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
 	flag.Parse()
 }
@@ -54,5 +54,5 @@ func main() {
 	}
 
 	state.Init()
-	logger.Fatal("failed to run server", zap.Error(state.Start(":8080")))
+	logger.Fatal("failed to run server", zap.Error(state.Start(addr)))
 }

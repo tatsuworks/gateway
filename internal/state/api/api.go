@@ -9,6 +9,7 @@ import (
 	"github.com/valyala/fasthttp/reuseport"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/internal/state"
@@ -65,14 +66,16 @@ func (s *Server) Init() {
 }
 
 func (s *Server) Start(addr string) error {
-	srv := new(http.Server)
-	http2.ConfigureServer(srv, nil)
+	var (
+		h1s = new(http.Server)
+		h2s = new(http2.Server)
+	)
 
 	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
 		return err
 	}
 
-	srv.Handler = s.router
-	return srv.ServeTLS(ln, "localhost.cert", "localhost.key")
+	h1s.Handler = h2c.NewHandler(s.router, h2s)
+	return h1s.Serve(ln)
 }

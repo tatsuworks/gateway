@@ -43,6 +43,9 @@ type Session struct {
 	interval time.Duration
 	trace    string
 
+	lastHB  time.Time
+	lastAck time.Time
+
 	bufs *bytebufferpool.Pool
 
 	zlr io.ReadCloser
@@ -59,7 +62,7 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 	}
 
 	return &Session{
-		log:     logger,
+		log:     logger.With(zap.Int("shard", shardID)),
 		token:   token,
 		shardID: shardID,
 		shards:  shards,
@@ -198,6 +201,17 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		s.log.Info("reconnect requested", zap.Int("shard", s.shardID))
 
 		return true, xerrors.New("reconnect")
+	}
+
+	switch ev.Op {
+	case 1:
+		err := s.heartbeat()
+		if err != nil {
+			return true, xerrors.Errorf("failed to heartbeat in response to op 1: %w", err)
+		}
+	case 10:
+		s.lastAck = time.Now()
+		return true, nil
 	}
 
 	return false, nil
@@ -360,22 +374,32 @@ func (s *Session) heartbeat() error {
 
 func (s *Session) sendHeartbeats() {
 	var (
-		t   = time.NewTicker(s.interval)
-		ctx = s.ctx
+		t      = time.NewTicker(s.interval)
+		ctx    = s.ctx
+		cancel = s.cancel
 	)
 	defer t.Stop()
 
 	for {
-		err := s.heartbeat()
-		if err != nil {
-			fmt.Println(err)
-		}
-
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+
+		if !s.lastHB.IsZero() {
+			if s.lastAck.Sub(s.lastHB) > 10*time.Second {
+				s.log.Warn("no response to heartbeat, closing")
+				cancel()
+				continue
+			}
+		}
+
+		err := s.heartbeat()
+		if err != nil {
+			s.log.Error("failed to send heartbeat", zap.Error(err))
+		}
+		s.lastHB = time.Now()
 	}
 }
 
@@ -395,13 +419,14 @@ func (s *Session) logTotalEvents() {
 
 		seq := atomic.LoadInt64(&s.seq)
 
-		s.log.Info(
-			"event report",
-			zap.Int("shard", s.shardID),
-			zap.Int64("seq", seq),
-			zap.Int64("since", seq-s.last),
-			zap.Float64("/sec", float64(seq-s.last)/15),
-		)
+		if seq-s.last == 0 {
+			s.log.Info(
+				"event report",
+				zap.Int64("seq", seq),
+				zap.Int64("since", seq-s.last),
+				zap.Float64("/sec", float64(seq-s.last)/15),
+			)
+		}
 
 		s.last = seq
 	}

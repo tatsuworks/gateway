@@ -108,7 +108,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
 
-	s.log.Info("websocket connected", zap.Int("shard", s.shardID))
+	s.log.Info("websocket connected")
 
 	for {
 		var byt []byte
@@ -181,24 +181,24 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		}
 
 		s.sessID = sess
-		s.log.Info("ready", zap.Int("shard", s.shardID))
+		s.log.Info("ready")
 
 		return true, nil
 
 	case "RESUMED":
-		s.log.Info("resumed", zap.Int("shard", s.shardID))
+		s.log.Info("resumed")
 
 		return true, nil
 
 	case "INVALID_SESSION":
-		s.log.Info("invalid session, reconnecting", zap.Int("shard", s.shardID))
+		s.log.Info("invalid session, reconnecting")
 		s.sessID = ""
 		s.seq = 0
 
 		return true, xerrors.New("invalid session")
 
 	case "RECONNECT":
-		s.log.Info("reconnect requested", zap.Int("shard", s.shardID))
+		s.log.Info("reconnect requested")
 
 		return true, xerrors.New("reconnect")
 	}

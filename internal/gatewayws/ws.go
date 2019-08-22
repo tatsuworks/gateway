@@ -173,6 +173,40 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 }
 
 func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
+	switch ev.Op {
+	case 1:
+		err := s.heartbeat()
+		if err != nil {
+			return true, xerrors.Errorf("failed to heartbeat in response to op 1: %w", err)
+		}
+
+	// RESUME
+	case 6:
+		s.log.Info("resumed")
+
+		return true, nil
+
+	// RECONNECT
+	case 7:
+		s.log.Info("reconnect requested")
+
+		return true, xerrors.New("reconnect")
+
+	// INVALID_SESSION
+	case 9:
+		s.log.Info("invalid session, reconnecting")
+		s.sessID = ""
+		s.seq = 0
+
+		return true, xerrors.New("invalid session")
+
+	// HEARTBEAT_ACK
+	case 11:
+		s.log.Info("heartbeat ack received")
+		s.lastAck = time.Now()
+		return true, nil
+	}
+
 	switch ev.T {
 	case "READY":
 		_, sess, err := discordetf.DecodeReady(ev.D)
@@ -185,35 +219,11 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 
 		return true, nil
 
-	case "RESUMED":
-		s.log.Info("resumed")
-
-		return true, nil
-
-	case "INVALID_SESSION":
-		s.log.Info("invalid session, reconnecting")
-		s.sessID = ""
-		s.seq = 0
-
-		return true, xerrors.New("invalid session")
-
-	case "RECONNECT":
-		s.log.Info("reconnect requested")
-
-		return true, xerrors.New("reconnect")
+	case "PRESENCE_UPDATE":
+		return false, nil
 	}
 
-	switch ev.Op {
-	case 1:
-		err := s.heartbeat()
-		if err != nil {
-			return true, xerrors.Errorf("failed to heartbeat in response to op 1: %w", err)
-		}
-	case 10:
-		s.lastAck = time.Now()
-		return true, nil
-	}
-
+	s.log.Info("event received", zap.String("type", ev.T))
 	return false, nil
 }
 
@@ -399,6 +409,8 @@ func (s *Session) sendHeartbeats() {
 		if err != nil {
 			s.log.Error("failed to send heartbeat", zap.Error(err))
 		}
+
+		s.log.Info("sent heartbeat")
 		s.lastHB = time.Now()
 	}
 }

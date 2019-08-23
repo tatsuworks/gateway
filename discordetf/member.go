@@ -65,13 +65,13 @@ func DecodeMember(buf []byte) (*Member, error) {
 
 	m.Id, m.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read id: %wait", err)
+		return nil, xerrors.Errorf("failed to read id: %w", err)
 	}
 
 	d.reset()
 	m.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read guild id: %wait", err)
+		return nil, xerrors.Errorf("failed to read guild id: %w", err)
 	}
 
 	return m, err
@@ -92,13 +92,13 @@ func DecodePresence(buf []byte) (*Presence, error) {
 
 	p.Id, p.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read id: %wait", err)
+		return nil, xerrors.Errorf("failed to read id: %w", err)
 	}
 
 	d.reset()
 	p.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read guild id: %wait", err)
+		return nil, xerrors.Errorf("failed to read guild id: %w", err)
 	}
 
 	return p, err

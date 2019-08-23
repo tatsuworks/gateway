@@ -376,7 +376,7 @@ func (s *Session) heartbeat() error {
 
 	_, err = w.Write(buf.B)
 	if err != nil {
-		return errors.Wrap(err, "failed to copy heartbear")
+		return errors.Wrap(err, "failed to copy heartbeat")
 	}
 
 	return nil

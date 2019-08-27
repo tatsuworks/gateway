@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"nhooyr.io/websocket"
 
 	"github.com/tatsuworks/gateway/discordetf"
-	"github.com/tatsuworks/gateway/etf"
 	"github.com/tatsuworks/gateway/handler"
 )
 

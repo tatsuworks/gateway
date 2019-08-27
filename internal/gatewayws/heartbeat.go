@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"

@@ -77,6 +77,7 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
+	s.lastAck = time.Time{}
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
 	if err != nil {

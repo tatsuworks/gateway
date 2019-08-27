@@ -31,7 +31,6 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	}
 
 	left := d.readMapLen()
-
 	for ; left > 0; left-- {
 		start := d.off
 

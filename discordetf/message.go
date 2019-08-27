@@ -28,7 +28,7 @@ func DecodeMessage(buf []byte) (*Message, error) {
 		return nil, xerrors.Errorf("failed to read channel id: %w", err)
 	}
 
-	return m, err
+	return m, nil
 }
 
 type MessageReaction struct {
@@ -76,7 +76,7 @@ func DecodeMessageReaction(buf []byte) (*MessageReaction, error) {
 
 	mr.Raw = buf
 
-	return mr, err
+	return mr, nil
 }
 
 type MessageReactionRemoveAll struct {
@@ -109,5 +109,5 @@ func DecodeMessageReactionRemoveAll(buf []byte) (*MessageReactionRemoveAll, erro
 		return nil, xerrors.Errorf("failed to read user id: %w", err)
 	}
 
-	return mr, err
+	return mr, nil
 }

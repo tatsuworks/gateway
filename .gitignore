@@ -5,3 +5,4 @@ node_modules
 cmd/gateway/gateway
 cmd/gateway/token.go
 dump.rdb
+logs.txt

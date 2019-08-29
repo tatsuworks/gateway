@@ -201,7 +201,6 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 
 	// HEARTBEAT_ACK
 	case 11:
-		s.log.Info("heartbeat ack received")
 		s.lastAck = time.Now()
 		return true, nil
 	}

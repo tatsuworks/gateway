@@ -46,7 +46,6 @@ func main() {
 		cancel()
 	}()
 
-	// change 5 to the total number of shards you want
 	m := manager.New(ctx, logger, Token, shards, redisHost)
 
 	err = m.Start(shards)

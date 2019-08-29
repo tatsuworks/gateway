@@ -145,7 +145,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 
 		err = s.state.HandleEvent(ev)
 		if err != nil {
-			s.log.Error("failed to send event to state", zap.Error(err))
+			s.log.Error("failed to handle state event", zap.Error(err))
 			continue
 		}
 
@@ -210,7 +210,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 	case "READY":
 		_, sess, err := discordetf.DecodeReady(ev.D)
 		if err != nil {
-			return true, errors.Wrap(err, "failed to decode ready")
+			return true, xerrors.Errorf("failed to decode ready: %w", err)
 		}
 
 		s.sessID = sess
@@ -222,33 +222,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		return false, nil
 	}
 
-	s.log.Info("event received", zap.String("type", ev.T))
 	return false, nil
-}
-
-func (s *Session) readHello() error {
-	_, r, err := s.wsConn.Reader(s.ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to get hello reader")
-	}
-
-	raw := s.bufs.Get()
-	_, err = io.Copy(raw, r)
-	if err != nil {
-		s.bufs.Put(raw)
-		return errors.Wrap(err, "failed to copy hello")
-	}
-
-	interval, trace, err := discordetf.DecodeHello(raw.B)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode hello message")
-	}
-
-	s.bufs.Put(raw)
-	s.interval = time.Duration(interval) * time.Millisecond
-	s.trace = trace
-
-	return nil
 }
 
 func (s *Session) putRawBuf(buf []byte) {

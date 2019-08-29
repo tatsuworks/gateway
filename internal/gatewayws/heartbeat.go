@@ -11,9 +11,6 @@ import (
 	"github.com/tatsuworks/gateway/etf"
 )
 
-// This is a magic number I stole from discordgo
-const FailedHeartbeatAcks = 5
-
 type heartbeatOp struct {
 	Op   int   `json:"op"`
 	Data int64 `json:"d"`
@@ -64,8 +61,8 @@ func (s *Session) sendHeartbeats() {
 		}
 
 		if !s.lastHB.IsZero() {
-			if s.lastAck.Sub(s.lastHB) > s.interval*5 {
-				s.log.Warn("no response to heartbeats, closing")
+			if s.lastAck.Sub(s.lastHB) > s.interval {
+				s.log.Warn("no response to heartbeat, closing")
 				cancel()
 				return
 			}
@@ -78,7 +75,6 @@ func (s *Session) sendHeartbeats() {
 			return
 		}
 
-		s.log.Info("sent heartbeat")
 		s.lastHB = time.Now()
 	}
 }

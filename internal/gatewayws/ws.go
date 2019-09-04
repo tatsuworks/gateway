@@ -86,7 +86,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	}
 
 	if s.seq == 0 && s.sessID == "" {
-		s.log.Debug("sending ready")
+		s.log.Debug("sending identify")
 		err := s.writeIdentify()
 		if err != nil {
 			return xerrors.Errorf("failed to send identify: %w", err)

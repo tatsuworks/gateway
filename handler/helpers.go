@@ -44,17 +44,23 @@ func (c *Client) HandleEvent(e *discordetf.Event) error {
 	case "VOICE_STATE_UPDATE":
 		return c.VoiceStateUpdate(e.D)
 	case "MESSAGE_CREATE":
-		return c.MessageCreate(e.D)
+		// return c.MessageCreate(e.D)
+		return nil
 	case "MESSAGE_UPDATE":
-		return c.MessageCreate(e.D)
+		return nil
+		// return c.MessageCreate(e.D)
 	case "MESSAGE_DELETE":
-		return c.MessageDelete(e.D)
+		return nil
+		// return c.MessageDelete(e.D)
 	case "MESSAGE_REACTION_ADD":
-		return c.MessageReactionAdd(e.D)
+		return nil
+		// return c.MessageReactionAdd(e.D)
 	case "MESSAGE_REACTION_REMOVE":
-		return c.MessageReactionRemove(e.D)
+		return nil
+		// return c.MessageReactionRemove(e.D)
 	case "MESSAGE_REACTION_REMOVE_ALL":
-		return c.MessageReactionRemoveAll(e.D)
+		return nil
+		// return c.MessageReactionRemoveAll(e.D)
 	case "TYPING_START":
 		return nil
 	case "nil":

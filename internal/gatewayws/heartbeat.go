@@ -1,6 +1,7 @@
 package gatewayws
 
 import (
+	"bytes"
 	"sync/atomic"
 	"time"
 
@@ -11,19 +12,20 @@ import (
 	"github.com/tatsuworks/gateway/etf"
 )
 
+// heartbeats need their own buffer since they execute in parallel
+// with the main event loop.
+var hbBuf = bytes.NewBuffer(nil)
+
 type heartbeatOp struct {
 	Op   int   `json:"op"`
 	Data int64 `json:"d"`
 }
 
 func (s *Session) heartbeat() error {
-	var (
-		buf = s.bufs.Get()
-		c   = new(etf.Context)
-	)
+	var c = new(etf.Context)
 
-	defer s.bufs.Put(buf)
-	err := c.Write(buf, heartbeatOp{
+	hbBuf.Reset()
+	err := c.Write(hbBuf, heartbeatOp{
 		Op:   1,
 		Data: atomic.LoadInt64(&s.seq),
 	})
@@ -37,7 +39,7 @@ func (s *Session) heartbeat() error {
 	}
 	defer w.Close()
 
-	_, err = w.Write(buf.B)
+	_, err = w.Write(hbBuf.Bytes())
 	if err != nil {
 		return xerrors.Errorf("failed to copy heartbeat: %w", err)
 	}

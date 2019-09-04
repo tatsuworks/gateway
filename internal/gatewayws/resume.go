@@ -24,12 +24,12 @@ func (s *Session) writeResume() error {
 		return xerrors.Errorf("failed to get writer: %w", err)
 	}
 
-	payload, err := s.resumePayload()
+	err = s.resumePayload()
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Write(payload)
+	_, err = w.Write(s.buf.Bytes())
 	if err != nil {
 		return xerrors.Errorf("failed to write identify payload: %w", err)
 	}
@@ -41,13 +41,11 @@ func (s *Session) writeResume() error {
 	return nil
 }
 
-func (s *Session) resumePayload() ([]byte, error) {
-	var (
-		buf = s.bufs.Get()
-		c   = new(etf.Context)
-	)
+func (s *Session) resumePayload() error {
+	var c = new(etf.Context)
 
-	err := c.Write(buf, resumeOp{
+	s.buf.Reset()
+	err := c.Write(s.buf, resumeOp{
 		Op: 6,
 		Data: resume{
 			Token:     s.token,
@@ -56,8 +54,8 @@ func (s *Session) resumePayload() ([]byte, error) {
 		},
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal resume payload: %w", err)
+		return xerrors.Errorf("failed to marshal resume payload: %w", err)
 	}
 
-	return buf.B, nil
+	return nil
 }

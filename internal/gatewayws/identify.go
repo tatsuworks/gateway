@@ -37,12 +37,12 @@ func (s *Session) writeIdentify() error {
 		return xerrors.Errorf("failed to get writer: %w", err)
 	}
 
-	rawIdentify, err := s.identifyPayload()
+	err = s.identifyPayload()
 	if err != nil {
 		return xerrors.Errorf("failed to make identify payload: %w", err)
 	}
 
-	_, err = w.Write(rawIdentify)
+	_, err = w.Write(s.buf.Bytes())
 	if err != nil {
 		return xerrors.Errorf("failed to write identify payload: %w", err)
 	}
@@ -54,13 +54,11 @@ func (s *Session) writeIdentify() error {
 	return nil
 }
 
-func (s *Session) identifyPayload() ([]byte, error) {
-	var (
-		buf = s.bufs.Get()
-		c   = new(etf.Context)
-	)
+func (s *Session) identifyPayload() error {
+	var c = new(etf.Context)
 
-	err := c.Write(buf, identifyOp{
+	s.buf.Reset()
+	err := c.Write(s.buf, identifyOp{
 		Op: 2,
 		Data: identify{
 			Token: s.token,
@@ -76,8 +74,8 @@ func (s *Session) identifyPayload() ([]byte, error) {
 		},
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to write identify payload: %w", err)
+		return xerrors.Errorf("failed to write identify payload: %w", err)
 	}
 
-	return buf.B, nil
+	return nil
 }

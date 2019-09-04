@@ -113,7 +113,7 @@ func (d *decoder) readSmallBigWithTagToInt64() (int64, error) {
 			return 0, nil
 		}
 
-		return 0, errors.Wrap(err, "failed to verify small big byte")
+		return 0, xerrors.Errorf("failed to verify small big byte: %w", err)
 	}
 
 	var (
@@ -150,7 +150,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "failed to read map key")
+			return 0, nil, xerrors.Errorf("failed to read map key: %w", err)
 		}
 
 		// instead of checking the string every time, check the length first
@@ -347,7 +347,7 @@ func (d *decoder) readListIntoMapByID() (map[int64][]byte, error) {
 
 	err = d.checkByte(ettNil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to verify ending nil byte")
+		return nil, xerrors.Errorf("failed to verify ending nil byte: %w", err)
 	}
 
 	return out, nil
@@ -404,7 +404,11 @@ func (d *decoder) readTerm() (err error) {
 		err = errors.Errorf("unknown type: %v", t)
 	}
 
-	return errors.Wrap(err, "failed to read raw term into buf")
+	if err != nil {
+		return xerrors.Errorf("failed to read raw term into buf: %w", err)
+	}
+
+	return nil
 }
 
 func (d *decoder) readRawNewFloat() {

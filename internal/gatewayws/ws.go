@@ -1,15 +1,13 @@
 package gatewayws
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/redis"
-	"github.com/pkg/errors"
-	"github.com/valyala/bytebufferpool"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
@@ -44,13 +42,10 @@ type Session struct {
 	lastHB  time.Time
 	lastAck time.Time
 
-	bufs *bytebufferpool.Pool
-
-	zlr io.ReadCloser
+	buf *bytes.Buffer
 
 	state *handler.Client
-
-	rc *redis.Client
+	rc    *redis.Client
 }
 
 func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, shards int) (*Session, error) {
@@ -65,7 +60,8 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 		shardID: shardID,
 		shards:  shards,
 
-		bufs: &bytebufferpool.Pool{},
+		// start with a 1kb buffer
+		buf: bytes.NewBuffer(make([]byte, 0, 1<<10)),
 
 		state: c,
 		rc:    rdb,
@@ -77,30 +73,30 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	defer s.cancel()
 	s.lastAck = time.Time{}
 
-	c, _, err := websocket.Dial(s.ctx, GatewayETF, websocket.DialOptions{})
+	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to dial gateway")
+		return xerrors.Errorf("failed to dial gateway: %w", err)
 	}
 	s.wsConn = c
 	s.wsConn.SetReadLimit(999999999)
 
 	err = s.readHello()
 	if err != nil {
-		return errors.Wrap(err, "failed to handle hello message")
+		return xerrors.Errorf("failed to handle hello message: %w", err)
 	}
 
 	if s.seq == 0 && s.sessID == "" {
 		s.log.Debug("sending ready")
 		err := s.writeIdentify()
 		if err != nil {
-			return errors.Wrap(err, "failed to send identify")
+			return xerrors.Errorf("failed to send identify: %w", err)
 		}
 
 	} else {
 		s.log.Debug("sending resume")
 		err := s.writeResume()
 		if err != nil {
-			return errors.Wrap(err, "failed to send resume")
+			return xerrors.Errorf("failed to send resume: %w", err)
 		}
 	}
 
@@ -110,17 +106,16 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	s.log.Info("websocket connected")
 
 	for {
-		var byt []byte
-		byt, err = s.readMessage()
+		err = s.readMessage()
 		if err != nil {
-			err = errors.Wrap(err, "failed to read message")
+			err = xerrors.Errorf("failed to read message: %w", err)
 			break
 		}
 
 		var ev *discordetf.Event
-		ev, err = discordetf.DecodeT(byt)
+		ev, err = discordetf.DecodeT(s.buf.Bytes())
 		if err != nil {
-			err = errors.Wrap(err, "failed to decode event")
+			err = xerrors.Errorf("failed to decode event: %w", err)
 			break
 		}
 
@@ -139,7 +134,6 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 				return err
 			}
 
-			s.putRawBuf(byt)
 			continue
 		}
 
@@ -163,8 +157,6 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		if err != nil {
 			s.log.Error("failed to run event pipeline", zap.Error(err))
 		}
-
-		s.putRawBuf(byt)
 	}
 
 	_ = c.Close(websocket.StatusNormalClosure, "")
@@ -222,8 +214,4 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func (s *Session) putRawBuf(buf []byte) {
-	s.bufs.Put(&bytebufferpool.ByteBuffer{B: buf})
 }

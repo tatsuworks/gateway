@@ -6,18 +6,18 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (s *Session) readMessage() ([]byte, error) {
+// readMessage populates buf on *Session with the next message.
+func (s *Session) readMessage() error {
+	s.buf.Reset()
 	_, r, err := s.wsConn.Reader(s.ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get reader: %w", err)
+		return xerrors.Errorf("failed to get reader: %w", err)
 	}
 
-	raw := s.bufs.Get()
-	_, err = io.Copy(raw, r)
+	_, err = io.Copy(s.buf, r)
 	if err != nil {
-		s.bufs.Put(raw)
-		return nil, xerrors.Errorf("failed to copy message: %w", err)
+		return xerrors.Errorf("failed to copy message: %w", err)
 	}
 
-	return raw.B, nil
+	return nil
 }

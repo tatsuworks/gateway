@@ -1,32 +1,23 @@
 package gatewayws
 
 import (
-	"io"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/tatsuworks/gateway/discordetf"
+	"golang.org/x/xerrors"
 )
 
 func (s *Session) readHello() error {
-	_, r, err := s.wsConn.Reader(s.ctx)
+	err := s.readMessage()
 	if err != nil {
-		return errors.Wrap(err, "failed to get hello reader")
+		return xerrors.Errorf("failed to read message: %w", err)
 	}
 
-	raw := s.bufs.Get()
-	_, err = io.Copy(raw, r)
+	interval, trace, err := discordetf.DecodeHello(s.buf.Bytes())
 	if err != nil {
-		s.bufs.Put(raw)
-		return errors.Wrap(err, "failed to copy hello")
+		return xerrors.Errorf("failed to decode hello message: %w", err)
 	}
 
-	interval, trace, err := discordetf.DecodeHello(raw.B)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode hello message")
-	}
-
-	s.bufs.Put(raw)
 	s.interval = time.Duration(interval) * time.Millisecond
 	s.trace = trace
 

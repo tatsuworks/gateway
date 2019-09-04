@@ -8,7 +8,6 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 )
 
@@ -73,7 +72,11 @@ func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
 	}
 
 	_, err := w.Write([]byte{ettNil})
-	return errors.Wrap(err, "failed to write ending nil")
+	if err != nil {
+		return xerrors.Errorf("failed to write ending nil: %w", err)
+	}
+
+	return nil
 }
 
 func writeTerm(w io.Writer, raw []byte) error {

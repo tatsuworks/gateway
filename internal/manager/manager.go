@@ -50,8 +50,8 @@ func New(
 	}
 }
 
-func (m *Manager) Start(stopAt int) error {
-	for i := 0; i < stopAt; i++ {
+func (m *Manager) Start(start, stop int) error {
+	for i := start; i < stop; i++ {
 		select {
 		case <-m.ctx.Done():
 			return m.ctx.Err()

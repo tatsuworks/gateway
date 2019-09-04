@@ -22,8 +22,7 @@ func init() {
 	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
 	flag.IntVar(&shards, "shards", 1, "1")
 
-	// both do not work
-	flag.IntVar(&start, "start", 0, "1")
+	flag.IntVar(&start, "start", 0, "0")
 	flag.IntVar(&stop, "stop", 1, "1")
 
 	flag.Parse()
@@ -48,7 +47,7 @@ func main() {
 
 	m := manager.New(ctx, logger, Token, shards, redisHost)
 
-	err = m.Start(shards)
+	err = m.Start(start, stop)
 	if err != nil {
 		logger.Fatal(err.Error())
 	}

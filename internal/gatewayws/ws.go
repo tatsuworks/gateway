@@ -42,7 +42,8 @@ type Session struct {
 	lastHB  time.Time
 	lastAck time.Time
 
-	buf *bytes.Buffer
+	buf  *bytes.Buffer
+	hbuf *bytes.Buffer
 
 	state *handler.Client
 	rc    *redis.Client
@@ -61,7 +62,8 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 		shards:  shards,
 
 		// start with a 1kb buffer
-		buf: bytes.NewBuffer(make([]byte, 0, 1<<10)),
+		buf:  bytes.NewBuffer(make([]byte, 0, 1<<10)),
+		hbuf: bytes.NewBuffer(nil),
 
 		state: c,
 		rc:    rdb,

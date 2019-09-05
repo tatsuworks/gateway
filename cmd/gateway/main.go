@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,11 +16,13 @@ import (
 
 var (
 	redisHost           string
+	pprof               string
 	shards, start, stop int
 )
 
 func init() {
 	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
+	flag.StringVar(&pprof, "pprof", "localhost:6060", "localhost:6060")
 	flag.IntVar(&shards, "shards", 1, "1")
 
 	flag.IntVar(&start, "start", 0, "0")
@@ -36,6 +39,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	go func() {
+		logger.Error("failed to pprof listen", zap.Error(http.ListenAndServe("localhost:6060", nil)))
+	}()
 
 	go func() {
 		sigs := make(chan os.Signal, 1)

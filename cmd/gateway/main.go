@@ -58,4 +58,6 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 	<-ctx.Done()
+	logger.Info("waiting for shards to disconnect")
+	wg.Wait()
 }

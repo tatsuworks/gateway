@@ -64,6 +64,7 @@ func NewSession(
 	}
 
 	return &Session{
+		wg:      wg,
 		log:     logger.With(zap.Int("shard", shardID)),
 		token:   token,
 		shardID: shardID,

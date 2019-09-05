@@ -49,7 +49,7 @@ func main() {
 	}()
 
 	wg := &sync.WaitGroup{}
-	m := manager.New(ctx, logger, Token, shards, redisHost)
+	m := manager.New(ctx, logger, wg, Token, shards, redisHost)
 
 	err = m.Start(start, stop)
 	if err != nil {

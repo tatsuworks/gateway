@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -26,6 +27,7 @@ type Manager struct {
 func New(
 	ctx context.Context,
 	logger *zap.Logger,
+	wg *sync.WaitGroup,
 	token string,
 	shards int,
 	redisAddr string,

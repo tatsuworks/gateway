@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,7 @@ var (
 type Session struct {
 	ctx    context.Context
 	cancel func()
+	wg     *sync.WaitGroup
 
 	log *zap.Logger
 
@@ -49,7 +51,13 @@ type Session struct {
 	rc    *redis.Client
 }
 
-func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, shards int) (*Session, error) {
+func NewSession(
+	logger *zap.Logger,
+	wg *sync.WaitGroup,
+	rdb *redis.Client,
+	token string,
+	shardID, shards int,
+) (*Session, error) {
 	c, err := handler.NewClient()
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create state handler: %w", err)
@@ -71,8 +79,12 @@ func NewSession(logger *zap.Logger, rdb *redis.Client, token string, shardID, sh
 }
 
 func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
+	s.wg.Add(1)
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	defer s.cancel()
+	defer func() {
+		s.cancel()
+		s.wg.Done()
+	}()
 	s.lastAck = time.Time{}
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)

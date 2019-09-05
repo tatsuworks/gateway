@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -47,6 +48,7 @@ func main() {
 		cancel()
 	}()
 
+	wg := &sync.WaitGroup{}
 	m := manager.New(ctx, logger, Token, shards, redisHost)
 
 	err = m.Start(start, stop)

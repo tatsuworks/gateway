@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	_ "net/http/pprof"
 
 	"github.com/tatsuworks/gateway/internal/manager"
 )

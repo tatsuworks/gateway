@@ -86,6 +86,8 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		s.cancel()
 		s.wg.Done()
 	}()
+
+	s.last = 0
 	s.lastAck = time.Time{}
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)

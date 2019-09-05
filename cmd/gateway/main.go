@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -56,7 +55,6 @@ func main() {
 		logger.Fatal(err.Error())
 	}
 
-	time.Sleep(5 * time.Second)
 	<-ctx.Done()
 	logger.Info("waiting for shards to disconnect")
 	wg.Wait()

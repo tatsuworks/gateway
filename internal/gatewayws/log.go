@@ -27,7 +27,7 @@ func (s *Session) logTotalEvents() {
 			"event report",
 			zap.Int64("seq", seq),
 			zap.Int64("since", seq-s.last),
-			zap.Float64("/sec", float64(seq-s.last)/60),
+			zap.Int64("/sec", (seq-s.last)/60),
 		)
 
 		s.last = seq

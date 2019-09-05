@@ -17,6 +17,7 @@ func (db *DB) setETFs(etfs map[int64][]byte, key func(id int64) fdb.Key) error {
 			return db.Transact(func(t fdb.Transaction) error {
 				opts := t.Options()
 				opts.SetReadYourWritesDisable()
+				opts.SetPrioritySystemImmediate()
 
 				for id, e := range etfs {
 					opts.SetNextWriteNoWriteConflictRange()
@@ -57,6 +58,7 @@ func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, key func(guild, i
 			return db.Transact(func(t fdb.Transaction) error {
 				opts := t.Options()
 				opts.SetReadYourWritesDisable()
+				opts.SetPrioritySystemImmediate()
 
 				for id, e := range etfs {
 					opts.SetNextWriteNoWriteConflictRange()

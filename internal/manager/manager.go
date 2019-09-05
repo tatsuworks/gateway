@@ -69,7 +69,7 @@ func (m *Manager) Start(start, stop int) error {
 		case <-m.startShard(i):
 		}
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 
 	return nil

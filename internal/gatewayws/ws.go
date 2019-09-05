@@ -150,6 +150,10 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 				return xerrors.Errorf("failed to set seq in redis: %w", err)
 			}
 
+			if ev.T == "PRESENCE_UPDATE" {
+				return nil
+			}
+
 			if err := pipe.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
 				return xerrors.Errorf("failed to push event to redis: %w", err)
 			}

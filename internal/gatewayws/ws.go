@@ -3,7 +3,7 @@ package gatewayws
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -146,7 +146,7 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		}
 
 		_, err = s.rc.Pipelined(func(pipe redis.Pipeliner) error {
-			if err := pipe.Set(fmt.Sprintf("gateway:seq:%d", s.shardID), s.seq, 0).Err(); err != nil {
+			if err := pipe.Set("gateway:seq:"+strconv.Itoa(s.shardID), s.seq, 0).Err(); err != nil {
 				return xerrors.Errorf("failed to set seq in redis: %w", err)
 			}
 

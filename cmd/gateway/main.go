@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"go.uber.org/zap"
-	_ "net/http/pprof"
 
 	"github.com/tatsuworks/gateway/internal/manager"
 )
@@ -40,10 +38,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	go func() {
-		logger.Error("failed to pprof listen", zap.Error(http.ListenAndServe("localhost:6060", nil)))
-	}()
 
 	go func() {
 		sigs := make(chan os.Signal, 1)

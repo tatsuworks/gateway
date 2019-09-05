@@ -15,6 +15,7 @@ import (
 type Manager struct {
 	ctx context.Context
 	log *zap.Logger
+	wg  *sync.WaitGroup
 
 	token  string
 	shards int
@@ -44,6 +45,7 @@ func New(
 	return &Manager{
 		ctx: ctx,
 		log: logger,
+		wg:  wg,
 
 		token:  token,
 		shards: shards,
@@ -74,7 +76,7 @@ func (m *Manager) Start(start, stop int) error {
 }
 
 func (m *Manager) startShard(shard int) <-chan struct{} {
-	s, err := gatewayws.NewSession(m.log, m.rdb, m.token, shard, m.shards)
+	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.token, shard, m.shards)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
 		return nil

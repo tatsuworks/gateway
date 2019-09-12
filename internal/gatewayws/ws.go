@@ -63,7 +63,7 @@ func NewSession(
 		return nil, xerrors.Errorf("failed to create state handler: %w", err)
 	}
 
-	return &Session{
+	sess := &Session{
 		wg:      wg,
 		log:     logger.With(zap.Int("shard", shardID)),
 		token:   token,
@@ -76,7 +76,11 @@ func NewSession(
 
 		state: c,
 		rc:    rdb,
-	}, nil
+	}
+
+	sess.loadSessID()
+	sess.loadSeq()
+	return sess, nil
 }
 
 func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
@@ -154,34 +158,72 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 			continue
 		}
 
+		if ev.T == "PRESENCE_UPDATE" {
+			continue
+		}
+
 		err = s.state.HandleEvent(ev)
 		if err != nil {
 			s.log.Error("failed to handle state event", zap.Error(err))
 			continue
 		}
 
-		_, err = s.rc.Pipelined(func(pipe redis.Pipeliner) error {
-			if err := pipe.Set("gateway:seq:"+strconv.Itoa(s.shardID), s.seq, 0).Err(); err != nil {
-				return xerrors.Errorf("failed to set seq in redis: %w", err)
-			}
-
-			if ev.T == "PRESENCE_UPDATE" {
-				return nil
-			}
-
-			if err := pipe.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
-				return xerrors.Errorf("failed to push event to redis: %w", err)
-			}
-
-			return nil
-		})
+		err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
-			s.log.Error("failed to run event pipeline", zap.Error(err))
+			s.log.Error("failed to push event to redis", zap.Error(err))
 		}
 	}
 
+	s.persistSeq()
 	_ = c.Close(websocket.StatusNormalClosure, "")
 	return err
+}
+
+func (s *Session) persistSeq() {
+	err := s.rc.Set(s.fmtSeqKey(), s.seq, 0).Err()
+	if err != nil {
+		s.log.Error("failed to save seq", zap.Error(err))
+	}
+}
+
+func (s *Session) loadSeq() {
+	sess, err := s.rc.Get(s.fmtSeqKey()).Result()
+	if err != nil {
+		s.log.Error("failed to load session id", zap.Error(err))
+	}
+
+	if sess == "" {
+		return
+	}
+
+	s.seq, err = strconv.ParseInt(sess, 10, 64)
+	if err != nil {
+		s.log.Error("failed to parse session id", zap.Error(err))
+	}
+}
+
+func (s *Session) persistSessID() {
+	err := s.rc.Set(s.fmtSessIDKey(), s.sessID, 0).Err()
+	if err != nil {
+		s.log.Error("failed to save seq", zap.Error(err))
+	}
+}
+
+func (s *Session) loadSessID() {
+	sess, err := s.rc.Get(s.fmtSessIDKey()).Result()
+	if err != nil {
+		s.log.Error("failed to load session id", zap.Error(err))
+	}
+
+	s.sessID = sess
+}
+
+func (s *Session) fmtSeqKey() string {
+	return "gateway:seq:" + strconv.Itoa(s.shardID)
+}
+
+func (s *Session) fmtSessIDKey() string {
+	return "gateway:sess:" + strconv.Itoa(s.shardID)
 }
 
 func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
@@ -208,7 +250,9 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 	case 9:
 		s.log.Info("invalid session, reconnecting")
 		s.sessID = ""
+		s.persistSessID()
 		s.seq = 0
+		s.persistSeq()
 
 		return true, xerrors.New("invalid session")
 

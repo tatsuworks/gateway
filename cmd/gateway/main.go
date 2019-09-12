@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 
 	"go.uber.org/zap"
 
@@ -41,7 +40,7 @@ func main() {
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(sigs)
 		<-sigs
 		logger.Info("closing")
 		cancel()

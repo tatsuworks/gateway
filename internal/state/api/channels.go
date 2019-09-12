@@ -79,6 +79,26 @@ func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
 	return nil
 }
 
+func writeTermsRaw(w io.Writer, raws [][]byte) error {
+	if err := writeSliceHeader(w, len(raws)); err != nil {
+		return err
+	}
+
+	for _, e := range raws {
+		_, err := w.Write(e)
+		if err != nil {
+			return xerrors.Errorf("failed to write term: %w", err)
+		}
+	}
+
+	_, err := w.Write([]byte{ettNil})
+	if err != nil {
+		return xerrors.Errorf("failed to write ending nil: %w", err)
+	}
+
+	return nil
+}
+
 func writeTerm(w io.Writer, raw []byte) error {
 	if err := writeETFHeader(w); err != nil {
 		return err

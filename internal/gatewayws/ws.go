@@ -204,14 +204,14 @@ func (s *Session) loadSeq() {
 
 func (s *Session) persistSessID() {
 	err := s.rc.Set(s.fmtSessIDKey(), s.sessID, 0).Err()
-	if err != nil {
+	if err != nil && !xerrors.Is(err, redis.Nil) {
 		s.log.Error("failed to save seq", zap.Error(err))
 	}
 }
 
 func (s *Session) loadSessID() {
 	sess, err := s.rc.Get(s.fmtSessIDKey()).Result()
-	if err != nil {
+	if err != nil && !xerrors.Is(err, redis.Nil) {
 		s.log.Error("failed to load session id", zap.Error(err))
 	}
 

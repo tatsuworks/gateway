@@ -181,14 +181,14 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 
 func (s *Session) persistSeq() {
 	err := s.rc.Set(s.fmtSeqKey(), s.seq, 0).Err()
-	if err != nil {
+	if err != nil && !xerrors.Is(err, redis.Nil) {
 		s.log.Error("failed to save seq", zap.Error(err))
 	}
 }
 
 func (s *Session) loadSeq() {
 	sess, err := s.rc.Get(s.fmtSeqKey()).Result()
-	if err != nil {
+	if err != nil && !xerrors.Is(err, redis.Nil) {
 		s.log.Error("failed to load session id", zap.Error(err))
 	}
 

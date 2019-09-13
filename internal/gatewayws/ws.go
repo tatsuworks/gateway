@@ -13,12 +13,13 @@ import (
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
+	"github.com/tatsuworks/czlib"
 	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/tatsuworks/gateway/handler"
 )
 
 var (
-	GatewayETF = "wss://gateway.discord.gg?encoding=etf"
+	GatewayETF = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
 )
 
 type Session struct {
@@ -37,6 +38,7 @@ type Session struct {
 	last   int64
 
 	wsConn *websocket.Conn
+	strm   *czlib.Zstream
 
 	interval time.Duration
 	trace    string
@@ -94,12 +96,18 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 	s.last = 0
 	s.lastAck = time.Time{}
 
+	strm, err := czlib.NewZstream()
+	if err != nil {
+		return xerrors.Errorf("failed to initialize zlib: %w", err)
+	}
+	s.strm = strm
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)
 	if err != nil {
 		return xerrors.Errorf("failed to dial gateway: %w", err)
 	}
 	s.wsConn = c
 	s.wsConn.SetReadLimit(999999999)
+
 
 	err = s.readHello()
 	if err != nil {

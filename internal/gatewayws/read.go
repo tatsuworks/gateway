@@ -4,6 +4,8 @@ import (
 	"io"
 
 	"golang.org/x/xerrors"
+
+	"github.com/tatsuworks/czlib"
 )
 
 // readMessage populates buf on *Session with the next message.
@@ -11,10 +13,16 @@ func (s *Session) readMessage() error {
 	s.buf.Reset()
 	_, r, err := s.wsConn.Reader(s.ctx)
 	if err != nil {
-		return xerrors.Errorf("failed to get reader: %w", err)
+		return xerrors.Errorf("failed to get ws reader: %w", err)
 	}
 
-	_, err = io.Copy(s.buf, r)
+	resetter, ok := s.zr.(czlib.Resetter)
+	if !ok {
+		return xerrors.Errorf("failed to reset zlib reader")
+	}
+	resetter.Reset(r)
+
+	_, err = io.Copy(s.buf, s.zr)
 	if err != nil {
 		return xerrors.Errorf("failed to copy message: %w", err)
 	}

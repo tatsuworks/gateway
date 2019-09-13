@@ -11,17 +11,18 @@ import (
 // readMessage populates buf on *Session with the next message.
 func (s *Session) readMessage() error {
 	s.buf.Reset()
-	_, wr, err := s.wsConn.Reader(s.ctx)
+	_, r, err := s.wsConn.Reader(s.ctx)
 	if err != nil {
 		return xerrors.Errorf("failed to get ws reader: %w", err)
 	}
 
-	sr, err := czlib.NewStreamReader(wr, s.strm)
-	if err != nil {
-		return xerrors.Errorf("failed to get zlib reader: %w", err)
+	resetter, ok := s.zr.(czlib.Resetter)
+	if !ok {
+		return xerrors.Errorf("failed to reset zlib reader")
 	}
+	resetter.Reset(r)
 
-	_, err = io.Copy(s.buf, sr)
+	_, err = io.Copy(s.buf, s.zr)
 	if err != nil {
 		return xerrors.Errorf("failed to copy message: %w", err)
 	}

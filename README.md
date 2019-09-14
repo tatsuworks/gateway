@@ -1,7 +1,8 @@
 # gateway
 
 Service for multiplexing many Discord websockets on top of any number of backends.
-Consists of 2 components: Gateway
+Consists of 2 components: Gateway & State Cache
+
 NOTE: This currently only supports Tatsu's specific use case. More backends will be written in the future
 as time permits.
 

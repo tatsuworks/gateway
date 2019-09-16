@@ -10,7 +10,7 @@ require (
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/tatsuworks/czlib v0.0.0-20190913053450-8f9e997c5fef
+	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
 	github.com/valyala/fasthttp v1.4.0
 	go.uber.org/zap v1.9.1
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859

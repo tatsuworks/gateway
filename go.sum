@@ -86,10 +86,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/tatsuworks/czlib v0.0.0-20190913044040-6df00ea4c625 h1:BdX2QkOvBA+DjC/m4NvM9DIW1leB8vwQZ7t8IB0REeY=
-github.com/tatsuworks/czlib v0.0.0-20190913044040-6df00ea4c625/go.mod h1:bJUwvyUr7U393QfID4xxNQyN+fz9PK+LTIMkiV90pvs=
-github.com/tatsuworks/czlib v0.0.0-20190913053450-8f9e997c5fef h1:QWsimDH7K83fvdC1hjAPB95JnOqJZQP8+mJsQGUeF9s=
-github.com/tatsuworks/czlib v0.0.0-20190913053450-8f9e997c5fef/go.mod h1:bJUwvyUr7U393QfID4xxNQyN+fz9PK+LTIMkiV90pvs=
+github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561 h1:KZQYH1KN3uLNJQ13smyemK3vQwIi/PA5S/cHBtgkFrE=
+github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561/go.mod h1:6HrfShlf4bKeQEFdWn4JP/yet/mHW2RhxOQf0e3HWA0=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.4.0 h1:PuaTGZIw3mjYhhhbVbCQp8aciRZN9YdoB7MGX9Ko76A=

@@ -88,11 +88,10 @@ func NewSession(
 
 func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
 	s.wg.Add(1)
+	defer s.wg.Done()
+
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	defer func() {
-		s.cancel()
-		s.wg.Done()
-	}()
+	defer s.cancel()
 
 	s.last = 0
 	s.lastAck = time.Time{}
@@ -102,6 +101,8 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		return xerrors.Errorf("failed to initialize zlib: %w", err)
 	}
 	s.zr = r
+	defer r.Close()
+
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)
 	if err != nil {
 		return xerrors.Errorf("failed to dial gateway: %w", err)

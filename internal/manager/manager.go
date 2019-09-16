@@ -69,7 +69,7 @@ func (m *Manager) Start(start, stop int) error {
 		case <-m.startShard(i):
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(7 * time.Second)
 	}
 
 	return nil
@@ -100,7 +100,7 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 				}
 			}
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}()
 

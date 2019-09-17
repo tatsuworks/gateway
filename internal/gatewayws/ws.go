@@ -182,6 +182,16 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	for {
 		err = s.readMessage()
 		if err != nil {
+			var werr websocket.CloseError
+			if xerrors.Is(err, &werr) {
+				if werr.Code == 4006 {
+					s.seq = 0
+					s.persistSeq()
+					s.sessID = ""
+					s.persistSessID()
+				}
+			}
+
 			err = xerrors.Errorf("failed to read message: %w", err)
 			break
 		}
@@ -328,7 +338,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		s.persistSessID()
 
 		go func() {
-			time.Sleep(5 * time.Second)
+			time.Sleep(7 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
 				s.log.Error("failed to release identify lock after ready", zap.Error(err))

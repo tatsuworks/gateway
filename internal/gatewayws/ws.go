@@ -9,6 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/go-redis/redis"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -18,6 +21,8 @@ import (
 	"github.com/tatsuworks/gateway/discordetf"
 	"github.com/tatsuworks/gateway/handler"
 )
+
+const IdentifyMutexName = "/gateway/identify"
 
 var (
 	GatewayETF = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
@@ -50,6 +55,10 @@ type Session struct {
 	buf  *bytes.Buffer
 	hbuf *bytes.Buffer
 
+	etcd       *clientv3.Client
+	etcdSess   *concurrency.Session
+	identifyMu *concurrency.Mutex
+
 	state *handler.Client
 	rc    *redis.Client
 }
@@ -58,6 +67,7 @@ func NewSession(
 	logger *zap.Logger,
 	wg *sync.WaitGroup,
 	rdb *redis.Client,
+	etcdCli *clientv3.Client,
 	token string,
 	shardID, shards int,
 ) (*Session, error) {
@@ -77,6 +87,8 @@ func NewSession(
 		buf:  bytes.NewBuffer(make([]byte, 0, 1<<10)),
 		hbuf: bytes.NewBuffer(nil),
 
+		etcd: etcdCli,
+
 		state: c,
 		rc:    rdb,
 	}
@@ -86,7 +98,22 @@ func NewSession(
 	return sess, nil
 }
 
-func (s *Session) Open(ctx context.Context, token string, connected chan struct{}) error {
+func (s *Session) initEtcd() error {
+	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(20))
+	if err != nil {
+		return xerrors.Errorf("failed to get etcd session: %w", err)
+	}
+
+	s.etcdSess = sess
+	s.identifyMu = concurrency.NewMutex(sess, IdentifyMutexName)
+	return nil
+}
+
+func (s *Session) shouldResume() bool {
+	return s.seq != 0 && s.sessID != ""
+}
+
+func (s *Session) Open(ctx context.Context, token string) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -95,6 +122,24 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 
 	s.last = 0
 	s.lastAck = time.Time{}
+
+	err := s.initEtcd()
+	if err != nil {
+		return err
+	}
+
+	// only acquire the identify lock if we know we won't send a resume
+	if !s.shouldResume() {
+		s.log.Debug("acquiring lock, no ability to resume")
+		err = s.acquireIdentifyLock()
+		if err != nil {
+			return xerrors.Errorf("failed to grab identify lock: %w", err)
+		}
+		s.log.Debug("lock acquired")
+
+	} else {
+		s.log.Debug("skipping lock, attempting resume", zap.String("sess", s.sessID), zap.Int64("seq", s.seq))
+	}
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
 	if err != nil {
@@ -108,32 +153,31 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		return xerrors.Errorf("failed to dial gateway: %w", err)
 	}
 	s.wsConn = c
-	s.wsConn.SetReadLimit(999999999)
+	s.wsConn.SetReadLimit(512 << 20)
 
 	err = s.readHello()
 	if err != nil {
 		return xerrors.Errorf("failed to handle hello message: %w", err)
 	}
 
-	if s.seq == 0 && s.sessID == "" {
-		s.log.Debug("sending identify")
-		err := s.writeIdentify()
-		if err != nil {
-			return xerrors.Errorf("failed to send identify: %w", err)
-		}
-
-	} else {
+	if s.shouldResume() {
 		s.log.Debug("sending resume")
 		err := s.writeResume()
 		if err != nil {
 			return xerrors.Errorf("failed to send resume: %w", err)
+		}
+	} else {
+		s.log.Debug("sending identify")
+		err := s.writeIdentify()
+		if err != nil {
+			return xerrors.Errorf("failed to send identify: %w", err)
 		}
 	}
 
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
 
-	s.log.Info("websocket connected")
+	s.log.Info("websocket connected, waiting for events")
 
 	for {
 		err = s.readMessage()
@@ -154,12 +198,6 @@ func (s *Session) Open(ctx context.Context, token string, connected chan struct{
 		}
 
 		if handled, err := s.handleInternalEvent(ev); handled {
-			select {
-			case <-connected:
-			default:
-				close(connected)
-			}
-
 			if err != nil {
 				return err
 			}
@@ -263,6 +301,13 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		s.seq = 0
 		s.persistSeq()
 
+		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
+			err := s.releaseIdentifyLock()
+			if err != nil {
+				s.log.Error("failed to release held identify lock after invalid session", zap.Error(err))
+			}
+		}
+
 		return true, xerrors.New("invalid session")
 
 	// HEARTBEAT_ACK
@@ -279,13 +324,37 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		}
 
 		s.sessID = sess
-		s.log.Info("ready")
+		s.log.Info("ready", zap.String("sess", sess))
+		s.persistSessID()
+
+		go func() {
+			time.Sleep(5 * time.Second)
+			err = s.releaseIdentifyLock()
+			if err != nil {
+				s.log.Error("failed to release identify lock after ready", zap.Error(err))
+			}
+		}()
 
 		return true, nil
-
-	case "PRESENCE_UPDATE":
-		return false, nil
 	}
 
 	return false, nil
+}
+
+func (s *Session) acquireIdentifyLock() error {
+	err := s.identifyMu.Lock(s.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to acquire identify lock: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Session) releaseIdentifyLock() error {
+	err := s.identifyMu.Unlock(s.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to release identify lock: %w", err)
+	}
+
+	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -16,12 +15,14 @@ import (
 
 var (
 	redisHost           string
+	etcdHost            string
 	pprof               string
 	shards, start, stop int
 )
 
 func init() {
 	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
+	flag.StringVar(&etcdHost, "etcd", "localhost:2379", "localhost:2379")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "localhost:6060")
 	flag.IntVar(&shards, "shards", 1, "1")
 
@@ -49,7 +50,7 @@ func main() {
 	}()
 
 	wg := &sync.WaitGroup{}
-	m := manager.New(ctx, logger, wg, Token, shards, redisHost)
+	m := manager.New(ctx, logger, wg, Token, shards, redisHost, etcdHost)
 
 	err = m.Start(start, stop)
 	if err != nil {
@@ -58,5 +59,5 @@ func main() {
 
 	<-ctx.Done()
 	logger.Info("waiting for shards to disconnect")
-	time.Sleep(time.Second)
+	wg.Wait()
 }

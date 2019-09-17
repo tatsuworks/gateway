@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -22,7 +23,8 @@ type Manager struct {
 
 	up int
 
-	rdb *redis.Client
+	rdb  *redis.Client
+	etcd *clientv3.Client
 }
 
 func New(
@@ -32,6 +34,7 @@ func New(
 	token string,
 	shards int,
 	redisAddr string,
+	etcdAddr string,
 ) *Manager {
 	rc := redis.NewClient(&redis.Options{
 		Addr: redisAddr,
@@ -42,6 +45,14 @@ func New(
 		logger.Fatal("failed to ping redis", zap.Error(err))
 	}
 
+	etcdCli, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"http://10.0.0.3:2379", "http://10.0.0.3:4001"},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		logger.Fatal("failed to connect to etcd", zap.Error(err))
+	}
+
 	return &Manager{
 		ctx: ctx,
 		log: logger,
@@ -50,7 +61,8 @@ func New(
 		token:  token,
 		shards: shards,
 
-		rdb: rc,
+		rdb:  rc,
+		etcd: etcdCli,
 	}
 }
 
@@ -66,23 +78,20 @@ func (m *Manager) Start(start, stop int) error {
 
 		select {
 		case <-m.ctx.Done():
-		case <-m.startShard(i):
+		default:
+			m.startShard(i)
 		}
-
-		time.Sleep(7 * time.Second)
 	}
 
 	return nil
 }
 
-func (m *Manager) startShard(shard int) <-chan struct{} {
-	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.token, shard, m.shards)
+func (m *Manager) startShard(shard int) {
+	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shards)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
-		return nil
+		return
 	}
-
-	ch := make(chan struct{})
 
 	go func() {
 		for {
@@ -93,7 +102,7 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 			}
 
 			m.log.Info("attempting shard connect", zap.Int("shard", shard))
-			err := s.Open(m.ctx, m.token, ch)
+			err := s.Open(m.ctx, m.token)
 			if err != nil {
 				if !xerrors.Is(err, context.Canceled) {
 					m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
@@ -103,6 +112,4 @@ func (m *Manager) startShard(shard int) <-chan struct{} {
 			time.Sleep(2 * time.Second)
 		}
 	}()
-
-	return ch
 }

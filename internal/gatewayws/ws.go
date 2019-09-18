@@ -120,7 +120,6 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
-	s.last = 0
 	s.lastAck = time.Time{}
 
 	err := s.initEtcd()
@@ -167,6 +166,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			return xerrors.Errorf("failed to send resume: %w", err)
 		}
 	} else {
+		s.last = 0
 		s.log.Info("sending identify")
 		err := s.writeIdentify()
 		if err != nil {

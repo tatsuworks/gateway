@@ -18,6 +18,7 @@ var (
 	etcdHost            string
 	pprof               string
 	shards, start, stop int
+	prod                bool
 )
 
 func init() {
@@ -25,6 +26,7 @@ func init() {
 	flag.StringVar(&etcdHost, "etcd", "localhost:2379", "localhost:2379")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "localhost:6060")
 	flag.IntVar(&shards, "shards", 1, "1")
+	flag.BoolVar(&prod, "prod", false, "enable production logging")
 
 	flag.IntVar(&start, "start", 0, "0")
 	flag.IntVar(&stop, "stop", 1, "1")
@@ -36,9 +38,21 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
+	var (
+		logger *zap.Logger
+		err    error
+	)
+
+	if prod {
+		logger, err = zap.NewProduction()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		logger, err = zap.NewDevelopment()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	go func() {

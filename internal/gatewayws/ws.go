@@ -161,13 +161,13 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	}
 
 	if s.shouldResume() {
-		s.log.Debug("sending resume")
+		s.log.Info("sending resume")
 		err := s.writeResume()
 		if err != nil {
 			return xerrors.Errorf("failed to send resume: %w", err)
 		}
 	} else {
-		s.log.Debug("sending identify")
+		s.log.Info("sending identify")
 		err := s.writeIdentify()
 		if err != nil {
 			return xerrors.Errorf("failed to send identify: %w", err)
@@ -346,6 +346,9 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		}()
 
 		return true, nil
+
+	case "RESUMED":
+		s.log.Info("resumed")
 	}
 
 	return false, nil

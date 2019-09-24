@@ -116,6 +116,10 @@ func (d *decoder) readSmallBigWithTagToInt64() (int64, error) {
 		return 0, xerrors.Errorf("failed to verify small big byte: %w", err)
 	}
 
+	return d.readSmallBigIntoInt64(), nil
+}
+
+func (d *decoder) readSmallBigIntoInt64() int64 {
 	var (
 		i    = d.read(2)
 		l    = int(i[0])
@@ -130,7 +134,7 @@ func (d *decoder) readSmallBigWithTagToInt64() (int64, error) {
 	if sign != 0 {
 		result = -result
 	}
-	return result, nil
+	return result
 }
 
 // readMapWithIDIntoSlice reads a map into a slice, extracting the id field if one exists.
@@ -318,6 +322,24 @@ func (d *decoder) guildIDFromMap() (int64, error) {
 	}
 
 	return id, nil
+}
+
+func (d *decoder) readInteger() (int64, error) {
+	s := d.read(1)
+
+	switch s[0] {
+	case ettSmallInteger:
+		return int64(d.readSmallIntIntoInt()), nil
+
+	case ettInteger:
+		return int64(d.readRawIntIntoInt()), nil
+
+	case ettSmallBig:
+		return d.readSmallBigIntoInt64(), nil
+
+	default:
+		return 0, xerrors.Errorf("unknown int type: %d", int(s[0]))
+	}
 }
 
 // readListIntoMapByID turns a list of ETF maps with an `id` key into a Go map by that key.

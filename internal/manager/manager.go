@@ -70,7 +70,7 @@ func (m *Manager) Start(start, stop int) error {
 	for i := start; i < stop; i++ {
 		select {
 		case <-m.ctx.Done():
-			return m.ctx.Err()
+			return nil
 		default:
 		}
 

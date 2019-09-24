@@ -9,6 +9,7 @@ import (
 type GuildCreate struct {
 	Id          int64
 	Guild       []byte
+	MemberCount int64
 	Channels    map[int64][]byte
 	Emojis      map[int64][]byte
 	Members     map[int64][]byte
@@ -86,10 +87,19 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 			gBuf = append(gBuf, d.buf[start:d.off]...)
 			gKeys++
 
+		case "member_count":
+			gc.MemberCount, err = d.readInteger()
+			if err != nil {
+				return nil, xerrors.Errorf("failed to read member_count: %w", err)
+			}
+
+			gBuf = append(gBuf, d.buf[start:d.off]...)
+			gKeys++
+
 		default:
 			err := d.readTerm()
 			if err != nil {
-				return gc, err
+				return nil, err
 			}
 
 			gBuf = append(gBuf, d.buf[start:d.off]...)

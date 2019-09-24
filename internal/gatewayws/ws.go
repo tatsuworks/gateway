@@ -183,7 +183,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		err = s.readMessage()
 		if err != nil {
 			var werr websocket.CloseError
-			if xerrors.Is(err, &werr) {
+			if xerrors.As(err, &werr) {
 				if werr.Code == 4006 {
 					s.seq = 0
 					s.persistSeq()
@@ -219,7 +219,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			continue
 		}
 
-		err = s.state.HandleEvent(ev)
+		var requestMembers int64
+		requestMembers, err = s.state.HandleEvent(ev)
 		if err != nil {
 			s.log.Error("failed to handle state event", zap.Error(err))
 			continue
@@ -228,6 +229,14 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
 			s.log.Error("failed to push event to redis", zap.Error(err))
+		}
+
+		if requestMembers != 0 {
+			s.log.Debug("requesting guild members", zap.Int64("guild", requestMembers))
+			err := s.requestGuildMembers(requestMembers)
+			if err != nil {
+				s.log.Error("failed to request guild members", zap.Error(err))
+			}
 		}
 	}
 

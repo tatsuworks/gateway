@@ -1,6 +1,7 @@
 package gatewayws
 
 import (
+	"bytes"
 	"runtime"
 
 	"golang.org/x/xerrors"
@@ -75,6 +76,52 @@ func (s *Session) identifyPayload() error {
 	})
 	if err != nil {
 		return xerrors.Errorf("failed to write identify payload: %w", err)
+	}
+
+	return nil
+}
+
+type op struct {
+	Op int         `json:"op"`
+	D  interface{} `json:"d"`
+}
+
+type requestGuildMembers struct {
+	GuildID int64  `json:"guild_id"`
+	Query   string `json:"query"`
+	Limit   int    `json:"limit"`
+}
+
+func (s *Session) requestGuildMembers(guild int64) error {
+	var (
+		c   = new(etf.Context)
+		buf = new(bytes.Buffer)
+	)
+
+	err := c.Write(buf, op{
+		Op: 8,
+		D: requestGuildMembers{
+			GuildID: guild,
+			Query:   "",
+			Limit:   0,
+		},
+	})
+	if err != nil {
+		return xerrors.Errorf("failed to encode guild member request: %w", err)
+	}
+
+	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
+	if err != nil {
+		return xerrors.Errorf("failed to get writer: %w", err)
+	}
+
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		return xerrors.Errorf("failed to write guild member request payload: %w", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return xerrors.Errorf("failed to close guild member request writer: %w", err)
 	}
 
 	return nil

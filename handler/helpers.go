@@ -6,68 +6,69 @@ import (
 	"github.com/tatsuworks/gateway/discordetf"
 )
 
-func (c *Client) HandleEvent(e *discordetf.Event) error {
+func (c *Client) HandleEvent(e *discordetf.Event) (int64, error) {
 	switch e.T {
 	case "GUILD_CREATE":
 		return c.GuildCreate(e.D)
 	case "GUILD_UPDATE":
-		return c.GuildCreate(e.D)
+		_, err := c.GuildCreate(e.D)
+		return 0, err
 	case "GUILD_DELETE":
-		return c.GuildDelete(e.D)
+		return 0, c.GuildDelete(e.D)
 	case "GUILD_BAN_ADD":
-		return c.GuildBanAdd(e.D)
+		return 0, c.GuildBanAdd(e.D)
 	case "GUILD_BAN_REMOVE":
-		return c.GuildBanRemove(e.D)
+		return 0, c.GuildBanRemove(e.D)
 	case "GUILD_ROLE_CREATE":
-		return c.RoleCreate(e.D)
+		return 0, c.RoleCreate(e.D)
 	case "GUILD_ROLE_UPDATE":
-		return c.RoleCreate(e.D)
+		return 0, c.RoleCreate(e.D)
 	case "GUILD_ROLE_DELETE":
-		return c.RoleDelete(e.D)
+		return 0, c.RoleDelete(e.D)
 	case "GUILD_MEMBERS_CHUNK":
-		return c.MemberChunk(e.D)
+		return 0, c.MemberChunk(e.D)
 	case "GUILD_MEMBER_ADD":
-		return c.MemberAdd(e.D)
+		return 0, c.MemberAdd(e.D)
 	case "GUILD_MEMBER_UPDATE":
-		return c.MemberAdd(e.D)
+		return 0, c.MemberAdd(e.D)
 	case "GUILD_MEMBER_REMOVE":
-		return c.MemberRemove(e.D)
+		return 0, c.MemberRemove(e.D)
 	case "PRESENCE_UPDATE":
-		// return c.PresenceUpdate(e.D)
-		return nil
+		// return 0, c.PresenceUpdate(e.D)
+		return 0, nil
 	case "CHANNEL_CREATE":
-		return c.ChannelCreate(e.D)
+		return 0, c.ChannelCreate(e.D)
 	case "CHANNEL_UPDATE":
-		return c.ChannelCreate(e.D)
+		return 0, c.ChannelCreate(e.D)
 	case "CHANNEL_DELETE":
-		return c.ChannelDelete(e.D)
+		return 0, c.ChannelDelete(e.D)
 	case "VOICE_STATE_UPDATE":
-		return c.VoiceStateUpdate(e.D)
+		return 0, c.VoiceStateUpdate(e.D)
 	case "MESSAGE_CREATE":
-		// return c.MessageCreate(e.D)
-		return nil
+		// return 0, c.MessageCreate(e.D)
+		return 0, nil
 	case "MESSAGE_UPDATE":
-		return nil
-		// return c.MessageCreate(e.D)
+		return 0, nil
+		// return 0, c.MessageCreate(e.D)
 	case "MESSAGE_DELETE":
-		return nil
-		// return c.MessageDelete(e.D)
+		return 0, nil
+		// return 0, c.MessageDelete(e.D)
 	case "MESSAGE_REACTION_ADD":
-		return nil
-		// return c.MessageReactionAdd(e.D)
+		return 0, nil
+		// return 0, c.MessageReactionAdd(e.D)
 	case "MESSAGE_REACTION_REMOVE":
-		return nil
-		// return c.MessageReactionRemove(e.D)
+		return 0, nil
+		// return 0, c.MessageReactionRemove(e.D)
 	case "MESSAGE_REACTION_REMOVE_ALL":
-		return nil
-		// return c.MessageReactionRemoveAll(e.D)
+		return 0, nil
+		// return 0, c.MessageReactionRemoveAll(e.D)
 	case "TYPING_START":
-		return nil
+		return 0, nil
 	case "nil":
-		return nil
+		return 0, nil
 	default:
-		// return errors.Errorf("unknown event: %s", e.T)
-		return nil
+		// return 0, errors.Errorf("unknown event: %s", e.T)
+		return 0, nil
 	}
 }
 

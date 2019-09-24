@@ -6,14 +6,17 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) GuildCreate(d []byte) error {
+func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 	gc, err := discordetf.DecodeGuildCreate(d)
 	if err != nil {
-		return xerrors.Errorf("failed to parse guild create: %w", err)
+		return 0, xerrors.Errorf("failed to parse guild create: %w", err)
+	}
+
+	if gc.MemberCount > int64(len(gc.Members)) {
+		guild = gc.Id
 	}
 
 	eg := new(errgroup.Group)
-
 	eg.Go(func() error {
 		err := c.db.SetGuild(gc.Id, gc.Guild)
 		if err != nil {
@@ -51,7 +54,7 @@ func (c *Client) GuildCreate(d []byte) error {
 		return nil
 	})
 
-	return eg.Wait()
+	return guild, eg.Wait()
 }
 
 func (c *Client) GuildDelete(d []byte) error {

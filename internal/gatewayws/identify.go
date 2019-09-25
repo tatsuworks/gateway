@@ -3,7 +3,9 @@ package gatewayws
 import (
 	"bytes"
 	"runtime"
+	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
@@ -102,14 +104,16 @@ func (s *Session) requestGuildMembers(guild int64) error {
 		Op: 8,
 		D: requestGuildMembers{
 			GuildID: guild,
-			Query:   "",
-			Limit:   0,
 		},
 	})
 	if err != nil {
 		return xerrors.Errorf("failed to encode guild member request: %w", err)
 	}
 
+	return s.writeBuf(buf)
+}
+
+func (s *Session) writeBuf(buf *bytes.Buffer) error {
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
 		return xerrors.Errorf("failed to get writer: %w", err)
@@ -117,12 +121,74 @@ func (s *Session) requestGuildMembers(guild int64) error {
 
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to write guild member request payload: %w", err)
+		return xerrors.Errorf("failed to write payload: %w", err)
 	}
 
 	if err := w.Close(); err != nil {
-		return xerrors.Errorf("failed to close guild member request writer: %w", err)
+		return xerrors.Errorf("failed to close writer: %w", err)
 	}
 
 	return nil
+}
+
+type status struct {
+	Game   game   `json:"game"`
+	Status string `json:"status"`
+}
+
+type game struct {
+	Name string `json:"name"`
+	Type int    `json:"type"`
+}
+
+func (s *Session) rotateStatuses() {
+	var (
+		ctx      = s.ctx
+		statuses = []string{
+			"Use t!help",
+			"https://tatsumaki.xyz",
+		}
+	)
+
+	time.Sleep(10 * time.Second)
+
+	for {
+		for _, e := range statuses {
+			var (
+				c   = new(etf.Context)
+				buf = new(bytes.Buffer)
+			)
+
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			s.log.Debug("writing status", zap.String("status", e))
+
+			err := c.Write(buf, op{
+				Op: 3,
+				D: status{
+					Game: game{
+						Name: e,
+						Type: 0,
+					},
+					Status: "online",
+				},
+			})
+			if err != nil {
+				s.log.Error("failed to encode status update", zap.Error(err))
+				return
+			}
+
+			err = s.writeBuf(buf)
+			if err != nil {
+				s.log.Error("failed to write status update", zap.Error(err))
+			}
+
+			time.Sleep(time.Minute)
+		}
+	}
+
 }

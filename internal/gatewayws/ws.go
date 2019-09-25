@@ -176,6 +176,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
+	// go s.rotateStatuses()
 
 	s.log.Info("websocket connected, waiting for events")
 

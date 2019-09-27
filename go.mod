@@ -12,7 +12,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/etcd-io/etcd v3.3.15+incompatible
 	github.com/go-redis/redis v6.15.2+incompatible
-	github.com/gogo/protobuf v1.2.1
+	github.com/gogo/protobuf v1.3.0
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/gops v0.3.6
@@ -33,11 +33,13 @@ require (
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+	golang.org/x/net v0.0.0-20190926025831-c00fd9afed17
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sys v0.0.0-20190926180325-855e68c8590b // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
-	google.golang.org/grpc v1.22.1
+	google.golang.org/genproto v0.0.0-20190926190326-7ee9db18f195 // indirect
+	google.golang.org/grpc v1.24.0
 	nhooyr.io/websocket v1.5.1
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

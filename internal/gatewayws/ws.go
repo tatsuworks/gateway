@@ -243,6 +243,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	s.persistSeq()
 	_ = c.Close(websocket.StatusNormalClosure, "")
+	s.log.Info("closed")
 	return err
 }
 
@@ -380,4 +381,8 @@ func (s *Session) releaseIdentifyLock() error {
 	}
 
 	return nil
+}
+
+func (s *Session) Cancel() {
+	s.cancel()
 }

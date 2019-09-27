@@ -6,7 +6,6 @@ service Gateway {
     rpc Version(EmptyRequest) returns (VersionResponse);
 
     rpc RestartShard(RestartShardRequest) returns (EmptyResponse);
-    rpc ShardStats(ShardStatsRequest) returns (ShardStatsResponse);
 }
 
 message EmptyRequest {}
@@ -18,12 +17,4 @@ message VersionResponse {
 
 message RestartShardRequest {
     int32 shard = 1;
-}
-
-message ShardStatsRequest {
-    int32 shard = 1;
-}
-
-message ShardStatsResponse {
-    
 }

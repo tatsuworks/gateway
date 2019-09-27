@@ -18,10 +18,11 @@ type Manager struct {
 	log *zap.Logger
 	wg  *sync.WaitGroup
 
-	token  string
-	shards int
+	token      string
+	shardCount int
 
-	up int
+	shardMu sync.Mutex
+	shards  map[int]*gatewayws.Session
 
 	rdb  *redis.Client
 	etcd *clientv3.Client
@@ -58,8 +59,10 @@ func New(
 		log: logger,
 		wg:  wg,
 
-		token:  token,
-		shards: shards,
+		token:      token,
+		shardCount: shards,
+
+		shards: map[int]*gatewayws.Session{},
 
 		rdb:  rc,
 		etcd: etcdCli,
@@ -68,16 +71,11 @@ func New(
 
 func (m *Manager) Start(start, stop int) error {
 	for i := start; i < stop; i++ {
+		m.log.Info("starting shard", zap.Int("shard", i), zap.Int("total", m.shardCount))
+
 		select {
 		case <-m.ctx.Done():
 			return nil
-		default:
-		}
-
-		m.log.Info("starting shard", zap.Int("shard", i), zap.Int("total", m.shards))
-
-		select {
-		case <-m.ctx.Done():
 		default:
 			m.startShard(i)
 		}
@@ -87,11 +85,15 @@ func (m *Manager) Start(start, stop int) error {
 }
 
 func (m *Manager) startShard(shard int) {
-	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shards)
+	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shardCount)
 	if err != nil {
 		m.log.Error("failed to make gateway session", zap.Error(err))
 		return
 	}
+
+	m.shardMu.Lock()
+	m.shards[shard] = s
+	m.shardMu.Unlock()
 
 	go func() {
 		for {
@@ -109,7 +111,7 @@ func (m *Manager) startShard(shard int) {
 				}
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(time.Second)
 		}
 	}()
 }

@@ -220,6 +220,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			continue
 		}
 
+		// this is jank, will fix soon
 		var requestMembers int64
 		requestMembers, err = s.state.HandleEvent(ev)
 		if err != nil {

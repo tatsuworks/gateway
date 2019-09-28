@@ -22,7 +22,7 @@ import (
 	"github.com/tatsuworks/gateway/handler"
 )
 
-const IdentifyMutexName = "/gateway/identify"
+const IdentifyMutexRootName = "/gateway/identify/"
 
 var (
 	GatewayETF = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
@@ -105,7 +105,7 @@ func (s *Session) initEtcd() error {
 	}
 
 	s.etcdSess = sess
-	s.identifyMu = concurrency.NewMutex(sess, IdentifyMutexName)
+	s.identifyMu = concurrency.NewMutex(sess, IdentifyMutexRootName+strconv.Itoa(s.shardID%16))
 	return nil
 }
 
@@ -350,7 +350,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		s.persistSessID()
 
 		go func() {
-			time.Sleep(7 * time.Second)
+			time.Sleep(5 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
 				s.log.Error("failed to release identify lock after ready", zap.Error(err))

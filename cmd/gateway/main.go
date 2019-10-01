@@ -29,7 +29,7 @@ var (
 
 func init() {
 	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
-	flag.StringVar(&etcdHost, "etcd", "localhost:2379", "localhost:2379")
+	flag.StringVar(&etcdHost, "etcd", "http://10.0.0.3:2379,http://10.0.0.3:4001", "http://10.0.0.3:2379,http://10.0.0.3:4001")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "localhost:6060")
 	flag.IntVar(&shards, "shards", 1, "1")
 	flag.BoolVar(&prod, "prod", false, "enable production logging")
@@ -49,14 +49,12 @@ func logger() *zap.Logger {
 
 	if prod {
 		logger, err = zap.NewProduction()
-		if err != nil {
-			panic(err)
-		}
 	} else {
 		logger, err = zap.NewDevelopment()
-		if err != nil {
-			panic(err)
-		}
+	}
+
+	if err != nil {
+		panic(err)
 	}
 
 	return logger

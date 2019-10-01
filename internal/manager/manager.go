@@ -2,15 +2,15 @@ package manager
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
+	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-
-	"github.com/tatsuworks/gateway/internal/gatewayws"
 )
 
 type Manager struct {
@@ -46,8 +46,8 @@ func New(
 		logger.Fatal("failed to ping redis", zap.Error(err))
 	}
 
-	etcdCli, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"http://10.0.0.3:2379", "http://10.0.0.3:4001"},
+	etcdc, err := clientv3.New(clientv3.Config{
+		Endpoints:   strings.Split(etcdAddr, ","),
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
@@ -65,7 +65,7 @@ func New(
 		shards: map[int]*gatewayws.Session{},
 
 		rdb:  rc,
-		etcd: etcdCli,
+		etcd: etcdc,
 	}
 }
 

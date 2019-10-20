@@ -24,9 +24,16 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 		gBuf  = []byte{116, 0, 0, 0, 0}
 		gKeys uint32
 		gc    = &GuildCreate{}
+		id    int64
+		err   error
 	)
 
-	err := d.checkByte(ettMap)
+	id, err = d.idFromMap("id")
+	if err != nil {
+		return nil, xerrors.Errorf("failed to find guild id: %w", err)
+	}
+
+	err = d.checkByte(ettMap)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to verify map byte: %w", err)
 	}

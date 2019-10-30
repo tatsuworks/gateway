@@ -150,7 +150,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, nil, errors.WithStack(err)
+		return 0, nil, xerrors.Errorf("failed to ensure map byte: %w", err)
 	}
 
 	_left := d.readMapLen()
@@ -166,7 +166,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 			if string(d.buf[d.off-l:d.off]) == "id" {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf("failed to read id: %w", err)
 				}
 
 				continue
@@ -177,7 +177,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 			if string(d.buf[d.off-l:d.off]) == "user_id" {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf("failed to read user_id: %w", err)
 				}
 
 				continue
@@ -189,7 +189,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 			if key == "user" {
 				id, _, err = d.readMapWithIDIntoSlice()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf("failed to read user_id from object: %w", err)
 				}
 				continue
 			}
@@ -199,7 +199,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 			if key == "role" {
 				id, data, err = d.readMapWithIDIntoSliceFixGuildID(guildID)
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf("failed to read role id from object: %w", err)
 				}
 				continue
 			}
@@ -207,7 +207,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 
 		err = d.readTerm()
 		if err != nil {
-			return 0, nil, errors.WithStack(err)
+			return 0, nil, xerrors.Errorf("failed to read term: %w", err)
 		}
 	}
 
@@ -466,7 +466,7 @@ func (d *decoder) readListIntoMapByIDFixGuildID(guildID int64) (map[int64][]byte
 			return nil, nil
 		}
 
-		return nil, errors.WithStack(err)
+		return nil, xerrors.Errorf("failed to verify list byte: %w", err)
 	}
 
 	// readListLen will automatically add the nil byte, but we want to
@@ -477,7 +477,7 @@ func (d *decoder) readListIntoMapByIDFixGuildID(guildID int64) (map[int64][]byte
 	for ; left > 0; left-- {
 		id, b, err := d.readMapWithIDIntoSliceFixGuildID(guildID)
 		if err != nil {
-			return out, err
+			return nil, xerrors.Errorf("failed to read list index: %w", err)
 		}
 
 		out[id] = b

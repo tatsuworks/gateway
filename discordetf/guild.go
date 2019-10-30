@@ -32,6 +32,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("failed to find guild id: %w", err)
 	}
+	d.reset()
 
 	err = d.checkByte(ettMap)
 	if err != nil {

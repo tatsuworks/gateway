@@ -218,7 +218,7 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 
 	data = d.buf[start:d.off]
 	// Fix map length
-	binary.BigEndian.PutUint32(data[1:4], uint32(_left+1))
+	binary.BigEndian.PutUint32(data[1:5], uint32(_left+1))
 	// Append guild id at the end
 	data = append(data, atomToBytes("guild_id")...)
 	data = append(data, snowflakeToBytes(guildID)...)

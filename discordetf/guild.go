@@ -50,7 +50,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 		key := string(d.buf[d.off-l : d.off])
 		switch key {
 		case "channels":
-			gc.Channels, err = d.readListIntoMapByID()
+			gc.Channels, err = d.readListIntoMapByIDFixGuildID(id)
 			if err != nil {
 				return nil, xerrors.Errorf("failed to read channels: %w", err)
 			}
@@ -80,7 +80,7 @@ func DecodeGuildCreate(buf []byte) (*GuildCreate, error) {
 			}
 
 		case "voice_states":
-			gc.VoiceStates, err = d.readListIntoMapByID()
+			gc.VoiceStates, err = d.readListIntoMapByIDFixGuildID(id)
 			if err != nil {
 				return nil, xerrors.Errorf("failed to read voice states: %w", err)
 			}

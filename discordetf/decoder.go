@@ -217,6 +217,8 @@ func (d *decoder) readMapWithIDIntoSliceFixGuildID(guildID int64) (int64, []byte
 	}
 
 	data = d.buf[start:d.off]
+	// Copy
+	data = append(data[:0:0], data...)
 	// Fix map length
 	binary.BigEndian.PutUint32(data[1:5], uint32(_left+1))
 	// Append guild id at the end

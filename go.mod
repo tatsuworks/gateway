@@ -22,7 +22,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
 	github.com/julienschmidt/httprouter v1.2.0
-	github.com/namsral/flag v1.7.4-pre
+	github.com/namsral/flag v1.7.4-pre.0.20170814194028-67f268f20922
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0 // indirect

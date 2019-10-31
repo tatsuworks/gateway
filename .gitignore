@@ -7,3 +7,4 @@ cmd/gateway/token.go
 dump.rdb
 logs.txt
 build/bin
+docker-secret.yaml

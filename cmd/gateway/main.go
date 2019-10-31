@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"flag"
 	"net"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
+	"github.com/namsral/flag"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

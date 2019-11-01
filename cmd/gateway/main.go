@@ -47,6 +47,7 @@ func main() {
 	defer cancel()
 
 	logger := sloghuman.Make(os.Stderr)
+	defer logger.Sync()
 
 	go func() {
 		sigs := make(chan os.Signal, 1)

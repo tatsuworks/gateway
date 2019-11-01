@@ -15,5 +15,7 @@ ENV FDB_URL "https://www.foundationdb.org/downloads/6.2.7/ubuntu/installers/foun
 RUN apt update && apt install -y wget zlib1g zlib1g-dev
 RUN wget -O fdb.deb $FDB_URL &&  dpkg -i fdb.deb
 
+COPY fdb.cluster /etc/foundationdb/fdb.cluster
+
 COPY --from=0 /go/gateway /
 CMD [ "/gateway" ]

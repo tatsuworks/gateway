@@ -9,13 +9,13 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
-	"go.uber.org/zap"
+	"go.coder.com/slog"
 	"golang.org/x/xerrors"
 )
 
 type Manager struct {
 	ctx context.Context
-	log *zap.Logger
+	log slog.Logger
 	wg  *sync.WaitGroup
 
 	token      string
@@ -30,7 +30,7 @@ type Manager struct {
 
 func New(
 	ctx context.Context,
-	logger *zap.Logger,
+	logger slog.Logger,
 	wg *sync.WaitGroup,
 	token string,
 	shards int,
@@ -43,7 +43,7 @@ func New(
 
 	_, err := rc.Ping().Result()
 	if err != nil {
-		logger.Fatal("failed to ping redis", zap.Error(err))
+		logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{
@@ -51,7 +51,7 @@ func New(
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		logger.Fatal("failed to connect to etcd", zap.Error(err))
+		logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
 	return &Manager{
@@ -71,7 +71,7 @@ func New(
 
 func (m *Manager) Start(start, stop int) error {
 	for i := start; i < stop; i++ {
-		m.log.Info("starting shard", zap.Int("shard", i), zap.Int("total", m.shardCount))
+		m.log.Info(m.ctx, "starting shard", slog.F("shard", i), slog.F("total", m.shardCount))
 
 		select {
 		case <-m.ctx.Done():
@@ -87,7 +87,7 @@ func (m *Manager) Start(start, stop int) error {
 func (m *Manager) startShard(shard int) {
 	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shardCount)
 	if err != nil {
-		m.log.Error("failed to make gateway session", zap.Error(err))
+		m.log.Error(m.ctx, "failed to make gateway session", slog.Error(err))
 		return
 	}
 
@@ -103,11 +103,11 @@ func (m *Manager) startShard(shard int) {
 			default:
 			}
 
-			m.log.Info("attempting shard connect", zap.Int("shard", shard))
+			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
 			err := s.Open(m.ctx, m.token)
 			if err != nil {
 				if !xerrors.Is(err, context.Canceled) {
-					m.log.Error("websocket closed", zap.Int("shard", shard), zap.Error(err))
+					m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))
 				}
 			}
 

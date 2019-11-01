@@ -13,7 +13,7 @@ import (
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/go-redis/redis"
-	"go.uber.org/zap"
+	"go.coder.com/slog"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
@@ -33,7 +33,7 @@ type Session struct {
 	cancel func()
 	wg     *sync.WaitGroup
 
-	log *zap.Logger
+	log slog.Logger
 
 	token   string
 	shardID int
@@ -64,7 +64,7 @@ type Session struct {
 }
 
 func NewSession(
-	logger *zap.Logger,
+	logger slog.Logger,
 	wg *sync.WaitGroup,
 	rdb *redis.Client,
 	etcdCli *clientv3.Client,
@@ -78,7 +78,7 @@ func NewSession(
 
 	sess := &Session{
 		wg:      wg,
-		log:     logger.With(zap.Int("shard", shardID)),
+		log:     logger.With(slog.F("shard", shardID)),
 		token:   token,
 		shardID: shardID,
 		shards:  shards,
@@ -129,15 +129,15 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	// only acquire the identify lock if we know we won't send a resume
 	if !s.shouldResume() {
-		s.log.Debug("acquiring lock, no ability to resume")
+		s.log.Debug(s.ctx, "acquiring lock, no ability to resume")
 		err = s.acquireIdentifyLock()
 		if err != nil {
 			return xerrors.Errorf("failed to grab identify lock: %w", err)
 		}
-		s.log.Debug("lock acquired")
+		s.log.Debug(s.ctx, "lock acquired")
 
 	} else {
-		s.log.Debug("skipping lock, attempting resume", zap.String("sess", s.sessID), zap.Int64("seq", s.seq))
+		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", s.seq))
 	}
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
@@ -160,14 +160,14 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	}
 
 	if s.shouldResume() {
-		s.log.Info("sending resume")
+		s.log.Info(s.ctx, "sending resume")
 		err := s.writeResume()
 		if err != nil {
 			return xerrors.Errorf("failed to send resume: %w", err)
 		}
 	} else {
 		s.last = 0
-		s.log.Info("sending identify")
+		s.log.Info(s.ctx, "sending identify")
 		err := s.writeIdentify()
 		if err != nil {
 			return xerrors.Errorf("failed to send identify: %w", err)
@@ -178,7 +178,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	go s.logTotalEvents()
 	// go s.rotateStatuses()
 
-	s.log.Info("websocket connected, waiting for events")
+	s.log.Info(s.ctx, "websocket connected, waiting for events")
 
 	for {
 		err = s.readMessage()
@@ -224,41 +224,41 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		var requestMembers int64
 		requestMembers, err = s.state.HandleEvent(ev)
 		if err != nil {
-			s.log.Error("failed to handle state event", zap.Error(err))
+			s.log.Error(s.ctx, "failed to handle state event", slog.Error(err))
 			continue
 		}
 
 		err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
-			s.log.Error("failed to push event to redis", zap.Error(err))
+			s.log.Error(s.ctx, "failed to push event to redis", slog.Error(err))
 		}
 
 		if requestMembers != 0 {
-			s.log.Debug("requesting guild members", zap.Int64("guild", requestMembers))
+			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", requestMembers))
 			err := s.requestGuildMembers(requestMembers)
 			if err != nil {
-				s.log.Error("failed to request guild members", zap.Error(err))
+				s.log.Error(s.ctx, "failed to request guild members", slog.Error(err))
 			}
 		}
 	}
 
 	s.persistSeq()
 	_ = c.Close(websocket.StatusNormalClosure, "")
-	s.log.Info("closed")
+	s.log.Info(s.ctx, "closed")
 	return err
 }
 
 func (s *Session) persistSeq() {
 	err := s.rc.Set(s.fmtSeqKey(), s.seq, 0).Err()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error("failed to save seq", zap.Error(err))
+		s.log.Error(s.ctx, "failed to save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSeq() {
 	sess, err := s.rc.Get(s.fmtSeqKey()).Result()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error("failed to load session id", zap.Error(err))
+		s.log.Error(s.ctx, "failed to load session id", slog.Error(err))
 	}
 
 	if sess == "" {
@@ -267,21 +267,21 @@ func (s *Session) loadSeq() {
 
 	s.seq, err = strconv.ParseInt(sess, 10, 64)
 	if err != nil {
-		s.log.Error("failed to parse session id", zap.Error(err))
+		s.log.Error(s.ctx, "failed to parse session id", slog.Error(err))
 	}
 }
 
 func (s *Session) persistSessID() {
 	err := s.rc.Set(s.fmtSessIDKey(), s.sessID, 0).Err()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error("failed to save seq", zap.Error(err))
+		s.log.Error(s.ctx, "failed to save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSessID() {
 	sess, err := s.rc.Get(s.fmtSessIDKey()).Result()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error("failed to load session id", zap.Error(err))
+		s.log.Error(s.ctx, "failed to load session id", slog.Error(err))
 	}
 
 	s.sessID = sess
@@ -305,19 +305,19 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 
 	// RESUME
 	case 6:
-		s.log.Info("resumed")
+		s.log.Info(s.ctx, "resumed")
 
 		return true, nil
 
 	// RECONNECT
 	case 7:
-		s.log.Info("reconnect requested")
+		s.log.Info(s.ctx, "reconnect requested")
 
 		return true, xerrors.New("reconnect")
 
 	// INVALID_SESSION
 	case 9:
-		s.log.Info("invalid session, reconnecting")
+		s.log.Info(s.ctx, "invalid session, reconnecting")
 		s.sessID = ""
 		s.persistSessID()
 		s.seq = 0
@@ -326,7 +326,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
 			err := s.releaseIdentifyLock()
 			if err != nil {
-				s.log.Error("failed to release held identify lock after invalid session", zap.Error(err))
+				s.log.Error(s.ctx, "failed to release held identify lock after invalid session", slog.Error(err))
 			}
 		}
 
@@ -346,21 +346,21 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		}
 
 		s.sessID = sess
-		s.log.Info("ready", zap.String("sess", sess))
+		s.log.Info(s.ctx, "ready", slog.F("sess", sess))
 		s.persistSessID()
 
 		go func() {
 			time.Sleep(5 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
-				s.log.Error("failed to release identify lock after ready", zap.Error(err))
+				s.log.Error(s.ctx, "failed to release identify lock after ready", slog.Error(err))
 			}
 		}()
 
 		return true, nil
 
 	case "RESUMED":
-		s.log.Info("resumed")
+		s.log.Info(s.ctx, "resumed")
 	}
 
 	return false, nil

@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
+	"go.coder.com/slog"
 )
 
 func (s *Session) logTotalEvents() {
@@ -24,9 +24,10 @@ func (s *Session) logTotalEvents() {
 		seq := atomic.LoadInt64(&s.seq)
 
 		s.log.Info(
+			s.ctx,
 			"event report",
-			zap.Int64("seq", seq),
-			zap.Int64("/sec", (seq-s.last)/60),
+			slog.F("seq", seq),
+			slog.F("/sec", (seq-s.last)/60),
 		)
 
 		s.last = seq

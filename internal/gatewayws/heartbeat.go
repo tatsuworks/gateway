@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
+	"go.coder.com/slog"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
@@ -59,7 +59,7 @@ func (s *Session) sendHeartbeats() {
 
 		if !s.lastHB.IsZero() {
 			if s.lastAck.Sub(s.lastHB) > s.interval {
-				s.log.Warn("no response to heartbeat, closing")
+				s.log.Warn(s.ctx, "no response to heartbeat, closing")
 				cancel()
 				return
 			}
@@ -67,7 +67,7 @@ func (s *Session) sendHeartbeats() {
 
 		err := s.heartbeat()
 		if err != nil {
-			s.log.Error("failed to send heartbeat", zap.Error(err))
+			s.log.Error(s.ctx, "failed to send heartbeat", slog.Error(err))
 			cancel()
 			return
 		}

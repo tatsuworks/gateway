@@ -9,7 +9,8 @@ import (
 	"syscall"
 
 	"github.com/namsral/flag"
-	"go.uber.org/zap"
+	"go.coder.com/slog"
+	"go.coder.com/slog/sloggers/sloghuman"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -28,12 +29,12 @@ var (
 )
 
 func init() {
-	flag.StringVar(&redisHost, "redis", "localhost:6380", "localhost:6379")
-	flag.StringVar(&etcdHost, "etcd", "http://10.0.0.3:2379,http://10.0.0.3:4001", "http://10.0.0.3:2379,http://10.0.0.3:4001")
+	flag.StringVar(&redisHost, "redis", "10.64.132.51:6379", "localhost:6379")
+	flag.StringVar(&etcdHost, "etcd", "http://10.64.132.51:2379,http://10.64.132.51:4001", "http://10.0.0.3:2379,http://10.0.0.3:4001")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "localhost:6060")
 	flag.IntVar(&shards, "shards", 1, "1")
 	flag.BoolVar(&prod, "prod", false, "enable production logging")
-	flag.StringVar(&addr, "addr", "127.0.0.1:8000", "address to listen on")
+	flag.StringVar(&addr, "addr", "0.0.0.0:80", "address to listen on")
 
 	flag.IntVar(&start, "start", 0, "0")
 	flag.IntVar(&stop, "stop", 1, "1")
@@ -41,42 +42,23 @@ func init() {
 	flag.Parse()
 }
 
-func logger() *zap.Logger {
-	var (
-		logger *zap.Logger
-		err    error
-	)
-
-	if prod {
-		logger, err = zap.NewProduction()
-	} else {
-		logger, err = zap.NewDevelopment()
-	}
-
-	if err != nil {
-		panic(err)
-	}
-
-	return logger
-}
-
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := logger()
+	logger := sloghuman.Make(os.Stderr)
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 		<-sigs
-		logger.Info("closing")
+		logger.Info(ctx, "closing")
 		cancel()
 	}()
 
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		logger.Fatal("failed to listen", zap.Error(err))
+		logger.Fatal(ctx, "failed to listen", slog.Error(err))
 	}
 
 	wg := &sync.WaitGroup{}
@@ -84,7 +66,7 @@ func main() {
 
 	err = m.Start(start, stop)
 	if err != nil {
-		logger.Fatal(err.Error())
+		logger.Fatal(ctx, "failed to start shard manager", slog.Error(err))
 	}
 
 	go func() {
@@ -95,6 +77,6 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	logger.Info("waiting for shards to disconnect")
+	logger.Info(ctx, "waiting for shards to disconnect")
 	wg.Wait()
 }

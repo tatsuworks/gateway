@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"go.uber.org/zap"
+	"go.coder.com/slog"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
@@ -165,7 +165,7 @@ func (s *Session) rotateStatuses() {
 			default:
 			}
 
-			s.log.Debug("writing status", zap.String("status", e))
+			s.log.Debug(s.ctx, "writing status", slog.F("status", e))
 
 			err := c.Write(buf, op{
 				Op: 3,
@@ -178,13 +178,13 @@ func (s *Session) rotateStatuses() {
 				},
 			})
 			if err != nil {
-				s.log.Error("failed to encode status update", zap.Error(err))
+				s.log.Error(s.ctx, "failed to encode status update", slog.Error(err))
 				return
 			}
 
 			err = s.writeBuf(buf)
 			if err != nil {
-				s.log.Error("failed to write status update", zap.Error(err))
+				s.log.Error(s.ctx, "failed to write status update", slog.Error(err))
 			}
 
 			time.Sleep(time.Minute)

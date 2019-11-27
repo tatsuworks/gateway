@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coadler/played"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
@@ -59,8 +60,9 @@ type Session struct {
 	etcdSess   *concurrency.Session
 	identifyMu *concurrency.Mutex
 
-	state *handler.Client
-	rc    *redis.Client
+	state  *handler.Client
+	rc     *redis.Client
+	played *played.Client
 }
 
 func NewSession(
@@ -113,16 +115,22 @@ func (s *Session) shouldResume() bool {
 	return s.seq != 0 && s.sessID != ""
 }
 
-func (s *Session) Open(ctx context.Context, token string) error {
+func (s *Session) Open(ctx context.Context, token string, playedAddr string) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
+	played, err := played.NewClient(s.ctx, playedAddr)
+	if err != nil {
+		return xerrors.Errorf("failed to connect to played: %w", err)
+	}
+	s.played = played
+
 	s.lastAck = time.Time{}
 
-	err := s.initEtcd()
+	err = s.initEtcd()
 	if err != nil {
 		return err
 	}
@@ -217,6 +225,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		}
 
 		if ev.T == "PRESENCE_UPDATE" {
+			err := s.played.WritePresence(s.ctx, ev.D)
+			if err != nil {
+				s.log.Error(s.ctx, "failed to send played event", slog.Error(err))
+			}
 			continue
 		}
 

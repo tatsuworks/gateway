@@ -10,13 +10,13 @@ metadata:
   name: gateway
   namespace: tatsu
   labels:
-    app: gateway
+    tatsu.deployment: gateway
 spec:
   ports:
   - port: 80
     name: gateway
   selector:
-    app: gateway
+    tatsu.deployment: gateway
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -25,14 +25,14 @@ metadata:
   namespace: tatsu
 spec:
   serviceName: gateway
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: gateway
+      tatsu.deployment: gateway
   template:
     metadata:
       labels:
-        app: gateway
+        tatsu.deployment: gateway
     spec:
       containers:
       - name: gateway
@@ -41,19 +41,21 @@ spec:
         ports:
         - containerPort: 80
         env:
-          - name: redis
-            value: "10.65.50.37:6379"
-          - name: etcd
-            value: "http://10.64.154.59:2379,http://10.64.154.59:2380"
-          - name: pprof
-            value: "localhost:6060"
-          - name: addr
-            value: "0.0.0.0:80"
-          - name: shards
-            value: "1000"
-          - name: start
-            value: "0"
-          - name: stop
+          - name: FORCE_COLOR
             value: "1"
+          - name: PLAYED
+            value: "ws://played.tatsu.svc.cluster.local"
+          - name: REDIS
+            value: "10.64.132.51:6379"
+          - name: ETCD
+            value: "http://10.64.132.51:2379,http://10.64.132.51:2380"
+          - name: PPROF
+            value: "localhost:6060"
+          - name: ADDR
+            value: "0.0.0.0:80"
+          - name: SHARDS
+            value: "1024"
+          - name: SHARDS_PER_POD
+            value: "4"
       imagePullSecrets:
         - name: scalewayauth

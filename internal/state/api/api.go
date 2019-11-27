@@ -48,7 +48,7 @@ func NewServer(
 func (s *Server) Init() {
 	base := "/v1/events"
 
-	s.router.GET("/v", wrapHandler(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	s.router.GET("/healthz", wrapHandler(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Version: " + s.version))
 		return nil

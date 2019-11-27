@@ -74,15 +74,16 @@ func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, key func(guild, i
 
 	// FDB recommends 10KB per transaction. If we limit transactions to
 	// 100 keys each, we allow an average of 100 bytes per k/v pair.
-	if len(etfs) > 100 {
-		bufMap = make(map[int64][]byte, 100)
+	const maxPerTxn = 100
+	if len(etfs) > maxPerTxn {
+		bufMap = make(map[int64][]byte, maxPerTxn)
 
 		for i, e := range etfs {
 			bufMap[i] = e
 
-			if len(bufMap) >= 100 {
+			if len(bufMap) >= maxPerTxn {
 				send(guild, bufMap, key)
-				bufMap = make(map[int64][]byte, 100)
+				bufMap = make(map[int64][]byte, maxPerTxn)
 			}
 		}
 	}

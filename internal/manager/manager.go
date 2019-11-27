@@ -24,8 +24,9 @@ type Manager struct {
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
 
-	rdb  *redis.Client
-	etcd *clientv3.Client
+	rdb        *redis.Client
+	etcd       *clientv3.Client
+	playedAddr string
 }
 
 func New(
@@ -36,6 +37,7 @@ func New(
 	shards int,
 	redisAddr string,
 	etcdAddr string,
+	playedAddr string,
 ) *Manager {
 	rc := redis.NewClient(&redis.Options{
 		Addr: redisAddr,
@@ -64,8 +66,9 @@ func New(
 
 		shards: map[int]*gatewayws.Session{},
 
-		rdb:  rc,
-		etcd: etcdc,
+		rdb:        rc,
+		etcd:       etcdc,
+		playedAddr: playedAddr,
 	}
 }
 
@@ -104,7 +107,7 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
-			err := s.Open(m.ctx, m.token)
+			err := s.Open(m.ctx, m.token, m.playedAddr)
 			if err != nil {
 				if !xerrors.Is(err, context.Canceled) {
 					m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))

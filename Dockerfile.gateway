@@ -18,4 +18,5 @@ RUN wget -O fdb.deb $FDB_URL &&  dpkg -i fdb.deb
 COPY fdb.cluster /etc/foundationdb/fdb.cluster
 
 COPY --from=0 /go/gateway /
-CMD [ "/gateway" ]
+COPY entrypoint-gateway.sh /
+CMD [ "/entrypoint-gateway.sh" ]

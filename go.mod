@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
+	github.com/coadler/played v0.0.0-20191101212905-60ec1a7e488d
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -20,8 +21,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
 	github.com/julienschmidt/httprouter v1.2.0
-	github.com/namsral/flag v1.7.4-pre.0.20170814194028-67f268f20922
-	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
@@ -30,15 +29,15 @@ require (
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
 	github.com/valyala/fasthttp v1.4.0
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	go.coder.com/slog v0.3.0
+	go.coder.com/slog v0.3.1-0.20191101183346-25e1d948339e
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20190926025831-c00fd9afed17
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20190926180325-855e68c8590b // indirect
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	google.golang.org/genproto v0.0.0-20190926190326-7ee9db18f195 // indirect
 	google.golang.org/grpc v1.24.0
-	nhooyr.io/websocket v1.5.1
+	nhooyr.io/websocket v1.7.3
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

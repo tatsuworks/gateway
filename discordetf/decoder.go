@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 )
 
@@ -260,7 +259,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, nil, errors.WithStack(err)
+		return 0, nil, xerrors.Errorf(": %w", err)
 	}
 
 	left := d.readMapLen()
@@ -275,7 +274,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 			if string(d.buf[d.off-l:d.off]) == "id" {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf(": %w", err)
 				}
 
 				continue
@@ -286,7 +285,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 			if string(d.buf[d.off-l:d.off]) == "user_id" {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf(": %w", err)
 				}
 
 				continue
@@ -298,14 +297,14 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 			if key == "user" {
 				id, _, err = d.readMapWithIDIntoSlice()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf(": %w", err)
 				}
 				continue
 			}
 			if key == "role" {
 				id, data, err = d.readMapWithIDIntoSlice()
 				if err != nil {
-					return 0, nil, errors.WithStack(err)
+					return 0, nil, xerrors.Errorf(": %w", err)
 				}
 				continue
 			}
@@ -313,7 +312,7 @@ func (d *decoder) readMapWithIDIntoSlice() (int64, []byte, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return 0, nil, errors.WithStack(err)
+			return 0, nil, xerrors.Errorf(": %w", err)
 		}
 	}
 
@@ -330,14 +329,14 @@ func (d *decoder) idFromMap(name string) (int64, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, xerrors.Errorf(": %w", err)
 	}
 
 	left := d.readMapLen()
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, xerrors.Errorf(": %w", err)
 		}
 
 		// instead of checking the string every time, check the length first
@@ -345,7 +344,7 @@ func (d *decoder) idFromMap(name string) (int64, error) {
 			if string(d.buf[d.off-l:d.off]) == name {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, errors.WithStack(err)
+					return 0, xerrors.Errorf(": %w", err)
 				}
 
 				continue
@@ -354,7 +353,7 @@ func (d *decoder) idFromMap(name string) (int64, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, xerrors.Errorf(": %w", err)
 		}
 	}
 
@@ -377,7 +376,7 @@ func (d *decoder) stringFromMap(name string) (string, error) {
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return "", errors.WithStack(err)
+			return "", xerrors.Errorf(": %w", err)
 		}
 
 		// instead of checking the string every time, check the length first
@@ -395,7 +394,7 @@ func (d *decoder) stringFromMap(name string) (string, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return "", errors.WithStack(err)
+			return "", xerrors.Errorf(": %w", err)
 		}
 	}
 
@@ -409,14 +408,14 @@ func (d *decoder) guildIDFromMap() (int64, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, errors.WithStack(err)
+		return 0, xerrors.Errorf(": %w", err)
 	}
 
 	left := d.readMapLen()
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, xerrors.Errorf(": %w", err)
 		}
 
 		// instead of checking the string every time, check the length first
@@ -424,7 +423,7 @@ func (d *decoder) guildIDFromMap() (int64, error) {
 			if string(d.buf[d.off-l:d.off]) == "guild_id" {
 				id, err = d.readSmallBigWithTagToInt64()
 				if err != nil {
-					return 0, errors.WithStack(err)
+					return 0, xerrors.Errorf(": %w", err)
 				}
 
 				continue
@@ -433,7 +432,7 @@ func (d *decoder) guildIDFromMap() (int64, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, xerrors.Errorf(": %w", err)
 		}
 	}
 
@@ -503,7 +502,7 @@ func (d *decoder) readListIntoMapByID() (map[int64][]byte, error) {
 			return nil, nil
 		}
 
-		return nil, errors.WithStack(err)
+		return nil, xerrors.Errorf(": %w", err)
 	}
 
 	// readListLen will automatically add the nil byte, but we want to handle it manually here.
@@ -567,7 +566,7 @@ func (d *decoder) readTerm() (err error) {
 	case ettNewFloat:
 		d.readRawNewFloat()
 	default:
-		err = errors.Errorf("unknown type: %v", t)
+		err = xerrors.Errorf("unknown type: %v", t)
 	}
 
 	if err != nil {

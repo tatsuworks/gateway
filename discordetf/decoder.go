@@ -532,7 +532,7 @@ func (d *decoder) readTermIntoSlice() ([]byte, error) {
 
 	err := d.readTerm()
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("read term: %w", err)
 	}
 
 	return d.buf[start:d.off], nil
@@ -612,7 +612,7 @@ func (d *decoder) readRawList() error {
 	for ; left > 0; left-- {
 		err := d.readTerm()
 		if err != nil {
-			return err
+			return xerrors.Errorf("read term: %w", err)
 		}
 	}
 

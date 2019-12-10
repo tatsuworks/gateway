@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.coder.com/slog"
+	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 

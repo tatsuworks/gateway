@@ -11,8 +11,8 @@ import (
 
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/manager"
-	"go.coder.com/slog"
-	"go.coder.com/slog/sloggers/slogjson"
+	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/slogjson"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

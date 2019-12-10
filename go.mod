@@ -3,6 +3,7 @@ module github.com/tatsuworks/gateway
 go 1.13
 
 require (
+	cdr.dev/slog v1.0.0
 	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
 	github.com/coadler/played v0.0.0-20191101212905-60ec1a7e488d
 	github.com/coreos/bbolt v1.3.3 // indirect
@@ -29,7 +30,6 @@ require (
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
 	github.com/valyala/fasthttp v1.4.0
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	go.coder.com/slog v0.3.1-0.20191101183346-25e1d948339e
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20190926025831-c00fd9afed17

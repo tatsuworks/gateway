@@ -9,7 +9,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
-	"go.coder.com/slog"
+	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 )
 

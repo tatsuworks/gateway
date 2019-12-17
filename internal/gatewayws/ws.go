@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"cdr.dev/slog"
 	"github.com/coadler/played"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/go-redis/redis"
-	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
@@ -23,10 +23,9 @@ import (
 	"github.com/tatsuworks/gateway/handler"
 )
 
-const IdentifyMutexRootName = "/gateway/identify/"
-
-var (
-	GatewayETF = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
+const (
+	IdentifyMutexRootName = "/gateway/identify/"
+	GatewayETF            = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
 )
 
 type Session struct {

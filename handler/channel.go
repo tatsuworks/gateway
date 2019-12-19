@@ -14,7 +14,7 @@ func (s *Client) ChannelCreate(d []byte) error {
 
 	err = s.db.SetChannel(ch.Guild, ch.Id, ch.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to set channel: %w", err)
+		return xerrors.Errorf("set channel: %w", err)
 	}
 
 	return nil
@@ -28,7 +28,7 @@ func (c *Client) ChannelDelete(d []byte) error {
 
 	err = c.db.DeleteChannel(ch.Guild, ch.Id, ch.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to delete channel: %w", err)
+		return xerrors.Errorf("delete channel: %w", err)
 	}
 
 	return nil
@@ -42,7 +42,7 @@ func (c *Client) VoiceStateUpdate(d []byte) error {
 
 	err = c.db.SetVoiceState(vs.Guild, vs.User, vs.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to set voice state: %w", err)
+		return xerrors.Errorf("set voice state: %w", err)
 	}
 
 	return nil

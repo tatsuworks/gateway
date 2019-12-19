@@ -59,7 +59,7 @@ func (s *Session) sendHeartbeats() {
 
 		if !s.lastHB.IsZero() {
 			if s.lastAck.Sub(s.lastHB) > s.interval {
-				s.log.Warn(s.ctx, "no response to heartbeat, closing")
+				s.log.Warn(s.ctx, "no response to heartbeat")
 				cancel()
 				return
 			}

@@ -12,7 +12,7 @@ type Client struct {
 func NewClient() (*Client, error) {
 	db, err := state.NewDB()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create state db: %w", err)
+		return nil, xerrors.Errorf("create state db: %w", err)
 	}
 
 	return &Client{

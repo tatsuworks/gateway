@@ -13,7 +13,7 @@ func (c *Client) MemberChunk(d []byte) error {
 
 	err = c.db.SetGuildMembers(mc.Guild, mc.Members)
 	if err != nil {
-		return xerrors.Errorf("failed to set guild members: %w", err)
+		return xerrors.Errorf("set guild members: %w", err)
 	}
 
 	return nil
@@ -27,7 +27,7 @@ func (c *Client) MemberAdd(d []byte) error {
 
 	err = c.db.SetGuildMember(mc.Guild, mc.Id, mc.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to set guild member: %w", err)
+		return xerrors.Errorf("set guild member: %w", err)
 	}
 
 	return nil
@@ -41,7 +41,7 @@ func (c *Client) MemberRemove(d []byte) error {
 
 	err = c.db.DeleteGuildMember(mc.Guild, mc.Id)
 	if err != nil {
-		return xerrors.Errorf("failed to delete guild member: %w", err)
+		return xerrors.Errorf("delete guild member: %w", err)
 	}
 
 	return nil

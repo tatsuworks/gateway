@@ -13,7 +13,7 @@ func (c *Client) MessageCreate(d []byte) error {
 
 	err = c.db.SetChannelMessage(mc.Channel, mc.Id, mc.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to set channel message: %w", err)
+		return xerrors.Errorf("set channel message: %w", err)
 	}
 
 	return nil
@@ -27,7 +27,7 @@ func (c *Client) MessageDelete(d []byte) error {
 
 	err = c.db.DeleteChannelMessage(mc.Channel, mc.Id)
 	if err != nil {
-		return xerrors.Errorf("failed to delete channel message: %w", err)
+		return xerrors.Errorf("delete channel message: %w", err)
 	}
 
 	return nil
@@ -41,7 +41,7 @@ func (c *Client) MessageReactionAdd(d []byte) error {
 
 	err = c.db.SetChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name, rc.Raw)
 	if err != nil {
-		return xerrors.Errorf("failed to set channel message reaction: %w", err)
+		return xerrors.Errorf("set channel message reaction: %w", err)
 	}
 
 	return nil
@@ -55,7 +55,7 @@ func (c *Client) MessageReactionRemove(d []byte) error {
 
 	err = c.db.DeleteChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name)
 	if err != nil {
-		return xerrors.Errorf("failed to delete channel message reaction: %w", err)
+		return xerrors.Errorf("delete channel message reaction: %w", err)
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func (c *Client) MessageReactionRemoveAll(d []byte) error {
 
 	err = c.db.DeleteChannelMessageReactions(rc.Message, rc.Message, rc.User)
 	if err != nil {
-		return xerrors.Errorf("failed to remove channel message reactions: %w", err)
+		return xerrors.Errorf("remove channel message reactions: %w", err)
 	}
 
 	return nil

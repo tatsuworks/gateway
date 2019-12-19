@@ -23,6 +23,11 @@ func (db *DB) GetGuild(id int64) ([]byte, error) {
 	return g, nil
 }
 
+func (db *DB) GetGuildCount() (int, error) {
+	rr, _ := fdb.PrefixRange(db.fmtGuildPrefix())
+	return db.keyCountForPrefix(rr)
+}
+
 func (db *DB) DeleteGuild(id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildKey(id))

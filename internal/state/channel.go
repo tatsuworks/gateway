@@ -27,6 +27,33 @@ func (db *DB) GetChannel(id int64) ([]byte, error) {
 	return c, nil
 }
 
+func (db *DB) GetChannelCount() (int, error) {
+	rr, _ := fdb.PrefixRange(db.fmtChannelPrefix())
+	return db.keyCountForPrefix(rr)
+}
+
+func (db *DB) keyCountForPrefix(r fdb.Range) (int, error) {
+	var count int
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		count = 0
+
+		ropt := fdb.RangeOptions{Mode: fdb.StreamingModeSerial}
+		i := t.Snapshot().GetRange(r, ropt).Iterator()
+
+		for i.Advance() {
+			count++
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (db *DB) GetChannels() ([]fdb.KeyValue, error) {
 	var (
 		raws   []fdb.KeyValue

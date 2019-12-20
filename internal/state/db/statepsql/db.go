@@ -3,13 +3,15 @@ package statepsql
 import (
 	"database/sql"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/tatsuworks/gateway/internal/state"
 )
 
 type db struct {
-	sql *sql.DB
+	sql *sqlx.DB
 }
 
 func NewDB(psql *sql.DB) (state.DB, error) {
-	return &db{}, nil
+	sqlx := sqlx.NewDb(psql, "postgres")
+	return &db{sqlx}, nil
 }

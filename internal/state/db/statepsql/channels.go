@@ -1,6 +1,13 @@
 package statepsql
 
 func (db *db) SetChannel(guild, id int64, raw []byte) error {
+	const q = `
+INSERT INTO
+	channels (id, data)
+VALUES
+	($1, $2)
+`
+
 	return nil
 }
 

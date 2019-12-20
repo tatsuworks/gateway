@@ -74,7 +74,7 @@ func (s *Session) identifyPayload() error {
 			Compress:           false,
 			LargeThreshold:     250,
 			GuildSubscriptions: true,
-			Shard:              []int{s.shardID, s.shards},
+			Shard:              []int{s.shardID, s.shardCount},
 		},
 	})
 	if err != nil {

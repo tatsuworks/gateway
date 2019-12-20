@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"cdr.dev/slog"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
-	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 )
 
@@ -19,6 +19,7 @@ type Manager struct {
 	wg  *sync.WaitGroup
 
 	token      string
+	intents    gatewayws.Intents
 	shardCount int
 
 	shardMu sync.Mutex
@@ -35,6 +36,7 @@ func New(
 	wg *sync.WaitGroup,
 	token string,
 	shards int,
+	intents gatewayws.Intents,
 	redisAddr string,
 	etcdAddr string,
 	playedAddr string,
@@ -62,6 +64,7 @@ func New(
 		wg:  wg,
 
 		token:      token,
+		intents:    intents,
 		shardCount: shards,
 
 		shards: map[int]*gatewayws.Session{},
@@ -88,7 +91,16 @@ func (m *Manager) Start(start, stop int) error {
 }
 
 func (m *Manager) startShard(shard int) {
-	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shardCount)
+	s, err := gatewayws.NewSession(&gatewayws.SessionConfig{
+		Logger:     m.log,
+		WorkGroup:  m.wg,
+		Redis:      m.rdb,
+		Etcd:       m.etcd,
+		Token:      m.token,
+		Intents:    nil,
+		ShardID:    shard,
+		ShardCount: m.shardCount,
+	})
 	if err != nil {
 		m.log.Error(m.ctx, "failed to make gateway session", slog.Error(err))
 		return

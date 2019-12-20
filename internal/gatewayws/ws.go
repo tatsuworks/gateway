@@ -104,6 +104,24 @@ func (i Intents) Collect() (n int) {
 	return
 }
 
+var DefaultIntents = Intents{
+	IntentGuilds,
+	IntentGuildMembers,
+	IntentGuildBans,
+	IntentGuildEmojis,
+	IntentGuildIntegrations,
+	IntentGuildWebhooks,
+	IntentGuildInvites,
+	IntentGuildVoiceStates,
+	IntentGuildPresences,
+	IntentGuildMessages,
+	IntentGuildMessageReactions,
+	IntentGuildMessageTyping,
+	IntentDirectMessages,
+	IntentDirectMessageReactions,
+	IntentDirectMessageTyping,
+}
+
 func NewSession(cfg *SessionConfig) (*Session, error) {
 	c, err := handler.NewClient()
 	if err != nil {

@@ -1,4 +1,4 @@
-package state
+package statefdb
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -18,7 +18,7 @@ func NewDB() (*DB, error) {
 
 	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create fdb directory: %w", err)
+		return nil, xerrors.Errorf("create fdb directory: %w", err)
 	}
 
 	return &DB{
@@ -27,26 +27,28 @@ func NewDB() (*DB, error) {
 	}, nil
 }
 
-// Transact is a helper around (fdb.Database).Transact which accepts a function that doesn't require a return value.
+// Transact is a helper around (fdb.Database).Transact which accepts a function
+// that doesn't require a return value.
 func (db *DB) Transact(fn func(t fdb.Transaction) error) error {
 	_, err := db.fdb.Transact(func(t fdb.Transaction) (ret interface{}, err error) {
 		return nil, fn(t)
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to commit fdb txn: %w", err)
+		return xerrors.Errorf("commit fdb txn: %w", err)
 
 	}
 
 	return nil
 }
 
-// ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a function that doesn't require a return value.
+// ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a
+// function that doesn't require a return value.
 func (db *DB) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
 	_, err := db.fdb.ReadTransact(func(t fdb.ReadTransaction) (ret interface{}, err error) {
 		return nil, fn(t)
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to commit fdb read txn: %w", err)
+		return xerrors.Errorf("commit fdb read txn: %w", err)
 	}
 
 	return nil

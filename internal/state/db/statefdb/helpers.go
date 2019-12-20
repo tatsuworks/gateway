@@ -1,4 +1,4 @@
-package state
+package statefdb
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"

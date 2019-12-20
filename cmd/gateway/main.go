@@ -13,6 +13,7 @@ import (
 	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
 	"github.com/tatsuworks/gateway/gatewaypb"
+	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -71,7 +72,16 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	m := manager.New(ctx, logger, wg, Token, shards, redisHost, etcdHost, playedHost)
+	m := manager.New(ctx,
+		logger,
+		wg,
+		Token,
+		shards,
+		gatewayws.DefaultIntents,
+		redisHost,
+		etcdHost,
+		playedHost,
+	)
 
 	logger.Info(ctx, "starting manager",
 		slog.F("shards", shards),

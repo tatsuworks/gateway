@@ -9,10 +9,11 @@ import (
 	"sync"
 	"syscall"
 
+	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/sloghuman"
+	"cdr.dev/slog/sloggers/slogjson"
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/manager"
-	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/slogjson"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -47,7 +48,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := slogjson.Make(os.Stderr)
+	var logger slog.Logger
+
+	if prod {
+		logger = slogjson.Make(os.Stderr)
+	} else {
+		logger = sloghuman.Make(os.Stderr)
+	}
 	defer logger.Sync()
 
 	go func() {

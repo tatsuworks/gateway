@@ -35,9 +35,9 @@ type Session struct {
 
 	log slog.Logger
 
-	token   string
-	shardID int
-	shards  int
+	token      string
+	shardID    int
+	shardCount int
 
 	seq    int64
 	sessID string
@@ -64,34 +64,67 @@ type Session struct {
 	played *played.Client
 }
 
-func NewSession(
-	logger slog.Logger,
-	wg *sync.WaitGroup,
-	rdb *redis.Client,
-	etcdCli *clientv3.Client,
-	token string,
-	shardID, shards int,
-) (*Session, error) {
+type SessionConfig struct {
+	Logger     slog.Logger
+	WorkGroup  *sync.WaitGroup
+	Redis      *redis.Client
+	Etcd       *clientv3.Client
+	Token      string
+	Intents    Intents
+	ShardID    int
+	ShardCount int
+}
+
+type Intent uint
+type Intents []Intent
+
+const (
+	IntentGuilds Intent = iota
+	IntentGuildMembers
+	IntentGuildBans
+	IntentGuildEmojis
+	IntentGuildIntegrations
+	IntentGuildWebhooks
+	IntentGuildInvites
+	IntentGuildVoiceStates
+	IntentGuildPresences
+	IntentGuildMessages
+	IntentGuildMessageReactions
+	IntentGuildMessageTyping
+	IntentDirectMessages
+	IntentDirectMessageReactions
+	IntentDirectMessageTyping
+)
+
+func (i Intents) Collect() (n int) {
+	for _, intent := range i {
+		n = n << intent
+	}
+
+	return
+}
+
+func NewSession(cfg *SessionConfig) (*Session, error) {
 	c, err := handler.NewClient()
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create state handler: %w", err)
 	}
 
 	sess := &Session{
-		wg:      wg,
-		log:     logger.With(slog.F("shard", shardID)),
-		token:   token,
-		shardID: shardID,
-		shards:  shards,
+		wg:         cfg.WorkGroup,
+		log:        cfg.Logger.With(slog.F("shard", cfg.ShardID)),
+		token:      cfg.Token,
+		shardID:    cfg.ShardID,
+		shardCount: cfg.ShardCount,
 
 		// start with a 1kb buffer
 		buf:  bytes.NewBuffer(make([]byte, 0, 1<<10)),
 		hbuf: bytes.NewBuffer(nil),
 
-		etcd: etcdCli,
+		etcd: cfg.Etcd,
 
 		state: c,
-		rc:    rdb,
+		rc:    cfg.Redis,
 	}
 
 	sess.loadSessID()

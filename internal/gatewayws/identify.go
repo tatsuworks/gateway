@@ -24,6 +24,7 @@ type identify struct {
 	LargeThreshold     int    `json:"large_threshold"`
 	GuildSubscriptions bool   `json:"guild_subscriptions"`
 	Shard              []int  `json:"shard"`
+	Intents            int    `json:"intents,omitempty"`
 }
 
 type props struct {

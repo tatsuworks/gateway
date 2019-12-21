@@ -37,7 +37,19 @@ func TestChannels(t *testing.T) {
 	})
 
 	t.Run("DeleteChannel", func(t *testing.T) {
-		err := db.DeleteChannel(ctx, id)
+		err := db.DeleteChannel(ctx, guild, id)
 		assert.Success(t, "failed to delete channel", err)
+	})
+
+	guild = rand.Int63()
+
+	t.Run("SetChannels", func(t *testing.T) {
+		cs := map[int64][]byte{}
+		for i := 0; i < 5; i++ {
+			cs[rand.Int63()] = channelJSON
+		}
+
+		err := db.SetChannels(ctx, guild, cs)
+		assert.Success(t, "failed to bulk set channels", err)
 	})
 }

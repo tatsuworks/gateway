@@ -1,15 +1,19 @@
 package statefdb
 
-import "github.com/apple/foundationdb/bindings/go/src/fdb"
+import (
+	"context"
 
-func (db *DB) SetGuildRole(guild, role int64, raw []byte) error {
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+)
+
+func (db *DB) SetGuildRole(ctx context.Context, guild, role int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildRoleKey(guild, role), raw)
 		return nil
 	})
 }
 
-func (db *DB) GetGuildRole(guild, role int64) ([]byte, error) {
+func (db *DB) GetGuildRole(ctx context.Context, guild, role int64) ([]byte, error) {
 	var r []byte
 
 	err := db.Transact(func(t fdb.Transaction) error {
@@ -23,13 +27,14 @@ func (db *DB) GetGuildRole(guild, role int64) ([]byte, error) {
 	return r, nil
 }
 
-func (db *DB) SetGuildRoles(guild int64, roles map[int64][]byte) error {
+func (db *DB) SetGuildRoles(ctx context.Context, guild int64, roles map[int64][]byte) error {
 	return db.setGuildETFs(guild, roles, db.fmtGuildRoleKey)
 }
 
-func (db *DB) GetGuildRoles(guild int64) ([]fdb.KeyValue, error) {
+func (db *DB) GetGuildRoles(ctx context.Context, guild int64) ([][]byte, error) {
 	var (
 		raws   []fdb.KeyValue
+		out    [][]byte
 		pre, _ = fdb.PrefixRange(db.fmtGuildRolePrefix(guild))
 	)
 
@@ -41,10 +46,15 @@ func (db *DB) GetGuildRoles(guild int64) ([]fdb.KeyValue, error) {
 		return nil, err
 	}
 
-	return raws, nil
+	out = make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, err
 }
 
-func (db *DB) DeleteGuildRoles(guild int64) error {
+func (db *DB) DeleteGuildRoles(ctx context.Context, guild int64) error {
 	pre, _ := fdb.PrefixRange(db.fmtGuildRolePrefix(guild))
 
 	return db.Transact(func(t fdb.Transaction) error {
@@ -53,7 +63,7 @@ func (db *DB) DeleteGuildRoles(guild int64) error {
 	})
 }
 
-func (db *DB) DeleteGuildRole(guild, role int64) error {
+func (db *DB) DeleteGuildRole(ctx context.Context, guild, role int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildRoleKey(guild, role))
 		return nil

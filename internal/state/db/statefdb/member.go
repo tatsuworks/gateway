@@ -1,12 +1,16 @@
 package statefdb
 
-import "github.com/apple/foundationdb/bindings/go/src/fdb"
+import (
+	"context"
 
-func (db *DB) SetGuildMembers(guild int64, raws map[int64][]byte) error {
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+)
+
+func (db *DB) SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error {
 	return db.setGuildETFs(guild, raws, db.fmtGuildMemberKey)
 }
 
-func (db *DB) DeleteGuildMembers(guild int64) error {
+func (db *DB) DeleteGuildMembers(ctx context.Context, guild int64) error {
 	pre, _ := fdb.PrefixRange(db.fmtGuildMemberPrefix(guild))
 
 	return db.Transact(func(t fdb.Transaction) error {
@@ -15,14 +19,14 @@ func (db *DB) DeleteGuildMembers(guild int64) error {
 	})
 }
 
-func (db *DB) SetGuildMember(guild, user int64, raw []byte) error {
+func (db *DB) SetGuildMember(ctx context.Context, guild, user int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildMemberKey(guild, user), raw)
 		return nil
 	})
 }
 
-func (db *DB) GetGuildMember(guild, user int64) ([]byte, error) {
+func (db *DB) GetGuildMember(ctx context.Context, guild, user int64) ([]byte, error) {
 	var m []byte
 
 	err := db.Transact(func(t fdb.Transaction) error {
@@ -36,9 +40,10 @@ func (db *DB) GetGuildMember(guild, user int64) ([]byte, error) {
 	return m, nil
 }
 
-func (db *DB) GetGuildMembers(guild int64) ([]fdb.KeyValue, error) {
+func (db *DB) GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error) {
 	var (
 		raws   []fdb.KeyValue
+		out    [][]byte
 		pre, _ = fdb.PrefixRange(db.fmtGuildMemberPrefix(guild))
 	)
 
@@ -50,10 +55,15 @@ func (db *DB) GetGuildMembers(guild int64) ([]fdb.KeyValue, error) {
 		return nil, err
 	}
 
-	return raws, nil
+	out = make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, err
 }
 
-func (db *DB) DeleteGuildMember(guild, user int64) error {
+func (db *DB) DeleteGuildMember(ctx context.Context, guild, user int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildMemberKey(guild, user))
 		return nil

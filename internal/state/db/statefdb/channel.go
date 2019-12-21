@@ -1,11 +1,13 @@
-package state
+package statefdb
 
 import (
+	"context"
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"golang.org/x/xerrors"
 )
 
-func (db *DB) SetChannel(guild, id int64, raw []byte) error {
+func (db *DB) SetChannel(ctx context.Context, guild, id int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtChannelKey(id), raw)
 		t.Set(db.fmtGuildChannelKey(guild, id), raw)
@@ -13,7 +15,7 @@ func (db *DB) SetChannel(guild, id int64, raw []byte) error {
 	})
 }
 
-func (db *DB) GetChannel(id int64) ([]byte, error) {
+func (db *DB) GetChannel(ctx context.Context, id int64) ([]byte, error) {
 	var c []byte
 
 	err := db.Transact(func(t fdb.Transaction) error {
@@ -27,7 +29,7 @@ func (db *DB) GetChannel(id int64) ([]byte, error) {
 	return c, nil
 }
 
-func (db *DB) GetChannelCount() (int, error) {
+func (db *DB) GetChannelCount(ctx context.Context) (int, error) {
 	rr, _ := fdb.PrefixRange(db.fmtChannelPrefix())
 	return db.keyCountForPrefix(rr)
 }
@@ -54,9 +56,10 @@ func (db *DB) keyCountForPrefix(r fdb.Range) (int, error) {
 	return count, nil
 }
 
-func (db *DB) GetChannels() ([]fdb.KeyValue, error) {
+func (db *DB) GetChannels(ctx context.Context) ([][]byte, error) {
 	var (
 		raws   []fdb.KeyValue
+		out    [][]byte
 		pre, _ = fdb.PrefixRange(db.fmtChannelPrefix())
 	)
 
@@ -68,12 +71,18 @@ func (db *DB) GetChannels() ([]fdb.KeyValue, error) {
 		return nil, xerrors.Errorf("failed to read channels: %w", err)
 	}
 
-	return raws, err
+	out = make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, err
 }
 
-func (db *DB) GetGuildChannels(guild int64) ([]fdb.KeyValue, error) {
+func (db *DB) GetGuildChannels(ctx context.Context, guild int64) ([][]byte, error) {
 	var (
 		raws   []fdb.KeyValue
+		out    [][]byte
 		pre, _ = fdb.PrefixRange(db.fmtGuildChannelPrefix(guild))
 	)
 
@@ -85,10 +94,15 @@ func (db *DB) GetGuildChannels(guild int64) ([]fdb.KeyValue, error) {
 		return nil, xerrors.Errorf("failed to read channels: %w", err)
 	}
 
-	return raws, err
+	out = make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, err
 }
 
-func (db *DB) DeleteChannel(guild, id int64) error {
+func (db *DB) DeleteChannel(ctx context.Context, guild, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtChannelKey(id))
 		t.Clear(db.fmtGuildChannelKey(guild, id))
@@ -96,13 +110,13 @@ func (db *DB) DeleteChannel(guild, id int64) error {
 	})
 }
 
-func (db *DB) SetChannels(guild int64, channels map[int64][]byte) error {
+func (db *DB) SetChannels(ctx context.Context, guild int64, channels map[int64][]byte) error {
 	return db.setETFs(channels, db.fmtChannelKey)
 }
 
 // this will leak channels in the main pool.
 // TODO: fix
-func (db *DB) DeleteChannels(guild int64) error {
+func (db *DB) DeleteChannels(ctx context.Context, guild int64) error {
 	gRange, _ := fdb.PrefixRange(db.fmtGuildChannelPrefix(guild))
 
 	return db.Transact(func(t fdb.Transaction) error {
@@ -111,7 +125,7 @@ func (db *DB) DeleteChannels(guild int64) error {
 	})
 }
 
-func (db *DB) SetVoiceState(guild, user int64, raw []byte) error {
+func (db *DB) SetVoiceState(ctx context.Context, guild, user int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildVoiceStateKey(guild, user), raw)
 		return nil

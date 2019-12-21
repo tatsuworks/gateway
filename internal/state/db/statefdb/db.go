@@ -5,6 +5,8 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"golang.org/x/xerrors"
+
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 type DB struct {
@@ -12,7 +14,7 @@ type DB struct {
 	subs *Subspaces
 }
 
-func NewDB() (*DB, error) {
+func NewDB() (state.DB, error) {
 	fdb.MustAPIVersion(610)
 	db := fdb.MustOpenDefault()
 

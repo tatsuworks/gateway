@@ -18,10 +18,6 @@ func NewDB(psql *sql.DB) (state.DB, error) {
 	return &db{sqlx}, nil
 }
 
-type DataRow struct {
-	Data RawJSON `db:"data"`
-}
-
 type RawJSON []byte
 
 func (r RawJSON) Value() (driver.Value, error) {

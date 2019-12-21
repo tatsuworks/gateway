@@ -88,7 +88,7 @@ func (db *DB) GetGuildChannels(guild int64) ([]fdb.KeyValue, error) {
 	return raws, err
 }
 
-func (db *DB) DeleteChannel(guild, id int64, raw []byte) error {
+func (db *DB) DeleteChannel(guild, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtChannelKey(id))
 		t.Clear(db.fmtGuildChannelKey(guild, id))

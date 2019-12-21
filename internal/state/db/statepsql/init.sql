@@ -1,5 +1,6 @@
 CREATE TABLE channels (
 	"id" int8 NOT NULL,
+	"guild_id" int8 NOT NULL,
 	"data" jsonb NOT NULL,
 	PRIMARY KEY("id")
 );

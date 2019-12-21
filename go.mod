@@ -3,7 +3,7 @@ module github.com/tatsuworks/gateway
 go 1.13
 
 require (
-	cdr.dev/slog v1.0.0
+	cdr.dev/slog v1.3.0
 	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
 	github.com/coadler/played v0.0.0-20191101212905-60ec1a7e488d
 	github.com/coreos/bbolt v1.3.3 // indirect
@@ -23,9 +23,9 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.2.0
+	github.com/lib/pq v1.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0 // indirect
-	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
 	github.com/soheilhy/cmux v0.1.4 // indirect
 	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
@@ -33,12 +33,10 @@ require (
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/net v0.0.0-20190926025831-c00fd9afed17
+	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20190926180325-855e68c8590b // indirect
-	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
-	google.golang.org/genproto v0.0.0-20190926190326-7ee9db18f195 // indirect
-	google.golang.org/grpc v1.24.0
+	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+	google.golang.org/grpc v1.25.1
 	nhooyr.io/websocket v1.7.3
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

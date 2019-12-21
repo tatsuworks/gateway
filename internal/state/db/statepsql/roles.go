@@ -14,7 +14,7 @@ func (db *db) SetGuildRoles(ctx context.Context, guild int64, roles map[int64][]
 	return nil
 }
 
-func (db *db) GetGuildRoles(ctx context.Context, guild int64) ([]map[int64][]byte, error) {
+func (db *db) GetGuildRoles(ctx context.Context, guild int64) ([][]byte, error) {
 	return nil, nil
 }
 

@@ -18,7 +18,7 @@ func (db *db) GetGuildMember(ctx context.Context, guild, user int64) ([]byte, er
 	return nil, nil
 }
 
-func (db *db) GetGuildMembers(ctx context.Context, guild int64) ([]map[int64][]byte, error) {
+func (db *db) GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error) {
 	return nil, nil
 }
 

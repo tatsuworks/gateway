@@ -18,9 +18,10 @@ CREATE TABLE voice_states (
 );
 
 CREATE TABLE members (
-	"id" int8 NOT NULL,
+	"guild_id" int8 NOT NULL,
+	"user_id" int8 NOT NULL,
 	"data" jsonb NOT NULL,
-	PRIMARY KEY("id")
+	PRIMARY KEY("guild_id", "user_id")
 );
 
 CREATE TABLE messages (

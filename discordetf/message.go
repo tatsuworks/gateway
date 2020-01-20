@@ -19,13 +19,13 @@ func DecodeMessage(buf []byte) (*Message, error) {
 
 	m.Id, m.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read id: %w", err)
+		return nil, xerrors.Errorf("read id: %w", err)
 	}
 
 	d.reset()
 	m.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read channel id: %w", err)
+		return nil, xerrors.Errorf("read channel id: %w", err)
 	}
 
 	return m, nil
@@ -48,30 +48,30 @@ func DecodeMessageReaction(buf []byte) (*MessageReaction, error) {
 
 	mr.Message, err = d.idFromMap("message_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read message id: %w", err)
+		return nil, xerrors.Errorf("read message id: %w", err)
 	}
 	d.reset()
 
 	mr.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read channel id: %w", err)
+		return nil, xerrors.Errorf("read channel id: %w", err)
 	}
 	d.reset()
 
 	mr.User, err = d.idFromMap("user_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read user id: %w", err)
+		return nil, xerrors.Errorf("read user id: %w", err)
 	}
 	d.reset()
 
 	err = d.readUntilKey("emoji")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read until emoji: %w", err)
+		return nil, xerrors.Errorf("read until emoji: %w", err)
 	}
 
 	mr.Name, err = d.readEmojiID()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read emoji id: %w", err)
+		return nil, xerrors.Errorf("read emoji id: %w", err)
 	}
 
 	mr.Raw = buf
@@ -94,19 +94,19 @@ func DecodeMessageReactionRemoveAll(buf []byte) (*MessageReactionRemoveAll, erro
 
 	mr.Message, err = d.idFromMap("message_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read message id: %w", err)
+		return nil, xerrors.Errorf("read message id: %w", err)
 	}
 	d.reset()
 
 	mr.Channel, err = d.idFromMap("channel_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read channel id: %w", err)
+		return nil, xerrors.Errorf("read channel id: %w", err)
 	}
 	d.reset()
 
 	mr.User, err = d.idFromMap("user_id")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read user id: %w", err)
+		return nil, xerrors.Errorf("read user id: %w", err)
 	}
 
 	return mr, nil

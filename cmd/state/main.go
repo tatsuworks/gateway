@@ -45,14 +45,14 @@ func main() {
 	}
 
 	if err := agent.Listen(agent.Options{}); err != nil {
-		logger.Fatal("failed to create gops agent", zap.Error(err))
+		logger.Fatal("create gops agent", zap.Error(err))
 	}
 
 	state, err := api.NewServer(logger, Version)
 	if err != nil {
-		logger.Panic("failed to create state", zap.Error(err))
+		logger.Panic("create state", zap.Error(err))
 	}
 
 	state.Init()
-	logger.Fatal("failed to run server", zap.Error(state.Start(addr)))
+	logger.Fatal("run server", zap.Error(state.Start(addr)))
 }

@@ -10,12 +10,12 @@ import (
 func (s *Session) readHello() error {
 	err := s.readMessage()
 	if err != nil {
-		return xerrors.Errorf("failed to read message: %w", err)
+		return xerrors.Errorf("read message: %w", err)
 	}
 
 	interval, trace, err := discordetf.DecodeHello(s.buf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to decode hello message: %w", err)
+		return xerrors.Errorf("decode hello message: %w", err)
 	}
 
 	s.interval = time.Duration(interval) * time.Millisecond

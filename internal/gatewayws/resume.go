@@ -21,7 +21,7 @@ type resume struct {
 func (s *Session) writeResume() error {
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
-		return xerrors.Errorf("failed to get writer: %w", err)
+		return xerrors.Errorf("get writer: %w", err)
 	}
 
 	err = s.resumePayload()
@@ -31,11 +31,11 @@ func (s *Session) writeResume() error {
 
 	_, err = w.Write(s.buf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to write identify payload: %w", err)
+		return xerrors.Errorf("write identify payload: %w", err)
 	}
 
 	if err := w.Close(); err != nil {
-		return xerrors.Errorf("failed to close identify writer: %w", err)
+		return xerrors.Errorf("close identify writer: %w", err)
 	}
 
 	return nil
@@ -54,7 +54,7 @@ func (s *Session) resumePayload() error {
 		},
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to marshal resume payload: %w", err)
+		return xerrors.Errorf("marshal resume payload: %w", err)
 	}
 
 	return nil

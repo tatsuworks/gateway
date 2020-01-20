@@ -13,13 +13,13 @@ func main() {
 
 	conn, err := grpc.Dial("127.0.0.1:8000", grpc.WithInsecure())
 	if err != nil {
-		logger.Fatal("failed to connect", zap.Error(err))
+		logger.Fatal("connect", zap.Error(err))
 	}
 
 	cli := gatewaypb.NewGatewayClient(conn)
 
 	_, err = cli.RestartShard(context.Background(), &gatewaypb.RestartShardRequest{Shard: 1})
 	if err != nil {
-		logger.Fatal("failed to send request", zap.Error(err))
+		logger.Fatal("send request", zap.Error(err))
 	}
 }

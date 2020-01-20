@@ -45,7 +45,7 @@ func New(
 
 	_, err := rc.Ping().Result()
 	if err != nil {
-		logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
+		logger.Fatal(ctx, "ping redis", slog.Error(err))
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{
@@ -53,7 +53,7 @@ func New(
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
+		logger.Fatal(ctx, "connect to etcd", slog.Error(err))
 	}
 
 	return &Manager{
@@ -90,7 +90,7 @@ func (m *Manager) Start(start, stop int) error {
 func (m *Manager) startShard(shard int) {
 	s, err := gatewayws.NewSession(m.log, m.wg, m.rdb, m.etcd, m.token, shard, m.shardCount)
 	if err != nil {
-		m.log.Error(m.ctx, "failed to make gateway session", slog.Error(err))
+		m.log.Error(m.ctx, "make gateway session", slog.Error(err))
 		return
 	}
 

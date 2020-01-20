@@ -60,7 +60,7 @@ func main() {
 
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		logger.Fatal(ctx, "failed to listen", slog.Error(err))
+		logger.Fatal(ctx, "listen", slog.Error(err))
 	}
 
 	wg := &sync.WaitGroup{}
@@ -76,7 +76,7 @@ func main() {
 
 	err = m.Start(start, stop)
 	if err != nil {
-		logger.Fatal(ctx, "failed to start shard manager", slog.Error(err))
+		logger.Fatal(ctx, "start shard manager", slog.Error(err))
 	}
 
 	go func() {

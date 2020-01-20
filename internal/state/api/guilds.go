@@ -11,7 +11,7 @@ import (
 func (s *Server) getGuild(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	g, err := s.db.GetGuild(guildParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read guild: %w", err)
+		return xerrors.Errorf("read guild: %w", err)
 	}
 
 	if g == nil {

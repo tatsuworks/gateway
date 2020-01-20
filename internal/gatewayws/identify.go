@@ -37,21 +37,21 @@ type props struct {
 func (s *Session) writeIdentify() error {
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
-		return xerrors.Errorf("failed to get writer: %w", err)
+		return xerrors.Errorf("get writer: %w", err)
 	}
 
 	err = s.identifyPayload()
 	if err != nil {
-		return xerrors.Errorf("failed to make identify payload: %w", err)
+		return xerrors.Errorf("make identify payload: %w", err)
 	}
 
 	_, err = w.Write(s.buf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to write identify payload: %w", err)
+		return xerrors.Errorf("write identify payload: %w", err)
 	}
 
 	if err := w.Close(); err != nil {
-		return xerrors.Errorf("failed to close identify writer: %w", err)
+		return xerrors.Errorf("close identify writer: %w", err)
 	}
 
 	return nil
@@ -77,7 +77,7 @@ func (s *Session) identifyPayload() error {
 		},
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to write identify payload: %w", err)
+		return xerrors.Errorf("write identify payload: %w", err)
 	}
 
 	return nil
@@ -107,7 +107,7 @@ func (s *Session) requestGuildMembers(guild int64) error {
 		},
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to encode guild member request: %w", err)
+		return xerrors.Errorf("encode guild member request: %w", err)
 	}
 
 	return s.writeBuf(buf)
@@ -116,16 +116,16 @@ func (s *Session) requestGuildMembers(guild int64) error {
 func (s *Session) writeBuf(buf *bytes.Buffer) error {
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
-		return xerrors.Errorf("failed to get writer: %w", err)
+		return xerrors.Errorf("get writer: %w", err)
 	}
 
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to write payload: %w", err)
+		return xerrors.Errorf("write payload: %w", err)
 	}
 
 	if err := w.Close(); err != nil {
-		return xerrors.Errorf("failed to close writer: %w", err)
+		return xerrors.Errorf("close writer: %w", err)
 	}
 
 	return nil
@@ -178,13 +178,13 @@ func (s *Session) rotateStatuses() {
 				},
 			})
 			if err != nil {
-				s.log.Error(s.ctx, "failed to encode status update", slog.Error(err))
+				s.log.Error(s.ctx, "encode status update", slog.Error(err))
 				return
 			}
 
 			err = s.writeBuf(buf)
 			if err != nil {
-				s.log.Error(s.ctx, "failed to write status update", slog.Error(err))
+				s.log.Error(s.ctx, "write status update", slog.Error(err))
 			}
 
 			time.Sleep(time.Minute)

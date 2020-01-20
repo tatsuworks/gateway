@@ -74,7 +74,7 @@ func NewSession(
 ) (*Session, error) {
 	c, err := handler.NewClient()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create state handler: %w", err)
+		return nil, xerrors.Errorf("create state handler: %w", err)
 	}
 
 	sess := &Session{
@@ -102,7 +102,7 @@ func NewSession(
 func (s *Session) initEtcd() error {
 	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(20))
 	if err != nil {
-		return xerrors.Errorf("failed to get etcd session: %w", err)
+		return xerrors.Errorf("get etcd session: %w", err)
 	}
 
 	s.etcdSess = sess
@@ -123,7 +123,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 	played, err := played.NewClient(s.ctx, playedAddr)
 	if err != nil {
-		return xerrors.Errorf("failed to connect to played: %w", err)
+		return xerrors.Errorf("connect to played: %w", err)
 	}
 	s.played = played
 
@@ -139,7 +139,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		s.log.Debug(s.ctx, "acquiring lock, no ability to resume")
 		err = s.acquireIdentifyLock()
 		if err != nil {
-			return xerrors.Errorf("failed to grab identify lock: %w", err)
+			return xerrors.Errorf("grab identify lock: %w", err)
 		}
 		s.log.Debug(s.ctx, "lock acquired")
 
@@ -149,35 +149,35 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
 	if err != nil {
-		return xerrors.Errorf("failed to initialize zlib: %w", err)
+		return xerrors.Errorf("initialize zlib: %w", err)
 	}
 	s.zr = r
 	defer r.Close()
 
 	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)
 	if err != nil {
-		return xerrors.Errorf("failed to dial gateway: %w", err)
+		return xerrors.Errorf("dial gateway: %w", err)
 	}
 	s.wsConn = c
 	s.wsConn.SetReadLimit(512 << 20)
 
 	err = s.readHello()
 	if err != nil {
-		return xerrors.Errorf("failed to handle hello message: %w", err)
+		return xerrors.Errorf("handle hello message: %w", err)
 	}
 
 	if s.shouldResume() {
 		s.log.Info(s.ctx, "sending resume")
 		err := s.writeResume()
 		if err != nil {
-			return xerrors.Errorf("failed to send resume: %w", err)
+			return xerrors.Errorf("send resume: %w", err)
 		}
 	} else {
 		s.last = 0
 		s.log.Info(s.ctx, "sending identify")
 		err := s.writeIdentify()
 		if err != nil {
-			return xerrors.Errorf("failed to send identify: %w", err)
+			return xerrors.Errorf("send identify: %w", err)
 		}
 	}
 
@@ -200,14 +200,14 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 				}
 			}
 
-			err = xerrors.Errorf("failed to read message: %w", err)
+			err = xerrors.Errorf("read message: %w", err)
 			break
 		}
 
 		var ev *discordetf.Event
 		ev, err = discordetf.DecodeT(s.buf.Bytes())
 		if err != nil {
-			err = xerrors.Errorf("failed to decode event: %w", err)
+			err = xerrors.Errorf("decode event: %w", err)
 			break
 		}
 
@@ -226,7 +226,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		if ev.T == "PRESENCE_UPDATE" {
 			err := s.played.WritePresence(s.ctx, ev.D)
 			if err != nil {
-				s.log.Error(s.ctx, "failed to send played event", slog.Error(err))
+				s.log.Error(s.ctx, "send played event", slog.Error(err))
 			}
 			continue
 		}
@@ -235,20 +235,20 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		var requestMembers int64
 		requestMembers, err = s.state.HandleEvent(ev)
 		if err != nil {
-			s.log.Error(s.ctx, "failed to handle state event", slog.Error(err))
+			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
 		err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
-			s.log.Error(s.ctx, "failed to push event to redis", slog.Error(err))
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 		}
 
 		if requestMembers != 0 {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", requestMembers))
 			err := s.requestGuildMembers(requestMembers)
 			if err != nil {
-				s.log.Error(s.ctx, "failed to request guild members", slog.Error(err))
+				s.log.Error(s.ctx, "request guild members", slog.Error(err))
 			}
 		}
 	}
@@ -262,14 +262,14 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 func (s *Session) persistSeq() {
 	err := s.rc.Set(s.fmtSeqKey(), s.seq, 0).Err()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error(s.ctx, "failed to save seq", slog.Error(err))
+		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSeq() {
 	sess, err := s.rc.Get(s.fmtSeqKey()).Result()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error(s.ctx, "failed to load session id", slog.Error(err))
+		s.log.Error(s.ctx, "load session id", slog.Error(err))
 	}
 
 	if sess == "" {
@@ -278,21 +278,21 @@ func (s *Session) loadSeq() {
 
 	s.seq, err = strconv.ParseInt(sess, 10, 64)
 	if err != nil {
-		s.log.Error(s.ctx, "failed to parse session id", slog.Error(err))
+		s.log.Error(s.ctx, "parse session id", slog.Error(err))
 	}
 }
 
 func (s *Session) persistSessID() {
 	err := s.rc.Set(s.fmtSessIDKey(), s.sessID, 0).Err()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error(s.ctx, "failed to save seq", slog.Error(err))
+		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSessID() {
 	sess, err := s.rc.Get(s.fmtSessIDKey()).Result()
 	if err != nil && !xerrors.Is(err, redis.Nil) {
-		s.log.Error(s.ctx, "failed to load session id", slog.Error(err))
+		s.log.Error(s.ctx, "load session id", slog.Error(err))
 	}
 
 	s.sessID = sess
@@ -311,7 +311,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 	case 1:
 		err := s.heartbeat()
 		if err != nil {
-			return true, xerrors.Errorf("failed to heartbeat in response to op 1: %w", err)
+			return true, xerrors.Errorf("heartbeat in response to op 1: %w", err)
 		}
 
 	// RESUME
@@ -337,7 +337,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
 			err := s.releaseIdentifyLock()
 			if err != nil {
-				s.log.Error(s.ctx, "failed to release held identify lock after invalid session", slog.Error(err))
+				s.log.Error(s.ctx, "release held identify lock after invalid session", slog.Error(err))
 			}
 		}
 
@@ -353,7 +353,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 	case "READY":
 		_, sess, err := discordetf.DecodeReady(ev.D)
 		if err != nil {
-			return true, xerrors.Errorf("failed to decode ready: %w", err)
+			return true, xerrors.Errorf("decode ready: %w", err)
 		}
 
 		s.sessID = sess
@@ -364,7 +364,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 			time.Sleep(15 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
-				s.log.Error(s.ctx, "failed to release identify lock after ready", slog.Error(err))
+				s.log.Error(s.ctx, "release identify lock after ready", slog.Error(err))
 			}
 		}()
 
@@ -380,7 +380,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 func (s *Session) acquireIdentifyLock() error {
 	err := s.identifyMu.Lock(s.ctx)
 	if err != nil {
-		return xerrors.Errorf("failed to acquire identify lock: %w", err)
+		return xerrors.Errorf("acquire identify lock: %w", err)
 	}
 
 	return nil
@@ -389,7 +389,7 @@ func (s *Session) acquireIdentifyLock() error {
 func (s *Session) releaseIdentifyLock() error {
 	err := s.identifyMu.Unlock(s.ctx)
 	if err != nil {
-		return xerrors.Errorf("failed to release identify lock: %w", err)
+		return xerrors.Errorf("release identify lock: %w", err)
 	}
 
 	return nil

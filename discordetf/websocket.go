@@ -13,19 +13,19 @@ func DecodeHello(buf []byte) (int, string, error) {
 
 	err := d.readUntilData()
 	if err != nil {
-		return 0, "", xerrors.Errorf("failed to read until data: %w", err)
+		return 0, "", xerrors.Errorf("read until data: %w", err)
 	}
 
 	err = d.checkByte(ettMap)
 	if err != nil {
-		return 0, "", xerrors.Errorf("failed to verify map byte: %w", err)
+		return 0, "", xerrors.Errorf("verify map byte: %w", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, "", xerrors.Errorf("failed to read map key: %w", err)
+			return 0, "", xerrors.Errorf("read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -33,7 +33,7 @@ func DecodeHello(buf []byte) (int, string, error) {
 		case "_trace":
 			err := d.checkByte(ettList)
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to verify _trace byte: %w", err)
+				return 0, "", xerrors.Errorf("verify _trace byte: %w", err)
 			}
 
 			l := d.readListLen()
@@ -43,7 +43,7 @@ func DecodeHello(buf []byte) (int, string, error) {
 
 			a, err := d.readAtomWithTag()
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to read _trace: %w", err)
+				return 0, "", xerrors.Errorf("read _trace: %w", err)
 			}
 
 			trace = string(d.buf[d.off-a : d.off])
@@ -52,7 +52,7 @@ func DecodeHello(buf []byte) (int, string, error) {
 		case "heartbeat_interval":
 			interval, err = d.readIntWithTagIntoInt()
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to read heartbeat_interval: %w", err)
+				return 0, "", xerrors.Errorf("read heartbeat_interval: %w", err)
 			}
 		default:
 			return 0, "", xerrors.Errorf("unknown key found in hello event: %w", err)
@@ -72,14 +72,14 @@ func DecodeReady(buf []byte) (int, string, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, "", xerrors.Errorf("failed to verify map byte: %s", err)
+		return 0, "", xerrors.Errorf("verify map byte: %s", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, "", xerrors.Errorf("failed to read map key: %s", err)
+			return 0, "", xerrors.Errorf("read map key: %s", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -87,13 +87,13 @@ func DecodeReady(buf []byte) (int, string, error) {
 		case "v":
 			v, err = d.readIntWithTagIntoInt()
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to read version: %s", err)
+				return 0, "", xerrors.Errorf("read version: %s", err)
 			}
 
 		case "session_id":
 			a, err := d.readAtomWithTag()
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to read session_id: %s", err)
+				return 0, "", xerrors.Errorf("read session_id: %s", err)
 			}
 
 			sessID = string(d.buf[d.off-a : d.off])
@@ -101,7 +101,7 @@ func DecodeReady(buf []byte) (int, string, error) {
 		default:
 			err := d.readTerm()
 			if err != nil {
-				return 0, "", xerrors.Errorf("failed to read ready field %s: %w", key, err)
+				return 0, "", xerrors.Errorf("read ready field %s: %w", key, err)
 			}
 		}
 

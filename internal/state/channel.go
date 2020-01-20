@@ -65,7 +65,7 @@ func (db *DB) GetChannels() ([]fdb.KeyValue, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read channels: %w", err)
+		return nil, xerrors.Errorf("read channels: %w", err)
 	}
 
 	return raws, err
@@ -82,7 +82,7 @@ func (db *DB) GetGuildChannels(guild int64) ([]fdb.KeyValue, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read channels: %w", err)
+		return nil, xerrors.Errorf("read channels: %w", err)
 	}
 
 	return raws, err

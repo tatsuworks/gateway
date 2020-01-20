@@ -11,7 +11,7 @@ import (
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	m, err := s.db.GetGuildMember(guildParam(p), memberParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read member: %w", err)
+		return xerrors.Errorf("read member: %w", err)
 	}
 
 	if m == nil {
@@ -28,7 +28,7 @@ func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 
 	ms, err := s.db.GetGuildMembers(guildParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read members: %w", err)
+		return xerrors.Errorf("read members: %w", err)
 	}
 
 	return writeTerms(w, ms)
@@ -44,12 +44,12 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 	for i, e := range ms {
 		mr, err := strconv.ParseInt(e, 10, 64)
 		if err != nil {
-			return xerrors.Errorf("failed to parse member id: %w", err)
+			return xerrors.Errorf("parse member id: %w", err)
 		}
 
 		mrs[i], err = s.db.GetGuildMember(g, mr)
 		if err != nil {
-			return xerrors.Errorf("failed to get member: %w", err)
+			return xerrors.Errorf("get member: %w", err)
 		}
 	}
 

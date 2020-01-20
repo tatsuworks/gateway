@@ -25,18 +25,18 @@ func (s *Session) heartbeat() error {
 		Data: atomic.LoadInt64(&s.seq),
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to write heartbeat: %w", err)
+		return xerrors.Errorf("write heartbeat: %w", err)
 	}
 
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
-		return xerrors.Errorf("failed to get heartbeat writer: %w", err)
+		return xerrors.Errorf("get heartbeat writer: %w", err)
 	}
 	defer w.Close()
 
 	_, err = w.Write(s.hbuf.Bytes())
 	if err != nil {
-		return xerrors.Errorf("failed to copy heartbeat: %w", err)
+		return xerrors.Errorf("copy heartbeat: %w", err)
 	}
 
 	return nil
@@ -67,7 +67,7 @@ func (s *Session) sendHeartbeats() {
 
 		err := s.heartbeat()
 		if err != nil {
-			s.log.Error(s.ctx, "failed to send heartbeat", slog.Error(err))
+			s.log.Error(s.ctx, "send heartbeat", slog.Error(err))
 			cancel()
 			return
 		}

@@ -17,14 +17,14 @@ func DecodeMemberChunk(buf []byte) (*MemberChunk, error) {
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to verify map byte: %w", err)
+		return nil, xerrors.Errorf("verify map byte: %w", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return nil, xerrors.Errorf("failed to read map key: %w", err)
+			return nil, xerrors.Errorf("read map key: %w", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -32,13 +32,13 @@ func DecodeMemberChunk(buf []byte) (*MemberChunk, error) {
 		case "guild_id":
 			mc.Guild, err = d.readSmallBigWithTagToInt64()
 			if err != nil {
-				return nil, xerrors.Errorf("failed to extract guild_id from map: %w", err)
+				return nil, xerrors.Errorf("extract guild_id from map: %w", err)
 			}
 
 		case "members":
 			mc.Members, err = d.readListIntoMapByID()
 			if err != nil {
-				return nil, xerrors.Errorf("failed to extract members list from maplenbytes: %w", err)
+				return nil, xerrors.Errorf("extract members list from maplenbytes: %w", err)
 			}
 
 		default:
@@ -65,13 +65,13 @@ func DecodeMember(buf []byte) (*Member, error) {
 
 	m.Id, m.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read id: %w", err)
+		return nil, xerrors.Errorf("read id: %w", err)
 	}
 
 	d.reset()
 	m.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read guild id: %w", err)
+		return nil, xerrors.Errorf("read guild id: %w", err)
 	}
 
 	return m, err
@@ -92,13 +92,13 @@ func DecodePresence(buf []byte) (*Presence, error) {
 
 	p.Id, p.Raw, err = d.readMapWithIDIntoSlice()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read id: %w", err)
+		return nil, xerrors.Errorf("read id: %w", err)
 	}
 
 	d.reset()
 	p.Guild, err = d.guildIDFromMap()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read guild id: %w", err)
+		return nil, xerrors.Errorf("read guild id: %w", err)
 	}
 
 	return p, err
@@ -118,14 +118,14 @@ func DecodePlayedPresence(buf []byte) (*PlayedPresence, error) {
 
 	err = d.checkByte(ettMap)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to check starting byte: %w", err)
+		return nil, xerrors.Errorf("check starting byte: %w", err)
 	}
 
 	left := d.readMapLen()
 	for ; left > 0; left-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return nil, xerrors.Errorf("failed to read map key: %w", err)
+			return nil, xerrors.Errorf("read map key: %w", err)
 		}
 		key := string(d.buf[d.off-l : d.off])
 
@@ -133,7 +133,7 @@ func DecodePlayedPresence(buf []byte) (*PlayedPresence, error) {
 		case "user":
 			p.UserID, err = d.idFromMap("id")
 			if err != nil {
-				return nil, xerrors.Errorf("failed to extract user id: %w", err)
+				return nil, xerrors.Errorf("extract user id: %w", err)
 			}
 
 			continue
@@ -141,7 +141,7 @@ func DecodePlayedPresence(buf []byte) (*PlayedPresence, error) {
 		case "game":
 			p.Game, err = d.stringFromMap("name")
 			if err != nil {
-				return nil, xerrors.Errorf("failed to extract game name: %w", err)
+				return nil, xerrors.Errorf("extract game name: %w", err)
 			}
 
 			continue
@@ -149,7 +149,7 @@ func DecodePlayedPresence(buf []byte) (*PlayedPresence, error) {
 
 		err = d.readTerm()
 		if err != nil {
-			return nil, xerrors.Errorf("failed to read term: %w", err)
+			return nil, xerrors.Errorf("read term: %w", err)
 		}
 	}
 

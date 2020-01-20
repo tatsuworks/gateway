@@ -369,7 +369,7 @@ func (d *decoder) stringFromMap(name string) (string, error) {
 		d.inc(-1)
 		d.readAtomWithTag()
 		return "", nil
-		// return "", xerrors.Errorf("failed to verify map byte: %w", err)
+		// return "", xerrors.Errorf("verify map byte: %w", err)
 	}
 
 	left := d.readMapLen()

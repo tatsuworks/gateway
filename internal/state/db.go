@@ -18,7 +18,7 @@ func NewDB() (*DB, error) {
 
 	dir, err := directory.CreateOrOpen(db, []string{"state"}, nil)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create fdb directory: %w", err)
+		return nil, xerrors.Errorf("create fdb directory: %w", err)
 	}
 
 	return &DB{
@@ -33,7 +33,7 @@ func (db *DB) Transact(fn func(t fdb.Transaction) error) error {
 		return nil, fn(t)
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to commit fdb txn: %w", err)
+		return xerrors.Errorf("commit fdb txn: %w", err)
 
 	}
 
@@ -46,7 +46,7 @@ func (db *DB) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
 		return nil, fn(t)
 	})
 	if err != nil {
-		return xerrors.Errorf("failed to commit fdb read txn: %w", err)
+		return xerrors.Errorf("commit fdb read txn: %w", err)
 	}
 
 	return nil

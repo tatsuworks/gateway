@@ -8,15 +8,15 @@ import (
 
 func main() {
 	db, err := state.NewDB()
-	must(err, "failed to init db")
+	must(err, "init db")
 
 	gCount, err := db.GetGuildCount()
-	must(err, "failed to get guild count")
+	must(err, "get guild count")
 
 	fmt.Println("Guild count:", gCount)
 
 	cCount, err := db.GetChannelCount()
-	must(err, "failed to get channel count")
+	must(err, "get channel count")
 
 	fmt.Println("Channel count:", cCount)
 }

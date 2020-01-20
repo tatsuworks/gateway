@@ -11,7 +11,7 @@ import (
 func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	m, err := s.db.GetChannelMessage(channelParam(p), messageParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to transact message: %w", err)
+		return xerrors.Errorf("transact message: %w", err)
 	}
 
 	if m == nil {

@@ -14,7 +14,7 @@ type ErrUnknownTerm struct {
 }
 
 var (
-	ErrFloatScan = fmt.Errorf("read: failed to sscanf float")
+	ErrFloatScan = fmt.Errorf("read: sscanf float")
 	be           = binary.BigEndian
 	bTrue        = []byte("true")
 	bFalse       = []byte("false")

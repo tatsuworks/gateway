@@ -11,7 +11,7 @@ import (
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	ro, err := s.db.GetGuildRole(guildParam(p), roleParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read role: %w", err)
+		return xerrors.Errorf("read role: %w", err)
 	}
 
 	if ro == nil {
@@ -28,7 +28,7 @@ func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprou
 
 	ros, err := s.db.GetGuildRoles(guildParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read roles: %w", err)
+		return xerrors.Errorf("read roles: %w", err)
 	}
 
 	return writeTerms(w, ros)
@@ -44,12 +44,12 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 	for i, e := range rs {
 		rr, err := strconv.ParseInt(e, 10, 64)
 		if err != nil {
-			return xerrors.Errorf("failed to parse role id: %w", err)
+			return xerrors.Errorf("parse role id: %w", err)
 		}
 
 		ros[i], err = s.db.GetGuildRole(g, rr)
 		if err != nil {
-			return xerrors.Errorf("failed to get role: %w", err)
+			return xerrors.Errorf("get role: %w", err)
 		}
 	}
 

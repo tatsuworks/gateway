@@ -14,7 +14,7 @@ import (
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	c, err := s.db.GetChannel(channelParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read channel: %w", err)
+		return xerrors.Errorf("read channel: %w", err)
 	}
 
 	if c == nil {
@@ -37,7 +37,7 @@ func channelParam(p httprouter.Params) int64 {
 func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	cs, err := s.db.GetChannels()
 	if err != nil {
-		return xerrors.Errorf("failed to read channels: %w", err)
+		return xerrors.Errorf("read channels: %w", err)
 	}
 
 	return writeTerms(w, cs)
@@ -46,7 +46,7 @@ func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httproute
 func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	cs, err := s.db.GetGuildChannels(guildParam(p))
 	if err != nil {
-		return xerrors.Errorf("failed to read guild channels: %w", err)
+		return xerrors.Errorf("read guild channels: %w", err)
 	}
 
 	return writeTerms(w, cs)
@@ -67,13 +67,13 @@ func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
 	for _, e := range raws {
 		_, err := w.Write(e.Value)
 		if err != nil {
-			return xerrors.Errorf("failed to write term: %w", err)
+			return xerrors.Errorf("write term: %w", err)
 		}
 	}
 
 	_, err := w.Write([]byte{ettNil})
 	if err != nil {
-		return xerrors.Errorf("failed to write ending nil: %w", err)
+		return xerrors.Errorf("write ending nil: %w", err)
 	}
 
 	return nil
@@ -87,13 +87,13 @@ func writeTermsRaw(w io.Writer, raws [][]byte) error {
 	for _, e := range raws {
 		_, err := w.Write(e)
 		if err != nil {
-			return xerrors.Errorf("failed to write term: %w", err)
+			return xerrors.Errorf("write term: %w", err)
 		}
 	}
 
 	_, err := w.Write([]byte{ettNil})
 	if err != nil {
-		return xerrors.Errorf("failed to write ending nil: %w", err)
+		return xerrors.Errorf("write ending nil: %w", err)
 	}
 
 	return nil
@@ -115,7 +115,7 @@ func writeSliceHeader(w io.Writer, len int) error {
 
 	_, err := w.Write(h[:])
 	if err != nil {
-		return xerrors.Errorf("failed to write slice header: %w", err)
+		return xerrors.Errorf("write slice header: %w", err)
 	}
 
 	return nil
@@ -124,7 +124,7 @@ func writeSliceHeader(w io.Writer, len int) error {
 func writeETFHeader(w io.Writer) error {
 	_, err := w.Write([]byte{131})
 	if err != nil {
-		return xerrors.Errorf("failed to write etf starting byte: %w", err)
+		return xerrors.Errorf("write etf starting byte: %w", err)
 	}
 
 	return nil

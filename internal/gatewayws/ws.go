@@ -361,7 +361,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 		s.persistSessID()
 
 		go func() {
-			time.Sleep(5 * time.Second)
+			time.Sleep(15 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
 				s.log.Error(s.ctx, "failed to release identify lock after ready", slog.Error(err))

@@ -147,3 +147,15 @@ func (db *DB) fmtGuildVoiceStatePrefix(guild int64) fdb.Key {
 func (db *DB) fmtVoiceStatePrefix() fdb.Key {
 	return db.subs.VoiceStates.FDBKey()
 }
+
+func (db *DB) fmtGuildEmojiKey(guild int64, emoji int64) fdb.Key {
+	return db.subs.Emojis.Pack(tuple.Tuple{guild, emoji})
+}
+
+func (db *DB) fmtGuildEmojiPrefix(guild int64) fdb.Key {
+	return db.subs.Emojis.Pack(tuple.Tuple{guild})
+}
+
+func (db *DB) fmtEmojiPrefix(guild int64, emoji int64) fdb.Key {
+	return db.subs.Emojis.FDBKey()
+}

@@ -38,11 +38,10 @@ func DecodeMemberChunk(buf []byte) (*MemberChunk, error) {
 		case "members":
 			mc.Members, err = d.readListIntoMapByID()
 			if err != nil {
-				return nil, xerrors.Errorf("extract members list from maplenbytes: %w", err)
+				return nil, xerrors.Errorf("extract members list from map: %w", err)
 			}
 
 		default:
-			return nil, xerrors.Errorf("unknown key found in member chunk: %s", key)
 		}
 
 	}

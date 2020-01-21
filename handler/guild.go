@@ -25,7 +25,6 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 		}
 		return nil
 	})
-
 	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
 			err := c.db.SetGuildRoles(gc.Id, gc.Roles)
@@ -51,6 +50,15 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 				return xerrors.Errorf("set guild channels: %w", err)
 			}
 
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		if len(gc.Emojis) > 0 {
+			err := c.db.SetGuildEmojis(gc.Id, gc.Emojis)
+			if err != nil {
+				return xerrors.Errorf("set guild emojis: %w", err)
+			}
 		}
 		return nil
 	})

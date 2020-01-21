@@ -97,7 +97,17 @@ func (db *DB) DeleteChannel(guild, id int64, raw []byte) error {
 }
 
 func (db *DB) SetChannels(guild int64, channels map[int64][]byte) error {
-	return db.setETFs(channels, db.fmtChannelKey)
+	err := db.setETFs(channels, db.fmtChannelKey)
+	if err != nil {
+		return xerrors.Errorf("set channels: %w", err)
+	}
+
+	err = db.setGuildETFs(guild, channels, db.fmtGuildChannelKey)
+	if err != nil {
+		return xerrors.Errorf("set guild channels: %w", err)
+	}
+
+	return nil
 }
 
 // this will leak channels in the main pool.

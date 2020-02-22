@@ -9,46 +9,93 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/tatsuworks/gateway/gatewaypb"
-	"github.com/tatsuworks/gateway/internal/manager"
 	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
+	"github.com/tatsuworks/gateway/gatewaypb"
+	"github.com/tatsuworks/gateway/internal/gatewayws"
+	"github.com/tatsuworks/gateway/internal/manager"
+	"github.com/tatsuworks/gateway/internal/state"
+	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
+	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 var (
+	name       string
 	redisHost  string
 	etcdHost   string
 	playedHost string
 	pprof      string
-	prod       bool
+	prod       string
+	psql       bool
+	psqlAddr   string
 	addr       string
+	intents    string
 
 	shards, start, stop int
 )
 
 func init() {
+	flag.StringVar(&name, "name", "gateway", "name of gateway")
 	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
-	flag.StringVar(&playedHost, "played", "ws://localhost:8089", "Played")
+	flag.StringVar(&playedHost, "played", "", "Played")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
-	flag.BoolVar(&prod, "prod", false, "Enable production logging")
+	flag.StringVar(&prod, "prod", "", "Enable production logging")
+	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
+	flag.StringVar(&intents, "intents", "default", "default, played, all")
 
 	flag.IntVar(&shards, "shards", 1, "Total shards")
 	flag.IntVar(&start, "start", 0, "First shard to start (inclusive)")
 	flag.IntVar(&stop, "stop", 1, "Last shard (non-inclusive)")
 
 	flag.Parse()
+	psql = psqlAddr != ""
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := slogjson.Make(os.Stderr)
+	var logger slog.Logger
+
+	if prod != "" {
+		logger = slogjson.Make(os.Stderr)
+	} else {
+		logger = sloghuman.Make(os.Stderr)
+	}
 	defer logger.Sync()
+
+	var (
+		statedb state.DB
+		err     error
+	)
+	if psql {
+		statedb, err = statepsql.NewDB(ctx, psqlAddr)
+		if err != nil {
+			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
+		}
+	} else {
+		statedb, err = statefdb.NewDB()
+		if err != nil {
+			logger.Fatal(ctx, "failed to init fdb state", slog.Error(err))
+		}
+	}
+
+	var ints gatewayws.Intents
+	switch intents {
+	case "default":
+		ints = gatewayws.DefaultIntents
+	case "played":
+		ints = gatewayws.PresencesOnly
+	case "all":
+		ints = gatewayws.AllIntents
+	default:
+		logger.Fatal(ctx, "unknown intents", slog.F("intent", intents))
+	}
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
@@ -64,7 +111,18 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	m := manager.New(ctx, logger, wg, Token, shards, redisHost, etcdHost, playedHost)
+	m := manager.New(ctx, &manager.Config{
+		Name:       name,
+		Logger:     logger,
+		Wg:         wg,
+		DB:         statedb,
+		Token:      Token,
+		Shards:     shards,
+		Intents:    ints,
+		RedisAddr:  redisHost,
+		EtcdAddr:   etcdHost,
+		PlayedAddr: playedHost,
+	})
 
 	logger.Info(ctx, "starting manager",
 		slog.F("shards", shards),

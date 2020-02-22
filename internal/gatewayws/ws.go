@@ -3,6 +3,7 @@ package gatewayws
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -15,17 +16,18 @@ import (
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/go-redis/redis"
+	"golang.org/x/time/rate"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
 
 	"github.com/tatsuworks/czlib"
-	"github.com/tatsuworks/gateway/discordetf"
+	"github.com/tatsuworks/gateway/discord"
 	"github.com/tatsuworks/gateway/handler"
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 const (
 	IdentifyMutexRootName = "/gateway/identify/"
-	GatewayETF            = "wss://gateway.discord.gg/?v=6&encoding=etf&compress=zlib-stream"
 )
 
 type Session struct {
@@ -33,15 +35,18 @@ type Session struct {
 	cancel func()
 	wg     *sync.WaitGroup
 
-	log slog.Logger
+	name string
+	log  slog.Logger
 
-	token   string
-	shardID int
-	shards  int
+	token      string
+	intents    Intents
+	shardID    int
+	shardCount int
 
-	seq    int64
-	sessID string
-	last   int64
+	sentAuth bool
+	seq      int64
+	sessID   string
+	last     int64
 
 	wsConn *websocket.Conn
 	zr     io.ReadCloser
@@ -49,11 +54,15 @@ type Session struct {
 	interval time.Duration
 	trace    string
 
+	rl     *rate.Limiter
+	wch    chan *Op
+	prioch chan *Op
+
 	lastHB  time.Time
 	lastAck time.Time
 
-	buf  *bytes.Buffer
-	hbuf *bytes.Buffer
+	buf *bytes.Buffer
+	enc discord.Encoding
 
 	etcd       *clientv3.Client
 	etcdSess   *concurrency.Session
@@ -64,34 +73,44 @@ type Session struct {
 	played *played.Client
 }
 
-func NewSession(
-	logger slog.Logger,
-	wg *sync.WaitGroup,
-	rdb *redis.Client,
-	etcdCli *clientv3.Client,
-	token string,
-	shardID, shards int,
-) (*Session, error) {
-	c, err := handler.NewClient()
-	if err != nil {
-		return nil, xerrors.Errorf("create state handler: %w", err)
-	}
+func (s *Session) GatewayURL() string {
+	return "wss://gateway.discord.gg/?v=6&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+}
 
+type SessionConfig struct {
+	Name       string
+	Logger     slog.Logger
+	DB         state.DB
+	WorkGroup  *sync.WaitGroup
+	Redis      *redis.Client
+	Etcd       *clientv3.Client
+	Token      string
+	Intents    Intents
+	ShardID    int
+	ShardCount int
+}
+
+func NewSession(cfg *SessionConfig) (*Session, error) {
 	sess := &Session{
-		wg:      wg,
-		log:     logger.With(slog.F("shard", shardID)),
-		token:   token,
-		shardID: shardID,
-		shards:  shards,
+		name:       cfg.Name,
+		wg:         cfg.WorkGroup,
+		log:        cfg.Logger.With(slog.F("name", cfg.Name), slog.F("shard", cfg.ShardID)),
+		token:      cfg.Token,
+		shardID:    cfg.ShardID,
+		shardCount: cfg.ShardCount,
+		intents:    cfg.Intents,
 
 		// start with a 1kb buffer
-		buf:  bytes.NewBuffer(make([]byte, 0, 1<<10)),
-		hbuf: bytes.NewBuffer(nil),
+		buf:    bytes.NewBuffer(make([]byte, 0, 1<<10)),
+		rl:     rate.NewLimiter(2, 2),
+		wch:    make(chan *Op, 2000),
+		prioch: make(chan *Op),
 
-		etcd: etcdCli,
+		etcd: cfg.Etcd,
 
-		state: c,
-		rc:    rdb,
+		state: handler.NewClient(cfg.Logger, cfg.DB),
+		enc:   cfg.DB.Encoding(),
+		rc:    cfg.Redis,
 	}
 
 	sess.loadSessID()
@@ -121,14 +140,20 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
-	played, err := played.NewClient(s.ctx, playedAddr)
-	if err != nil {
-		return xerrors.Errorf("connect to played: %w", err)
+	if playedAddr != "" {
+		played, err := played.NewClient(s.ctx, playedAddr)
+		if err != nil {
+			return xerrors.Errorf("connect to played: %w", err)
+		}
+		s.played = played
 	}
-	s.played = played
+
+	s.log.Info(ctx, "encoding", slog.F("name", s.enc.Name()))
 
 	s.lastAck = time.Time{}
+	s.sentAuth = false
 
+	var err error
 	err = s.initEtcd()
 	if err != nil {
 		return err
@@ -154,7 +179,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.zr = r
 	defer r.Close()
 
-	c, _, err := websocket.Dial(s.ctx, GatewayETF, nil)
+	c, _, err := websocket.Dial(s.ctx, s.GatewayURL(), nil)
 	if err != nil {
 		return xerrors.Errorf("dial gateway: %w", err)
 	}
@@ -166,21 +191,21 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		return xerrors.Errorf("handle hello message: %w", err)
 	}
 
+	go s.writer()
 	if s.shouldResume() {
 		s.log.Info(s.ctx, "sending resume")
-		err := s.writeResume()
-		if err != nil {
-			return xerrors.Errorf("send resume: %w", err)
-		}
+		s.writeResume()
 	} else {
 		s.last = 0
 		s.log.Info(s.ctx, "sending identify")
-		err := s.writeIdentify()
-		if err != nil {
-			return xerrors.Errorf("send identify: %w", err)
+		s.writeIdentify()
+		if len(s.wch)+len(s.prioch) > 0 {
+			s.wch = make(chan *Op, 2000)
+			s.prioch = make(chan *Op)
 		}
 	}
 
+	s.sentAuth = true
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
 	// go s.rotateStatuses()
@@ -204,8 +229,8 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			break
 		}
 
-		var ev *discordetf.Event
-		ev, err = discordetf.DecodeT(s.buf.Bytes())
+		var ev *discord.Event
+		ev, err = s.enc.DecodeT(s.buf.Bytes())
 		if err != nil {
 			err = xerrors.Errorf("decode event: %w", err)
 			break
@@ -223,7 +248,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			continue
 		}
 
-		if ev.T == "PRESENCE_UPDATE" {
+		if ev.T == "PRESENCE_UPDATE" && playedAddr != "" {
 			err := s.played.WritePresence(s.ctx, ev.D)
 			if err != nil {
 				s.log.Error(s.ctx, "send played event", slog.Error(err))
@@ -246,10 +271,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 		if requestMembers != 0 {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", requestMembers))
-			err := s.requestGuildMembers(requestMembers)
-			if err != nil {
-				s.log.Error(s.ctx, "request guild members", slog.Error(err))
-			}
+			s.requestGuildMembers(requestMembers)
 		}
 	}
 
@@ -299,20 +321,18 @@ func (s *Session) loadSessID() {
 }
 
 func (s *Session) fmtSeqKey() string {
-	return "gateway:seq:" + strconv.Itoa(s.shardID)
+	return fmt.Sprintf("gateway:seq:%s:%d", s.name, s.shardID)
 }
 
 func (s *Session) fmtSessIDKey() string {
-	return "gateway:sess:" + strconv.Itoa(s.shardID)
+	return fmt.Sprintf("gateway:sess:%s:%d", s.name, s.shardID)
 }
 
-func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
+func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	switch ev.Op {
 	case 1:
-		err := s.heartbeat()
-		if err != nil {
-			return true, xerrors.Errorf("heartbeat in response to op 1: %w", err)
-		}
+		s.writeHeartbeat()
+		return true, nil
 
 	// RESUME
 	case 6:
@@ -351,7 +371,7 @@ func (s *Session) handleInternalEvent(ev *discordetf.Event) (bool, error) {
 
 	switch ev.T {
 	case "READY":
-		_, sess, err := discordetf.DecodeReady(ev.D)
+		_, sess, err := s.enc.DecodeReady(ev.D)
 		if err != nil {
 			return true, xerrors.Errorf("decode ready: %w", err)
 		}

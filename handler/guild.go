@@ -3,23 +3,21 @@ package handler
 import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
-
-	"github.com/tatsuworks/gateway/discordetf"
 )
 
 func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
-	gc, err := discordetf.DecodeGuildCreate(d)
+	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
 		return 0, xerrors.Errorf("parse guild create: %w", err)
 	}
 
 	if gc.MemberCount > int64(len(gc.Members)) {
-		guild = gc.Id
+		guild = gc.ID
 	}
 
 	eg := new(errgroup.Group)
 	eg.Go(func() error {
-		err := c.db.SetGuild(gc.Id, gc.Guild)
+		err := c.db.SetGuild(defaultCtx, gc.ID, gc.Raw)
 		if err != nil {
 			return xerrors.Errorf("set guild: %w", err)
 		}
@@ -27,7 +25,7 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 	})
 	eg.Go(func() error {
 		if len(gc.Roles) > 0 {
-			err := c.db.SetGuildRoles(gc.Id, gc.Roles)
+			err := c.db.SetGuildRoles(defaultCtx, gc.ID, gc.Roles)
 			if err != nil {
 				return xerrors.Errorf("set guild roles: %w", err)
 			}
@@ -36,7 +34,7 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 	})
 	eg.Go(func() error {
 		if len(gc.Members) > 0 {
-			err := c.db.SetGuildMembers(gc.Id, gc.Members)
+			err := c.db.SetGuildMembers(defaultCtx, gc.ID, gc.Members)
 			if err != nil {
 				return xerrors.Errorf("set guild member: %w", err)
 			}
@@ -45,7 +43,7 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 	})
 	eg.Go(func() error {
 		if len(gc.Channels) > 0 {
-			err := c.db.SetChannels(gc.Id, gc.Channels)
+			err := c.db.SetChannels(defaultCtx, gc.ID, gc.Channels)
 			if err != nil {
 				return xerrors.Errorf("set guild channels: %w", err)
 			}
@@ -67,7 +65,7 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 }
 
 func (c *Client) GuildDelete(d []byte) error {
-	gc, err := discordetf.DecodeGuildCreate(d)
+	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
 		return err
 	}
@@ -75,7 +73,7 @@ func (c *Client) GuildDelete(d []byte) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		err := c.db.DeleteGuild(gc.Id)
+		err := c.db.DeleteGuild(defaultCtx, gc.ID)
 		if err != nil {
 			return xerrors.Errorf("delete guild: %w", err)
 		}
@@ -84,7 +82,7 @@ func (c *Client) GuildDelete(d []byte) error {
 	})
 
 	eg.Go(func() error {
-		err := c.db.DeleteGuildRoles(gc.Id)
+		err := c.db.DeleteGuildRoles(defaultCtx, gc.ID)
 		if err != nil {
 			return xerrors.Errorf("delete guild roles: %w", err)
 		}
@@ -92,7 +90,7 @@ func (c *Client) GuildDelete(d []byte) error {
 		return nil
 	})
 	eg.Go(func() error {
-		err := c.db.DeleteGuildMembers(gc.Id)
+		err := c.db.DeleteGuildMembers(defaultCtx, gc.ID)
 		if err != nil {
 			return xerrors.Errorf("delete guild members: %w", err)
 		}
@@ -100,7 +98,7 @@ func (c *Client) GuildDelete(d []byte) error {
 		return nil
 	})
 	eg.Go(func() error {
-		err := c.db.DeleteChannels(gc.Id)
+		err := c.db.DeleteChannels(defaultCtx, gc.ID)
 		if err != nil {
 			return xerrors.Errorf("delete channels: %w", err)
 		}
@@ -112,12 +110,12 @@ func (c *Client) GuildDelete(d []byte) error {
 }
 
 func (c *Client) GuildBanAdd(d []byte) error {
-	gb, err := discordetf.DecodeGuildBan(d)
+	gb, err := c.enc.DecodeGuildBan(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetGuildBan(gb.Guild, gb.User, gb.Raw)
+	err = c.db.SetGuildBan(defaultCtx, gb.GuildID, gb.UserID, gb.Raw)
 	if err != nil {
 		return xerrors.Errorf("set guild ban: %w", err)
 	}
@@ -125,12 +123,12 @@ func (c *Client) GuildBanAdd(d []byte) error {
 }
 
 func (c *Client) GuildBanRemove(d []byte) error {
-	gb, err := discordetf.DecodeGuildBan(d)
+	gb, err := c.enc.DecodeGuildBan(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteGuildBan(gb.Guild, gb.User)
+	err = c.db.DeleteGuildBan(defaultCtx, gb.GuildID, gb.UserID)
 	if err != nil {
 		return xerrors.Errorf("delete guild ban: %w", err)
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	m, err := s.db.GetChannelMessage(channelParam(p), messageParam(p))
+	m, err := s.db.GetChannelMessage(r.Context(), channelParam(p), messageParam(p))
 	if err != nil {
 		return xerrors.Errorf("transact message: %w", err)
 	}
@@ -18,7 +18,7 @@ func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p htt
 		return ErrNotFound
 	}
 
-	return writeTerm(w, m)
+	return s.writeTerm(w, m)
 }
 
 func messageParam(p httprouter.Params) int64 {

@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) getGuild(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	g, err := s.db.GetGuild(guildParam(p))
+	g, err := s.db.GetGuild(r.Context(), guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("read guild: %w", err)
 	}
@@ -18,7 +18,7 @@ func (s *Server) getGuild(w http.ResponseWriter, r *http.Request, p httprouter.P
 		return ErrNotFound
 	}
 
-	return writeTerm(w, g)
+	return s.writeTerm(w, g)
 }
 
 func guildParam(p httprouter.Params) int64 {

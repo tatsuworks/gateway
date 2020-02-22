@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	c, err := s.db.GetChannel(channelParam(p))
+	c, err := s.db.GetChannel(r.Context(), channelParam(p))
 	if err != nil {
 		return xerrors.Errorf("read channel: %w", err)
 	}
@@ -21,7 +20,7 @@ func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter
 		return ErrNotFound
 	}
 
-	return writeTerm(w, c)
+	return s.writeTerm(w, c)
 }
 
 func channelParam(p httprouter.Params) int64 {
@@ -35,21 +34,21 @@ func channelParam(p httprouter.Params) int64 {
 }
 
 func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	cs, err := s.db.GetChannels()
+	cs, err := s.db.GetChannels(r.Context())
 	if err != nil {
 		return xerrors.Errorf("read channels: %w", err)
 	}
 
-	return writeTerms(w, cs)
+	return s.writeTerms(w, cs)
 }
 
 func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	cs, err := s.db.GetGuildChannels(guildParam(p))
+	cs, err := s.db.GetGuildChannels(r.Context(), guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("read guild channels: %w", err)
 	}
 
-	return writeTerms(w, cs)
+	return s.writeTerms(w, cs)
 }
 
 // Erlang external term tags.
@@ -59,49 +58,51 @@ const (
 	ettNil   = byte(106)
 )
 
-func writeTerms(w io.Writer, raws []fdb.KeyValue) error {
-	if err := writeSliceHeader(w, len(raws)); err != nil {
-		return err
-	}
-
-	for _, e := range raws {
-		_, err := w.Write(e.Value)
-		if err != nil {
-			return xerrors.Errorf("write term: %w", err)
+<<<<<<< HEAD
+func (s *Server) writeTerms(w io.Writer, raws [][]byte) error {
+	if s.enc == "etf" {
+		if err := writeSliceHeader(w, len(raws)); err != nil {
+			return err
 		}
+	} else if s.enc == "json" {
+		w.Write([]byte("["))
 	}
 
-	_, err := w.Write([]byte{ettNil})
-	if err != nil {
-		return xerrors.Errorf("write ending nil: %w", err)
-	}
+	first := true
+	writeComma := func() {
+		if first {
+			first = false
+			return
+		}
 
-	return nil
-}
-
-func writeTermsRaw(w io.Writer, raws [][]byte) error {
-	if err := writeSliceHeader(w, len(raws)); err != nil {
-		return err
+		w.Write([]byte(","))
 	}
 
 	for _, e := range raws {
+		writeComma()
 		_, err := w.Write(e)
 		if err != nil {
 			return xerrors.Errorf("write term: %w", err)
 		}
 	}
 
-	_, err := w.Write([]byte{ettNil})
-	if err != nil {
-		return xerrors.Errorf("write ending nil: %w", err)
+	if s.enc == "etf" {
+		_, err := w.Write([]byte{ettNil})
+		if err != nil {
+			return xerrors.Errorf("failed to write ending nil: %w", err)
+		}
+	} else if s.enc == "json" {
+		w.Write([]byte("]"))
 	}
 
 	return nil
 }
 
-func writeTerm(w io.Writer, raw []byte) error {
-	if err := writeETFHeader(w); err != nil {
-		return err
+func (s *Server) writeTerm(w io.Writer, raw []byte) error {
+	if s.enc == "etf" {
+		if err := writeETFHeader(w); err != nil {
+			return err
+		}
 	}
 
 	_, err := w.Write(raw)

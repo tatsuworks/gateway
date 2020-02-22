@@ -1,4 +1,6 @@
 #!/bin/bash
 
 exec /state \
-	--addr="$ADDR" \
+	--prod="$PROD" \
+	--psql="$PSQL" \
+	--addr="$ADDR"

@@ -1,21 +1,25 @@
 package handler
 
 import (
+	"context"
+
+	"cdr.dev/slog"
+	"github.com/tatsuworks/gateway/discord"
 	"github.com/tatsuworks/gateway/internal/state"
-	"golang.org/x/xerrors"
 )
 
+var defaultCtx = context.Background()
+
 type Client struct {
-	db *state.DB
+	log slog.Logger
+	db  state.DB
+	enc discord.Encoding
 }
 
-func NewClient() (*Client, error) {
-	db, err := state.NewDB()
-	if err != nil {
-		return nil, xerrors.Errorf("create state db: %w", err)
-	}
-
+func NewClient(log slog.Logger, db state.DB) *Client {
 	return &Client{
-		db: db,
-	}, nil
+		log: log,
+		db:  db,
+		enc: db.Encoding(),
+	}
 }

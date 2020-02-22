@@ -1,12 +1,8 @@
 package handler
 
-import (
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
+import "github.com/tatsuworks/gateway/discord"
 
-	"github.com/tatsuworks/gateway/discordetf"
-)
-
-func (c *Client) HandleEvent(e *discordetf.Event) (int64, error) {
+func (c *Client) HandleEvent(e *discord.Event) (int64, error) {
 	switch e.T {
 	case "PRESENCE_UPDATE":
 		// return 0, c.PresenceUpdate(e.D)
@@ -72,14 +68,4 @@ func (c *Client) HandleEvent(e *discordetf.Event) (int64, error) {
 		// return 0, errors.Errorf("unknown event: %s", e.T)
 		return 0, nil
 	}
-}
-
-// Transact is a helper around (fdb.Database).Transact which accepts a function that doesn't require a return value.
-func (c *Client) Transact(fn func(t fdb.Transaction) error) error {
-	return c.db.Transact(fn)
-}
-
-// ReadTransact is a helper around (fdb.Database).ReadTransact which accepts a function that doesn't require a return value.
-func (c *Client) ReadTransact(fn func(t fdb.ReadTransaction) error) error {
-	return c.db.ReadTransact(fn)
 }

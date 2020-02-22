@@ -1,17 +1,16 @@
 package handler
 
 import (
-	"github.com/tatsuworks/gateway/discordetf"
 	"golang.org/x/xerrors"
 )
 
 func (c *Client) RoleCreate(d []byte) error {
-	rc, err := discordetf.DecodeRole(d)
+	rc, err := c.enc.DecodeRole(d)
 	if err != nil {
 		return xerrors.Errorf("decode role create: %w", err)
 	}
 
-	err = c.db.SetGuildRole(rc.Guild, rc.Id, rc.Raw)
+	err = c.db.SetGuildRole(defaultCtx, rc.GuildID, rc.ID, rc.Raw)
 	if err != nil {
 		return xerrors.Errorf("set guild role: %w", err)
 	}
@@ -20,12 +19,12 @@ func (c *Client) RoleCreate(d []byte) error {
 }
 
 func (c *Client) RoleDelete(d []byte) error {
-	rc, err := discordetf.DecodeRoleDelete(d)
+	rc, err := c.enc.DecodeRoleDelete(d)
 	if err != nil {
 		return xerrors.Errorf("decode role delete: %w", err)
 	}
 
-	err = c.db.DeleteGuildRole(rc.Guild, rc.Id)
+	err = c.db.DeleteGuildRole(defaultCtx, rc.GuildID, rc.ID)
 	if err != nil {
 		return xerrors.Errorf("delete role: %w", err)
 	}

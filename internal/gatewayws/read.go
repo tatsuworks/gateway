@@ -1,8 +1,6 @@
 package gatewayws
 
 import (
-	"io"
-
 	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/czlib"
@@ -16,13 +14,9 @@ func (s *Session) readMessage() error {
 		return xerrors.Errorf("get ws reader: %w", err)
 	}
 
-	resetter, ok := s.zr.(czlib.Resetter)
-	if !ok {
-		return xerrors.Errorf("reset zlib reader")
-	}
-	resetter.Reset(r)
+	s.zr.(czlib.Resetter).Reset(r)
 
-	_, err = io.Copy(s.buf, s.zr)
+	_, err = s.buf.ReadFrom(s.zr)
 	if err != nil {
 		return xerrors.Errorf("copy message: %w", err)
 	}

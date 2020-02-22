@@ -1,17 +1,16 @@
 package handler
 
 import (
-	"github.com/tatsuworks/gateway/discordetf"
 	"golang.org/x/xerrors"
 )
 
 func (c *Client) MessageCreate(d []byte) error {
-	mc, err := discordetf.DecodeMessage(d)
+	mc, err := c.enc.DecodeMessage(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetChannelMessage(mc.Channel, mc.Id, mc.Raw)
+	err = c.db.SetChannelMessage(defaultCtx, mc.ChannelID, mc.ID, mc.Raw)
 	if err != nil {
 		return xerrors.Errorf("set channel message: %w", err)
 	}
@@ -20,12 +19,12 @@ func (c *Client) MessageCreate(d []byte) error {
 }
 
 func (c *Client) MessageDelete(d []byte) error {
-	mc, err := discordetf.DecodeMessage(d)
+	mc, err := c.enc.DecodeMessage(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteChannelMessage(mc.Channel, mc.Id)
+	err = c.db.DeleteChannelMessage(defaultCtx, mc.ChannelID, mc.ID)
 	if err != nil {
 		return xerrors.Errorf("delete channel message: %w", err)
 	}
@@ -34,12 +33,12 @@ func (c *Client) MessageDelete(d []byte) error {
 }
 
 func (c *Client) MessageReactionAdd(d []byte) error {
-	rc, err := discordetf.DecodeMessageReaction(d)
+	rc, err := c.enc.DecodeMessageReaction(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name, rc.Raw)
+	err = c.db.SetChannelMessageReaction(defaultCtx, rc.ChannelID, rc.MessageID, rc.UserID, rc.Name, rc.Raw)
 	if err != nil {
 		return xerrors.Errorf("set channel message reaction: %w", err)
 	}
@@ -48,12 +47,12 @@ func (c *Client) MessageReactionAdd(d []byte) error {
 }
 
 func (c *Client) MessageReactionRemove(d []byte) error {
-	rc, err := discordetf.DecodeMessageReaction(d)
+	rc, err := c.enc.DecodeMessageReaction(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteChannelMessageReaction(rc.Channel, rc.Message, rc.User, rc.Name)
+	err = c.db.DeleteChannelMessageReaction(defaultCtx, rc.ChannelID, rc.MessageID, rc.UserID, rc.Name)
 	if err != nil {
 		return xerrors.Errorf("delete channel message reaction: %w", err)
 	}
@@ -62,12 +61,12 @@ func (c *Client) MessageReactionRemove(d []byte) error {
 }
 
 func (c *Client) MessageReactionRemoveAll(d []byte) error {
-	rc, err := discordetf.DecodeMessageReactionRemoveAll(d)
+	rc, err := c.enc.DecodeMessageReactionRemoveAll(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteChannelMessageReactions(rc.Message, rc.Message, rc.User)
+	err = c.db.DeleteChannelMessageReactions(defaultCtx, rc.ChannelID, rc.MessageID, rc.UserID)
 	if err != nil {
 		return xerrors.Errorf("remove channel message reactions: %w", err)
 	}

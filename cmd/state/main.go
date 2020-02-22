@@ -1,41 +1,68 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
+	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/sloghuman"
+	"cdr.dev/slog/sloggers/slogjson"
 	"github.com/google/gops/agent"
+	"github.com/tatsuworks/gateway/internal/state"
 	"github.com/tatsuworks/gateway/internal/state/api"
-	"go.uber.org/zap"
+	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
+	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
 )
 
 var (
-	verbose   bool
-	usePsql   bool
-	useEs     bool
-	usePprof  bool
-	addr      string
-	redisAddr string
+	prod     string
+	usePprof bool
+	addr     string
+	usePsql  bool
+	psqlAddr string
 
 	Version string
 )
 
 func init() {
-	flag.BoolVar(&verbose, "v", false, "enable verbose logging")
-	flag.BoolVar(&usePsql, "psql", false, "use postgres")
-	flag.BoolVar(&useEs, "elastic", false, "use elasticsearch")
+	flag.StringVar(&prod, "prod", "", "Enable production logging")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
 	flag.StringVar(&addr, "addr", "0.0.0.0:8080", "0.0.0.0:80")
-	flag.StringVar(&redisAddr, "redis", "localhost:6379", "localhost:6379")
+	flag.StringVar(&psqlAddr, "psql", "", "Postgres address")
 	flag.Parse()
 }
 
 func main() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var logger slog.Logger
+
+	if prod != "" {
+		logger = slogjson.Make(os.Stderr)
+	} else {
+		logger = sloghuman.Make(os.Stderr)
+	}
+	defer logger.Sync()
+
+	var (
+		statedb state.DB
+		err     error
+	)
+	if psqlAddr != "" {
+		statedb, err = statepsql.NewDB(ctx, psqlAddr)
+		if err != nil {
+			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
+		}
+	} else {
+		statedb, err = statefdb.NewDB()
+		if err != nil {
+			logger.Fatal(ctx, "failed to init fdb state", slog.Error(err))
+		}
 	}
 
 	if usePprof {
@@ -45,14 +72,14 @@ func main() {
 	}
 
 	if err := agent.Listen(agent.Options{}); err != nil {
-		logger.Fatal("create gops agent", zap.Error(err))
+		logger.Fatal(ctx, "failed to create gops agent", slog.Error(err))
 	}
 
-	state, err := api.NewServer(logger, Version)
+	state, err := api.NewServer(logger, statedb, Version)
 	if err != nil {
-		logger.Panic("create state", zap.Error(err))
+		logger.Fatal(ctx, "failed to create state", slog.Error(err))
 	}
 
 	state.Init()
-	logger.Fatal("run server", zap.Error(state.Start(addr)))
+	logger.Fatal(ctx, "failed to run server", slog.Error(state.Start(addr)))
 }

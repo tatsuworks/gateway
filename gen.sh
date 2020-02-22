@@ -8,5 +8,5 @@ pushd () { builtin pushd "$@" > /dev/null ; }
 popd () { builtin popd > /dev/null ; }
 
 pushd gatewaypb
-	protoc -I. --gogofaster_out=plugins=grpc:. *.proto
+	protoc -I. --gogofaster_out=plugins=grpc:. ./*.proto
 popd

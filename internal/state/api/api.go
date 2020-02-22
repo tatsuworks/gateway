@@ -4,13 +4,12 @@ import (
 	"net/http"
 	"path"
 
+	"cdr.dev/slog"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"github.com/valyala/fasthttp/reuseport"
-	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/internal/state"
 )
@@ -20,28 +19,26 @@ var (
 )
 
 type Server struct {
-	log     *zap.Logger
+	log     slog.Logger
 	version string
 
 	router *httprouter.Router
 
-	db *state.DB
+	db  state.DB
+	enc string
 }
 
 func NewServer(
-	logger *zap.Logger,
+	logger slog.Logger,
+	db state.DB,
 	version string,
 ) (*Server, error) {
-	db, err := state.NewDB()
-	if err != nil {
-		return nil, xerrors.Errorf("create state db: %w", err)
-	}
-
 	return &Server{
 		log:     logger,
 		router:  httprouter.New(),
 		version: version,
 		db:      db,
+		enc:     db.Encoding().Name(),
 	}, nil
 }
 

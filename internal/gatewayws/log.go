@@ -32,6 +32,7 @@ func (s *Session) logTotalEvents() {
 			slog.F("seq", seq),
 			slog.F("events", since),
 			slog.F("/sec", float64(since)/LogInterval.Seconds()),
+			slog.F("write_queue", len(s.wch)),
 		)
 
 		s.last = seq

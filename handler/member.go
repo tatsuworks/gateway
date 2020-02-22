@@ -1,17 +1,25 @@
 package handler
 
 import (
-	"github.com/tatsuworks/gateway/discordetf"
+	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 )
 
 func (c *Client) MemberChunk(d []byte) error {
-	mc, err := discordetf.DecodeMemberChunk(d)
+	mc, err := c.enc.DecodeMemberChunk(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetGuildMembers(mc.Guild, mc.Members)
+	if mc.GuildID == 173184118492889089 || mc.GuildID == 390426490103136256 {
+		c.log.Info(defaultCtx,
+			"member chunk",
+			slog.F("guild", mc.GuildID),
+			slog.F("members", len(mc.Members)),
+		)
+	}
+
+	err = c.db.SetGuildMembers(defaultCtx, mc.GuildID, mc.Members)
 	if err != nil {
 		return xerrors.Errorf("set guild members: %w", err)
 	}
@@ -20,12 +28,12 @@ func (c *Client) MemberChunk(d []byte) error {
 }
 
 func (c *Client) MemberAdd(d []byte) error {
-	mc, err := discordetf.DecodeMember(d)
+	mc, err := c.enc.DecodeMember(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetGuildMember(mc.Guild, mc.Id, mc.Raw)
+	err = c.db.SetGuildMember(defaultCtx, mc.GuildID, mc.ID, mc.Raw)
 	if err != nil {
 		return xerrors.Errorf("set guild member: %w", err)
 	}
@@ -34,12 +42,12 @@ func (c *Client) MemberAdd(d []byte) error {
 }
 
 func (c *Client) MemberRemove(d []byte) error {
-	mc, err := discordetf.DecodeMember(d)
+	mc, err := c.enc.DecodeMember(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteGuildMember(mc.Guild, mc.Id)
+	err = c.db.DeleteGuildMember(defaultCtx, mc.GuildID, mc.ID)
 	if err != nil {
 		return xerrors.Errorf("delete guild member: %w", err)
 	}

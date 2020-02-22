@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	ro, err := s.db.GetGuildRole(guildParam(p), roleParam(p))
+	ro, err := s.db.GetGuildRole(r.Context(), guildParam(p), roleParam(p))
 	if err != nil {
 		return xerrors.Errorf("read role: %w", err)
 	}
@@ -18,7 +18,7 @@ func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprout
 		return ErrNotFound
 	}
 
-	return writeTerm(w, ro)
+	return s.writeTerm(w, ro)
 }
 
 func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -26,16 +26,17 @@ func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprou
 		return s.getGuildRoleSlice(w, r, p)
 	}
 
-	ros, err := s.db.GetGuildRoles(guildParam(p))
+	ros, err := s.db.GetGuildRoles(r.Context(), guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("read roles: %w", err)
 	}
 
-	return writeTerms(w, ros)
+	return s.writeTerms(w, ros)
 }
 
 func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	var (
+		ctx = r.Context()
 		g   = guildParam(p)
 		rs  = r.URL.Query()["id"]
 		ros = make([][]byte, len(rs))
@@ -47,13 +48,13 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 			return xerrors.Errorf("parse role id: %w", err)
 		}
 
-		ros[i], err = s.db.GetGuildRole(g, rr)
+		ros[i], err = s.db.GetGuildRole(ctx, g, rr)
 		if err != nil {
 			return xerrors.Errorf("get role: %w", err)
 		}
 	}
 
-	return writeTermsRaw(w, ros)
+	return s.writeTerms(w, ros)
 }
 
 func roleParam(p httprouter.Params) int64 {

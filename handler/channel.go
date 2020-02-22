@@ -2,17 +2,15 @@ package handler
 
 import (
 	"golang.org/x/xerrors"
-
-	"github.com/tatsuworks/gateway/discordetf"
 )
 
-func (s *Client) ChannelCreate(d []byte) error {
-	ch, err := discordetf.DecodeChannel(d)
+func (c *Client) ChannelCreate(d []byte) error {
+	ch, err := c.enc.DecodeChannel(d)
 	if err != nil {
 		return err
 	}
 
-	err = s.db.SetChannel(ch.Guild, ch.Id, ch.Raw)
+	err = c.db.SetChannel(defaultCtx, ch.GuildID, ch.ID, ch.Raw)
 	if err != nil {
 		return xerrors.Errorf("set channel: %w", err)
 	}
@@ -21,12 +19,12 @@ func (s *Client) ChannelCreate(d []byte) error {
 }
 
 func (c *Client) ChannelDelete(d []byte) error {
-	ch, err := discordetf.DecodeChannel(d)
+	ch, err := c.enc.DecodeChannel(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.DeleteChannel(ch.Guild, ch.Id, ch.Raw)
+	err = c.db.DeleteChannel(defaultCtx, ch.GuildID, ch.ID)
 	if err != nil {
 		return xerrors.Errorf("delete channel: %w", err)
 	}
@@ -35,12 +33,12 @@ func (c *Client) ChannelDelete(d []byte) error {
 }
 
 func (c *Client) VoiceStateUpdate(d []byte) error {
-	vs, err := discordetf.DecodeVoiceState(d)
+	vs, err := c.enc.DecodeVoiceState(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetVoiceState(vs.Guild, vs.User, vs.Raw)
+	err = c.db.SetVoiceState(defaultCtx, vs.GuildID, vs.UserID, vs.Raw)
 	if err != nil {
 		return xerrors.Errorf("set voice state: %w", err)
 	}

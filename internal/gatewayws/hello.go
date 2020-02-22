@@ -3,7 +3,6 @@ package gatewayws
 import (
 	"time"
 
-	"github.com/tatsuworks/gateway/discordetf"
 	"golang.org/x/xerrors"
 )
 
@@ -13,7 +12,7 @@ func (s *Session) readHello() error {
 		return xerrors.Errorf("read message: %w", err)
 	}
 
-	interval, trace, err := discordetf.DecodeHello(s.buf.Bytes())
+	interval, trace, err := s.enc.DecodeHello(s.buf.Bytes())
 	if err != nil {
 		return xerrors.Errorf("decode hello message: %w", err)
 	}

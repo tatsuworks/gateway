@@ -12,6 +12,8 @@ import (
 	"golang.org/x/xerrors"
 )
 
+var _ state.DB = &db{}
+
 type db struct {
 	sql *sqlx.DB
 }

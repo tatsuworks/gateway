@@ -43,29 +43,22 @@ func (c *Client) HandleEvent(e *discord.Event) (int64, error) {
 	case "VOICE_STATE_UPDATE":
 		return 0, c.VoiceStateUpdate(e.D)
 	case "MESSAGE_CREATE":
-		// return 0, c.MessageCreate(e.D)
 		return 0, nil
 	case "MESSAGE_UPDATE":
-		// return 0, c.MessageCreate(e.D)
 		return 0, nil
 	case "MESSAGE_DELETE":
-		// return 0, c.MessageDelete(e.D)
 		return 0, nil
 	case "MESSAGE_REACTION_ADD":
-		// return 0, c.MessageReactionAdd(e.D)
 		return 0, nil
 	case "MESSAGE_REACTION_REMOVE":
-		// return 0, c.MessageReactionRemove(e.D)
 		return 0, nil
 	case "MESSAGE_REACTION_REMOVE_ALL":
-		// return 0, c.MessageReactionRemoveAll(e.D)
 		return 0, nil
 	case "TYPING_START":
 		return 0, nil
 	case "nil":
 		return 0, nil
 	default:
-		// return 0, errors.Errorf("unknown event: %s", e.T)
 		return 0, nil
 	}
 }

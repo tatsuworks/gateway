@@ -27,5 +27,7 @@ type Encoding interface {
 	DecodeRole(buf []byte) (*Role, error)
 	DecodeRoleDelete(buf []byte) (*RoleDelete, error)
 
+	DecodeGuildEmojisUpdate(buf []byte) (*GuildEmojisUpdate, error)
+
 	Write(obj interface{}) ([]byte, error)
 }

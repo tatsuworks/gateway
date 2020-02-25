@@ -1,12 +1,16 @@
-package state
+package statefdb
 
-import "github.com/apple/foundationdb/bindings/go/src/fdb"
+import (
+	"context"
 
-func (db *DB) SetGuildEmojis(guild int64, raws map[int64][]byte) error {
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
+)
+
+func (db *DB) SetGuildEmojis(_ context.Context, guild int64, raws map[int64][]byte) error {
 	return db.setGuildETFs(guild, raws, db.fmtGuildEmojiKey)
 }
 
-func (db *DB) DeleteGuildEmojis(guild int64) error {
+func (db *DB) DeleteGuildEmojis(_ context.Context, guild int64) error {
 	pre, _ := fdb.PrefixRange(db.fmtGuildEmojiPrefix(guild))
 
 	return db.Transact(func(t fdb.Transaction) error {
@@ -15,14 +19,14 @@ func (db *DB) DeleteGuildEmojis(guild int64) error {
 	})
 }
 
-func (db *DB) SetGuildEmoji(guild, emoji int64, raw []byte) error {
+func (db *DB) SetGuildEmoji(_ context.Context, guild, emoji int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildEmojiKey(guild, emoji), raw)
 		return nil
 	})
 }
 
-func (db *DB) GetGuildEmoji(guild, emoji int64) ([]byte, error) {
+func (db *DB) GetGuildEmoji(_ context.Context, guild, emoji int64) ([]byte, error) {
 	var e []byte
 
 	err := db.Transact(func(t fdb.Transaction) error {
@@ -36,7 +40,7 @@ func (db *DB) GetGuildEmoji(guild, emoji int64) ([]byte, error) {
 	return e, nil
 }
 
-func (db *DB) GetGuildEmojis(guild int64) ([]fdb.KeyValue, error) {
+func (db *DB) GetGuildEmojis(_ context.Context, guild int64) ([][]byte, error) {
 	var (
 		raws   []fdb.KeyValue
 		pre, _ = fdb.PrefixRange(db.fmtGuildEmojiPrefix(guild))
@@ -50,10 +54,15 @@ func (db *DB) GetGuildEmojis(guild int64) ([]fdb.KeyValue, error) {
 		return nil, err
 	}
 
-	return raws, nil
+	out := make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, nil
 }
 
-func (db *DB) DeleteGuildEmoji(guild, emoji int64) error {
+func (db *DB) DeleteGuildEmoji(_ context.Context, guild, emoji int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildEmojiKey(guild, emoji))
 		return nil

@@ -40,3 +40,10 @@ CREATE TABLE roles (
 	"data" jsonb NOT NULL,
 	PRIMARY KEY("id", "guild_id")
 );
+
+CREATE TABLE emojis (
+	"id" int8 NOT NULL,
+	"guild_id" int8 NOT NULL,
+	"data" jsonb NOT NULL,
+	PRIMARY KEY("id", "guild_id")
+);

@@ -11,6 +11,8 @@ import (
 	"github.com/tatsuworks/gateway/internal/state"
 )
 
+var _ state.DB = &DB{}
+
 type DB struct {
 	fdb  fdb.Database
 	subs *Subspaces

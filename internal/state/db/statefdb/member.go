@@ -69,3 +69,6 @@ func (db *DB) DeleteGuildMember(_ context.Context, guild, user int64) error {
 		return nil
 	})
 }
+func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
+	panic("unimplemented")
+}

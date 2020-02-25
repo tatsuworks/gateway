@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) getGuildEmoji(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	c, err := s.db.GetGuildEmoji(guildParam(p), emojiParam(p))
+	c, err := s.db.GetGuildEmoji(r.Context(), guildParam(p), emojiParam(p))
 	if err != nil {
 		return xerrors.Errorf("read emoji: %w", err)
 	}
@@ -18,7 +18,7 @@ func (s *Server) getGuildEmoji(w http.ResponseWriter, r *http.Request, p httprou
 		return ErrNotFound
 	}
 
-	return writeTerm(w, c)
+	return s.writeTerm(w, c)
 }
 
 func emojiParam(p httprouter.Params) int64 {
@@ -31,20 +31,11 @@ func emojiParam(p httprouter.Params) int64 {
 	return eid
 }
 
-// func (s *Server) getEmojis(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-// 	cs, err := s.db.GetEmojis()
-// 	if err != nil {
-// 		return xerrors.Errorf("read emojis: %w", err)
-// 	}
-//
-// 	return writeTerms(w, cs)
-// }
-
 func (s *Server) getGuildEmojis(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	cs, err := s.db.GetGuildEmojis(guildParam(p))
+	cs, err := s.db.GetGuildEmojis(r.Context(), guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("read guild emojis: %w", err)
 	}
 
-	return writeTerms(w, cs)
+	return s.writeTerms(w, cs)
 }

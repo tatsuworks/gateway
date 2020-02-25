@@ -217,10 +217,13 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		if err != nil {
 			var werr websocket.CloseError
 			if xerrors.As(err, &werr) {
+				// This somehow happens if you resume to a
+				// valid session associated with a different
+				// token.
 				if werr.Code == 4006 {
 					s.seq = 0
-					s.persistSeq()
 					s.sessID = ""
+					s.persistSeq()
 					s.persistSessID()
 				}
 			}
@@ -392,6 +395,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	case "RESUMED":
 		s.log.Info(s.ctx, "resumed")
+		return true, nil
 	}
 
 	return false, nil

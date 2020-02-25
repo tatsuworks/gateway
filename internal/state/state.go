@@ -47,4 +47,12 @@ type DB interface {
 	GetGuildRoles(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteGuildRoles(ctx context.Context, guild int64) error
 	DeleteGuildRole(ctx context.Context, guild, role int64) error
+
+	SetGuildEmojis(ctx context.Context, guild int64, raws map[int64][]byte) error
+	SetGuildEmoji(ctx context.Context, guild, emoji int64, raw []byte) error
+	GetGuildEmoji(ctx context.Context, guild, emoji int64) ([]byte, error)
+	GetGuildEmojis(ctx context.Context, guild int64) ([][]byte, error)
+	DeleteGuildEmoji(ctx context.Context, guild, emoji int64) error
+
+	GetUser(ctx context.Context, userID int64) ([]byte, error)
 }

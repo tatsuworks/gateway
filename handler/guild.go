@@ -53,7 +53,7 @@ func (c *Client) GuildCreate(d []byte) (guild int64, _ error) {
 	})
 	eg.Go(func() error {
 		if len(gc.Emojis) > 0 {
-			err := c.db.SetGuildEmojis(gc.Id, gc.Emojis)
+			err := c.db.SetGuildEmojis(defaultCtx, gc.ID, gc.Emojis)
 			if err != nil {
 				return xerrors.Errorf("set guild emojis: %w", err)
 			}

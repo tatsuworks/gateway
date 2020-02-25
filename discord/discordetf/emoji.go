@@ -1,11 +1,14 @@
 package discordetf
 
-import "golang.org/x/xerrors"
+import (
+	"github.com/tatsuworks/gateway/discord"
+	"golang.org/x/xerrors"
+)
 
 func (_ decoder) DecodeGuildEmojisUpdate(buf []byte) (*discord.GuildEmojisUpdate, error) {
 	var (
 		eu = &discord.GuildEmojisUpdate{}
-		d  = &decoder{buf: buf}
+		d  = &etfDecoder{buf: buf}
 	)
 
 	err := d.checkByte(ettMap)

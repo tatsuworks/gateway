@@ -58,7 +58,6 @@ const (
 	ettNil   = byte(106)
 )
 
-<<<<<<< HEAD
 func (s *Server) writeTerms(w io.Writer, raws [][]byte) error {
 	if s.enc == "etf" {
 		if err := writeSliceHeader(w, len(raws)); err != nil {

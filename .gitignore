@@ -8,3 +8,4 @@ dump.rdb
 logs.txt
 build/bin
 docker-secret.yaml
+target/

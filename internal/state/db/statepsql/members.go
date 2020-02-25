@@ -135,3 +135,23 @@ WHERE
 
 	return nil
 }
+
+func (db *db) GetUser(ctx context.Context, userID int64) ([]byte, error) {
+	const q = `
+SELECT
+	data->'user'
+FROM
+	members
+WHERE
+	user_id = $1
+LIMIT 1
+`
+
+	var usr RawJSON
+	err := db.sql.SelectContext(ctx, &usr, q, userID)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w")
+	}
+
+	return *(*[]byte)(unsafe.Pointer(&usr)), nil
+}

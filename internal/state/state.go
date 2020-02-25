@@ -53,4 +53,6 @@ type DB interface {
 	GetGuildEmoji(ctx context.Context, guild, emoji int64) ([]byte, error)
 	GetGuildEmojis(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteGuildEmoji(ctx context.Context, guild, emoji int64) error
+
+	GetUser(ctx context.Context, userID int64) ([]byte, error)
 }

@@ -65,3 +65,26 @@ func memberParam(p httprouter.Params) int64 {
 
 	return mi
 }
+
+func userParam(p httprouter.Params) int64 {
+	u := p.ByName("user")
+	ui, err := strconv.ParseInt(u, 10, 64)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return ui
+}
+
+func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	m, err := s.db.GetUser(r.Context(), userParam(p))
+	if err != nil {
+		return xerrors.Errorf("read user: %w", err)
+	}
+
+	if m == nil {
+		return ErrNotFound
+	}
+
+	return s.writeTerm(w, m)
+}

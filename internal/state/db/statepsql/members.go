@@ -109,7 +109,7 @@ SELECT
 FROM
 	members
 WHERE
-	guild_id $1
+	guild_id = $1
 `
 
 	var ms []RawJSON

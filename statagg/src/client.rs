@@ -6,6 +6,7 @@ use gatewaypb::gateway_client;
 use tonic::transport::channel::Channel;
 
 pub type GatewayClient = gateway_client::GatewayClient<Channel>;
+pub use gatewaypb::{EmptyRequest, StatsResponse};
 
 async fn test() -> Result<Vec<GatewayClient>, Box<dyn std::error::Error>> {
     let mut conn = GatewayClient::connect("asdf").await?;

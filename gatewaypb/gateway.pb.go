@@ -26,6 +26,141 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type ShardStatus int32
+
+const (
+	ShardStatus_DISCONNECTED ShardStatus = 0
+	ShardStatus_CONNECTING   ShardStatus = 1
+	ShardStatus_GUILD_STREAM ShardStatus = 2
+	ShardStatus_CONNECTED    ShardStatus = 3
+)
+
+var ShardStatus_name = map[int32]string{
+	0: "DISCONNECTED",
+	1: "CONNECTING",
+	2: "GUILD_STREAM",
+	3: "CONNECTED",
+}
+
+var ShardStatus_value = map[string]int32{
+	"DISCONNECTED": 0,
+	"CONNECTING":   1,
+	"GUILD_STREAM": 2,
+	"CONNECTED":    3,
+}
+
+func (x ShardStatus) String() string {
+	return proto.EnumName(ShardStatus_name, int32(x))
+}
+
+func (ShardStatus) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_f1a937782ebbded5, []int{0}
+}
+
+type StatsResponse struct {
+	Stats []*Stat `protobuf:"bytes,1,rep,name=stats,proto3" json:"stats,omitempty"`
+}
+
+func (m *StatsResponse) Reset()         { *m = StatsResponse{} }
+func (m *StatsResponse) String() string { return proto.CompactTextString(m) }
+func (*StatsResponse) ProtoMessage()    {}
+func (*StatsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f1a937782ebbded5, []int{0}
+}
+func (m *StatsResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StatsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StatsResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StatsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StatsResponse.Merge(m, src)
+}
+func (m *StatsResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *StatsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_StatsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StatsResponse proto.InternalMessageInfo
+
+func (m *StatsResponse) GetStats() []*Stat {
+	if m != nil {
+		return m.Stats
+	}
+	return nil
+}
+
+type Stat struct {
+	Shard     int32       `protobuf:"varint,1,opt,name=shard,proto3" json:"shard,omitempty"`
+	Status    ShardStatus `protobuf:"varint,2,opt,name=status,proto3,enum=gateway.ShardStatus" json:"status,omitempty"`
+	EventRate int32       `protobuf:"varint,3,opt,name=event_rate,json=eventRate,proto3" json:"event_rate,omitempty"`
+}
+
+func (m *Stat) Reset()         { *m = Stat{} }
+func (m *Stat) String() string { return proto.CompactTextString(m) }
+func (*Stat) ProtoMessage()    {}
+func (*Stat) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f1a937782ebbded5, []int{1}
+}
+func (m *Stat) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Stat) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Stat.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Stat) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Stat.Merge(m, src)
+}
+func (m *Stat) XXX_Size() int {
+	return m.Size()
+}
+func (m *Stat) XXX_DiscardUnknown() {
+	xxx_messageInfo_Stat.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Stat proto.InternalMessageInfo
+
+func (m *Stat) GetShard() int32 {
+	if m != nil {
+		return m.Shard
+	}
+	return 0
+}
+
+func (m *Stat) GetStatus() ShardStatus {
+	if m != nil {
+		return m.Status
+	}
+	return ShardStatus_DISCONNECTED
+}
+
+func (m *Stat) GetEventRate() int32 {
+	if m != nil {
+		return m.EventRate
+	}
+	return 0
+}
+
 type EmptyRequest struct {
 }
 
@@ -33,7 +168,7 @@ func (m *EmptyRequest) Reset()         { *m = EmptyRequest{} }
 func (m *EmptyRequest) String() string { return proto.CompactTextString(m) }
 func (*EmptyRequest) ProtoMessage()    {}
 func (*EmptyRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f1a937782ebbded5, []int{0}
+	return fileDescriptor_f1a937782ebbded5, []int{2}
 }
 func (m *EmptyRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -69,7 +204,7 @@ func (m *EmptyResponse) Reset()         { *m = EmptyResponse{} }
 func (m *EmptyResponse) String() string { return proto.CompactTextString(m) }
 func (*EmptyResponse) ProtoMessage()    {}
 func (*EmptyResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f1a937782ebbded5, []int{1}
+	return fileDescriptor_f1a937782ebbded5, []int{3}
 }
 func (m *EmptyResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -106,7 +241,7 @@ func (m *VersionResponse) Reset()         { *m = VersionResponse{} }
 func (m *VersionResponse) String() string { return proto.CompactTextString(m) }
 func (*VersionResponse) ProtoMessage()    {}
 func (*VersionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f1a937782ebbded5, []int{2}
+	return fileDescriptor_f1a937782ebbded5, []int{4}
 }
 func (m *VersionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -151,7 +286,7 @@ func (m *RequestGuildMembersRequest) Reset()         { *m = RequestGuildMembersR
 func (m *RequestGuildMembersRequest) String() string { return proto.CompactTextString(m) }
 func (*RequestGuildMembersRequest) ProtoMessage()    {}
 func (*RequestGuildMembersRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f1a937782ebbded5, []int{3}
+	return fileDescriptor_f1a937782ebbded5, []int{5}
 }
 func (m *RequestGuildMembersRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -202,7 +337,7 @@ func (m *RestartShardRequest) Reset()         { *m = RestartShardRequest{} }
 func (m *RestartShardRequest) String() string { return proto.CompactTextString(m) }
 func (*RestartShardRequest) ProtoMessage()    {}
 func (*RestartShardRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f1a937782ebbded5, []int{4}
+	return fileDescriptor_f1a937782ebbded5, []int{6}
 }
 func (m *RestartShardRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -239,6 +374,9 @@ func (m *RestartShardRequest) GetShard() int32 {
 }
 
 func init() {
+	proto.RegisterEnum("gateway.ShardStatus", ShardStatus_name, ShardStatus_value)
+	proto.RegisterType((*StatsResponse)(nil), "gateway.StatsResponse")
+	proto.RegisterType((*Stat)(nil), "gateway.Stat")
 	proto.RegisterType((*EmptyRequest)(nil), "gateway.EmptyRequest")
 	proto.RegisterType((*EmptyResponse)(nil), "gateway.EmptyResponse")
 	proto.RegisterType((*VersionResponse)(nil), "gateway.VersionResponse")
@@ -249,25 +387,34 @@ func init() {
 func init() { proto.RegisterFile("gateway.proto", fileDescriptor_f1a937782ebbded5) }
 
 var fileDescriptor_f1a937782ebbded5 = []byte{
-	// 277 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4d, 0x4f, 0x2c, 0x49,
-	0x2d, 0x4f, 0xac, 0xd4, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x87, 0x72, 0x95, 0xf8, 0xb8,
-	0x78, 0x5c, 0x73, 0x0b, 0x4a, 0x2a, 0x83, 0x52, 0x0b, 0x4b, 0x53, 0x8b, 0x4b, 0x94, 0xf8, 0xb9,
-	0x78, 0xa1, 0xfc, 0xe2, 0x82, 0xfc, 0xbc, 0xe2, 0x54, 0x25, 0x6d, 0x2e, 0xfe, 0xb0, 0xd4, 0xa2,
-	0xe2, 0xcc, 0xfc, 0x3c, 0x98, 0x90, 0x90, 0x04, 0x17, 0x7b, 0x19, 0x44, 0x48, 0x82, 0x51, 0x81,
-	0x51, 0x83, 0x33, 0x08, 0xc6, 0x55, 0xf2, 0xe5, 0x92, 0x82, 0x1a, 0xe4, 0x5e, 0x9a, 0x99, 0x93,
-	0xe2, 0x9b, 0x9a, 0x9b, 0x94, 0x5a, 0x54, 0x0c, 0x15, 0x12, 0x92, 0xe4, 0xe2, 0x48, 0x07, 0x09,
-	0xc7, 0x67, 0xa6, 0x80, 0x35, 0x32, 0x07, 0xb1, 0x83, 0xf9, 0x9e, 0x29, 0x42, 0x22, 0x5c, 0xac,
-	0xc5, 0x19, 0x89, 0x45, 0x29, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0xac, 0x41, 0x10, 0x8e, 0x92, 0x36,
-	0x97, 0x70, 0x50, 0x6a, 0x71, 0x49, 0x62, 0x51, 0x49, 0x30, 0x88, 0x0f, 0x33, 0x07, 0xae, 0x98,
-	0x11, 0x49, 0xb1, 0xd1, 0x7d, 0x46, 0x2e, 0x76, 0x77, 0x88, 0xaf, 0x84, 0xac, 0xb8, 0xd8, 0xa1,
-	0x8e, 0x16, 0x12, 0xd5, 0x83, 0xf9, 0x1c, 0xd9, 0x9f, 0x52, 0x12, 0x70, 0x61, 0x74, 0xdf, 0x05,
-	0x81, 0x2c, 0xc5, 0xf0, 0x83, 0x90, 0x32, 0x5c, 0x03, 0x6e, 0x1f, 0x4a, 0x89, 0xa1, 0x5b, 0x06,
-	0x35, 0xd3, 0x85, 0x8b, 0x07, 0xd9, 0x23, 0x42, 0x32, 0x48, 0x86, 0x61, 0xf8, 0x0f, 0x97, 0x29,
-	0x4e, 0xca, 0x27, 0x1e, 0xc9, 0x31, 0x5e, 0x78, 0x24, 0xc7, 0xf8, 0xe0, 0x91, 0x1c, 0xe3, 0x84,
-	0xc7, 0x72, 0x0c, 0x17, 0x1e, 0xcb, 0x31, 0xdc, 0x78, 0x2c, 0xc7, 0x10, 0xc5, 0x09, 0xd5, 0x50,
-	0x90, 0x94, 0xc4, 0x06, 0x8e, 0x60, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x54, 0x5f, 0xfe,
-	0x38, 0xf1, 0x01, 0x00, 0x00,
+	// 429 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x93, 0x41, 0x6f, 0xd3, 0x30,
+	0x1c, 0xc5, 0xe3, 0x84, 0x2c, 0xe4, 0xbf, 0xa6, 0x8b, 0xcc, 0x98, 0x42, 0x05, 0x51, 0x95, 0x5e,
+	0x2a, 0x86, 0x76, 0x28, 0x88, 0x03, 0x37, 0x58, 0xa2, 0x28, 0x12, 0x2d, 0xc8, 0x19, 0x1c, 0xb8,
+	0x54, 0xa9, 0x6a, 0x8d, 0x48, 0xac, 0x09, 0xb1, 0x3b, 0xb4, 0x6f, 0xc1, 0x8d, 0xaf, 0xc4, 0x71,
+	0x47, 0x8e, 0xa8, 0xfd, 0x22, 0xc8, 0x8e, 0x9b, 0x86, 0x75, 0x3d, 0xbe, 0xe7, 0xff, 0xff, 0xc5,
+	0xef, 0x27, 0x07, 0x9c, 0xcb, 0x8c, 0xd3, 0x1f, 0xd9, 0xcd, 0x59, 0x59, 0x15, 0xbc, 0xc0, 0x96,
+	0x92, 0xc1, 0x2b, 0x70, 0x52, 0x9e, 0x71, 0x46, 0x28, 0x2b, 0x8b, 0x05, 0xa3, 0x78, 0x00, 0x26,
+	0x13, 0x86, 0x87, 0xfa, 0xc6, 0xf0, 0x70, 0xe4, 0x9c, 0x6d, 0x16, 0xc5, 0x18, 0xa9, 0xcf, 0x82,
+	0x1c, 0x1e, 0x08, 0x89, 0x8f, 0xc1, 0x64, 0x5f, 0xb3, 0x6a, 0xee, 0xa1, 0x3e, 0x1a, 0x9a, 0xa4,
+	0x16, 0xf8, 0x05, 0x1c, 0x88, 0xb1, 0x25, 0xf3, 0xf4, 0x3e, 0x1a, 0x76, 0x47, 0xc7, 0xdb, 0x0c,
+	0x71, 0x9e, 0xca, 0x33, 0xa2, 0x66, 0xf0, 0x33, 0x00, 0x7a, 0x4d, 0x17, 0x7c, 0x5a, 0x65, 0x9c,
+	0x7a, 0x86, 0x0c, 0xb2, 0xa5, 0x43, 0x32, 0x4e, 0x83, 0x2e, 0x74, 0xa2, 0xab, 0x92, 0xdf, 0x10,
+	0xfa, 0x7d, 0x49, 0x19, 0x0f, 0x8e, 0xc0, 0x51, 0xba, 0xbe, 0x70, 0x70, 0x0a, 0x47, 0x9f, 0x69,
+	0xc5, 0xf2, 0x62, 0xd1, 0x74, 0xf0, 0xc0, 0xba, 0xae, 0x2d, 0x79, 0x31, 0x9b, 0x6c, 0x64, 0x30,
+	0x86, 0x9e, 0x0a, 0x8a, 0x97, 0xf9, 0xb7, 0xf9, 0x98, 0x5e, 0xcd, 0x68, 0xc5, 0x94, 0x85, 0x9f,
+	0xc0, 0xc3, 0x4b, 0x61, 0x4f, 0xf3, 0xba, 0x91, 0x41, 0x2c, 0xa9, 0x93, 0xf9, 0xb6, 0xa9, 0xde,
+	0x6a, 0x1a, 0x9c, 0xc2, 0x23, 0x42, 0x19, 0xcf, 0x2a, 0x2e, 0x9b, 0x6d, 0x72, 0xee, 0xc5, 0xf2,
+	0xfc, 0x23, 0x1c, 0xb6, 0xfa, 0x63, 0x17, 0x3a, 0x61, 0x92, 0x9e, 0x7f, 0x98, 0x4c, 0xa2, 0xf3,
+	0x8b, 0x28, 0x74, 0x35, 0xdc, 0x05, 0x50, 0x32, 0x99, 0xc4, 0x2e, 0x12, 0x13, 0xf1, 0xa7, 0xe4,
+	0x7d, 0x38, 0x4d, 0x2f, 0x48, 0xf4, 0x76, 0xec, 0xea, 0xd8, 0x01, 0x7b, 0xbb, 0x60, 0x8c, 0x7e,
+	0xe9, 0x60, 0xc5, 0x35, 0x5a, 0xfc, 0x06, 0x2c, 0x85, 0x01, 0x3f, 0x6e, 0x78, 0xb7, 0xc9, 0xf5,
+	0xbc, 0xc6, 0xbe, 0xcb, 0x8b, 0x88, 0x1a, 0x3b, 0x54, 0xf0, 0xa0, 0x59, 0xd8, 0xcf, 0xac, 0x77,
+	0x72, 0xf7, 0x63, 0x2a, 0x33, 0x84, 0x4e, 0x1b, 0x0d, 0x7e, 0xda, 0x0a, 0xdb, 0x21, 0xb6, 0x37,
+	0xe5, 0x35, 0x98, 0xf2, 0x79, 0xee, 0xeb, 0x74, 0xf2, 0xdf, 0xf3, 0x6c, 0x5e, 0xf1, 0xbb, 0xc1,
+	0xef, 0x95, 0x8f, 0x6e, 0x57, 0x3e, 0xfa, 0xbb, 0xf2, 0xd1, 0xcf, 0xb5, 0xaf, 0xdd, 0xae, 0x7d,
+	0xed, 0xcf, 0xda, 0xd7, 0xbe, 0xd8, 0x6a, 0xa1, 0x9c, 0xcd, 0x0e, 0xe4, 0xbf, 0xf0, 0xf2, 0x5f,
+	0x00, 0x00, 0x00, 0xff, 0xff, 0xb7, 0x2e, 0x17, 0x04, 0x1c, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -285,6 +432,7 @@ type GatewayClient interface {
 	Version(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*VersionResponse, error)
 	RequestGuildMembers(ctx context.Context, in *RequestGuildMembersRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	RestartShard(ctx context.Context, in *RestartShardRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Stats(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*StatsResponse, error)
 }
 
 type gatewayClient struct {
@@ -322,11 +470,21 @@ func (c *gatewayClient) RestartShard(ctx context.Context, in *RestartShardReques
 	return out, nil
 }
 
+func (c *gatewayClient) Stats(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*StatsResponse, error) {
+	out := new(StatsResponse)
+	err := c.cc.Invoke(ctx, "/gateway.Gateway/Stats", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayServer is the server API for Gateway service.
 type GatewayServer interface {
 	Version(context.Context, *EmptyRequest) (*VersionResponse, error)
 	RequestGuildMembers(context.Context, *RequestGuildMembersRequest) (*EmptyResponse, error)
 	RestartShard(context.Context, *RestartShardRequest) (*EmptyResponse, error)
+	Stats(context.Context, *EmptyRequest) (*StatsResponse, error)
 }
 
 // UnimplementedGatewayServer can be embedded to have forward compatible implementations.
@@ -341,6 +499,9 @@ func (*UnimplementedGatewayServer) RequestGuildMembers(ctx context.Context, req 
 }
 func (*UnimplementedGatewayServer) RestartShard(ctx context.Context, req *RestartShardRequest) (*EmptyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RestartShard not implemented")
+}
+func (*UnimplementedGatewayServer) Stats(ctx context.Context, req *EmptyRequest) (*StatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stats not implemented")
 }
 
 func RegisterGatewayServer(s *grpc.Server, srv GatewayServer) {
@@ -401,6 +562,24 @@ func _Gateway_RestartShard_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Gateway_Stats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServer).Stats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gateway.Gateway/Stats",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServer).Stats(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Gateway_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "gateway.Gateway",
 	HandlerType: (*GatewayServer)(nil),
@@ -417,9 +596,88 @@ var _Gateway_serviceDesc = grpc.ServiceDesc{
 			MethodName: "RestartShard",
 			Handler:    _Gateway_RestartShard_Handler,
 		},
+		{
+			MethodName: "Stats",
+			Handler:    _Gateway_Stats_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "gateway.proto",
+}
+
+func (m *StatsResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StatsResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StatsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Stats) > 0 {
+		for iNdEx := len(m.Stats) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Stats[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGateway(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *Stat) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Stat) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Stat) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.EventRate != 0 {
+		i = encodeVarintGateway(dAtA, i, uint64(m.EventRate))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.Status != 0 {
+		i = encodeVarintGateway(dAtA, i, uint64(m.Status))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.Shard != 0 {
+		i = encodeVarintGateway(dAtA, i, uint64(m.Shard))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *EmptyRequest) Marshal() (dAtA []byte, err error) {
@@ -570,6 +828,39 @@ func encodeVarintGateway(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *StatsResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Stats) > 0 {
+		for _, e := range m.Stats {
+			l = e.Size()
+			n += 1 + l + sovGateway(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *Stat) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Shard != 0 {
+		n += 1 + sovGateway(uint64(m.Shard))
+	}
+	if m.Status != 0 {
+		n += 1 + sovGateway(uint64(m.Status))
+	}
+	if m.EventRate != 0 {
+		n += 1 + sovGateway(uint64(m.EventRate))
+	}
+	return n
+}
+
 func (m *EmptyRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -633,6 +924,203 @@ func sovGateway(x uint64) (n int) {
 }
 func sozGateway(x uint64) (n int) {
 	return sovGateway(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *StatsResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGateway
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StatsResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StatsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Stats", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGateway
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGateway
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGateway
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Stats = append(m.Stats, &Stat{})
+			if err := m.Stats[len(m.Stats)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGateway(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGateway
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGateway
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Stat) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGateway
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Stat: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Stat: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Shard", wireType)
+			}
+			m.Shard = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGateway
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Shard |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGateway
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= ShardStatus(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EventRate", wireType)
+			}
+			m.EventRate = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGateway
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EventRate |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGateway(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGateway
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGateway
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *EmptyRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)

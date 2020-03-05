@@ -10,7 +10,22 @@ service Gateway {
     rpc Stats(EmptyRequest) returns (StatsResponse);
 }
 
-message StatsResponse {}
+message StatsResponse {
+    repeated Stat stats = 1;
+}
+
+message Stat {
+    int32 shard = 1;
+    ShardStatus status = 2;
+    int32 event_rate = 3;
+}
+
+enum ShardStatus {
+    DISCONNECTED = 0;
+    CONNECTING = 1;
+    GUILD_STREAM = 2;
+    CONNECTED = 3;
+}
 
 message EmptyRequest {}
 message EmptyResponse {}

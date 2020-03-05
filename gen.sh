@@ -7,6 +7,8 @@ cd "$(dirname "$0")"
 pushd () { builtin pushd "$@" > /dev/null ; }
 popd () { builtin popd > /dev/null ; }
 
+GO111MODULE=off go get -u github.com/gogo/protobuf/protoc-gen-gogofaster
+
 pushd gatewaypb
 	protoc -I. --gogofaster_out=plugins=grpc:. ./*.proto
 popd

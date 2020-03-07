@@ -10,9 +10,9 @@ if [[ $VERSION == *-dirty ]]; then
   VERSION+="-$(head -c 5 < /dev/urandom | base32)"
 fi
 
-gateway_uri="rg.fr-par.scw.cloud/tatsu/gateway:41edf38-dirty-D6NODXBT"
-# docker build -t "$gateway_uri" -f Dockerfile.gateway .
-# docker push "$gateway_uri" 
+gateway_uri="rg.fr-par.scw.cloud/tatsu/gateway:$VERSION"
+docker build -t "$gateway_uri" -f Dockerfile.gateway .
+docker push "$gateway_uri" 
 
 state_uri="rg.fr-par.scw.cloud/tatsu/state:$VERSION"
 docker build -t "$state_uri" -f Dockerfile.state .

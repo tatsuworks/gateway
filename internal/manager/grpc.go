@@ -11,6 +11,10 @@ import (
 
 var _ gatewaypb.GatewayServer = &Manager{}
 
+func (m *Manager) Stats(ctx context.Context, req *gatewaypb.EmptyRequest) (*gatewaypb.StatsResponse, error) {
+	return &gatewaypb.StatsResponse{}, nil
+}
+
 func (m *Manager) Version(ctx context.Context, req *gatewaypb.EmptyRequest) (*gatewaypb.VersionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Version not implemented")
 }

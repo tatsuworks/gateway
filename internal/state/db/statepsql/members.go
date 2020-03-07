@@ -2,7 +2,6 @@ package statepsql
 
 import (
 	"context"
-	"fmt"
 	"unsafe"
 
 	"golang.org/x/xerrors"
@@ -83,13 +82,8 @@ DO UPDATE SET
 	}
 
 	for i, e := range members {
-		if guildID == 390426490103136256 {
-			fmt.Println(i, guildID, string(e))
-		}
 		_, err := st.ExecContext(ctx, i, guildID, e)
 		if err != nil {
-			// fmt.Println(e)
-			// fmt.Println(xerrors.Errorf("insert member: %w", err).Error())
 			return xerrors.Errorf("insert member: %w", err)
 		}
 	}
@@ -115,7 +109,7 @@ WHERE
 	var ms []RawJSON
 	err := db.sql.SelectContext(ctx, &ms, q, guildID)
 	if err != nil {
-		return nil, xerrors.Errorf("exec select: %w")
+		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
@@ -154,4 +148,26 @@ LIMIT 1
 	}
 
 	return *(*[]byte)(unsafe.Pointer(&usr)), nil
+}
+
+func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
+	const q = `
+SELECT
+	data
+FROM
+	members
+WHERE
+	guild_id = $1 AND (
+		data->'user'->>'username' like '%$2%' OR
+		data->>'nick' like '%$2%'
+	)
+`
+
+	var ms []RawJSON
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, query)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
 }

@@ -16,6 +16,8 @@ require (
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/lib/pq v1.0.0
+	github.com/minio/simdjson-go v0.1.4
+	github.com/mmcloughlin/avo v0.0.0-20200303042253-6df701fe672f // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
 	github.com/valyala/fasthttp v1.4.0

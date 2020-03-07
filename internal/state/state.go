@@ -33,6 +33,7 @@ type DB interface {
 	GetGuildMember(ctx context.Context, guild, user int64) ([]byte, error)
 	GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteGuildMember(ctx context.Context, guild, user int64) error
+	SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error)
 
 	SetChannelMessage(ctx context.Context, channel, id int64, raw []byte) error
 	GetChannelMessage(ctx context.Context, channel, id int64) ([]byte, error)

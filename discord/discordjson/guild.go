@@ -69,7 +69,7 @@ func idFromNestedObject(raw []byte, obj string) (int64, error) {
 	return snowflakeFromObject(objRaw, "id")
 }
 
-func (_ decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
+func (_ *decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 	var (
 		gc = &discord.GuildCreate{
 			ID:          0,
@@ -195,7 +195,7 @@ func (_ decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 	return gc, nil
 }
 
-func (_ decoder) DecodeGuildBan(buf []byte) (*discord.GuildBan, error) {
+func (_ *decoder) DecodeGuildBan(buf []byte) (*discord.GuildBan, error) {
 	var (
 		gb  discord.GuildBan
 		err error

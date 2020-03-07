@@ -7,13 +7,30 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var Encoding discord.Encoding = &decoder{}
+var Encoding discord.Encoding = &decoder{
+	// iterPool: &sync.Pool{
+	// 	New: func() interface{} {
+	// 		return &simdjson.ParsedJson{}
+	// 	},
+	// },
+}
 
-type decoder struct{}
+type decoder struct {
+	// iterPool *sync.Pool
+}
 
-func (_ decoder) Name() string {
+func (_ *decoder) Name() string {
 	return "json"
 }
+
+// func (d *decoder) getIter() *simdjson.ParsedJson {
+// 	return d.iterPool.Get().(*simdjson.ParsedJson)
+// }
+//
+// func (d *decoder) putIter(iter *simdjson.ParsedJson) {
+// 	iter.Reset()
+// 	d.iterPool.Put(iter)
+// }
 
 var _ json.RawMessage
 

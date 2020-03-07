@@ -26,6 +26,10 @@ func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 		return s.getGuildMemberSlice(w, r, p)
 	}
 
+	if r.URL.Query().Get("query") != "" {
+		return s.searchGuildMembers(w, r, p)
+	}
+
 	ms, err := s.db.GetGuildMembers(r.Context(), guildParam(p))
 	if err != nil {
 		return xerrors.Errorf("read members: %w", err)
@@ -54,6 +58,21 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 	}
 
 	return s.writeTerms(w, mrs)
+}
+
+func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	var (
+		ctx   = r.Context()
+		g     = guildParam(p)
+		query = r.URL.Query().Get("query")
+	)
+
+	ms, err := s.db.SearchGuildMembers(ctx, g, query)
+	if err != nil {
+		return xerrors.Errorf("search members: %w", err)
+	}
+
+	return s.writeTerms(w, ms)
 }
 
 func memberParam(p httprouter.Params) int64 {

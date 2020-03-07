@@ -68,10 +68,6 @@ func (s *Session) writeOp(op *Op) error {
 		return xerrors.Errorf("close writer: %w", err)
 	}
 
-	if op.Op == 8 && s.shardID == 798 || s.shardID == 1014 {
-		s.log.Info(s.ctx, "wrote message", slog.F("op", op.Op), slog.F("raw", string(raw)))
-	}
-
 	return nil
 }
 

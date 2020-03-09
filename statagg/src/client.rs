@@ -3,14 +3,19 @@ mod gatewaypb {
 }
 
 use gatewaypb::gateway_client;
+use std::error::Error;
 use tonic::transport::channel::Channel;
 
 pub type GatewayClient = gateway_client::GatewayClient<Channel>;
-pub use gatewaypb::{EmptyRequest, StatsResponse};
+pub use gatewaypb::{EmptyRequest, Stat, StatsResponse};
 
-async fn test() -> Result<Vec<GatewayClient>, Box<dyn std::error::Error>> {
-    let mut conn = GatewayClient::connect("asdf").await?;
-    let res = conn.version(gatewaypb::EmptyRequest {}).await?.into_inner();
-    println!("{}", res.version);
-    Ok(vec![conn])
+pub async fn get_clients(clusters: i32) -> Result<Vec<GatewayClient>, Box<dyn Error>> {
+    let mut conns: Vec<GatewayClient> = Vec::new();
+
+    for i in 0..clusters {
+        let conn = GatewayClient::connect(format!("gateway-{}.tatsu.svc.cluster.local", i)).await?;
+        conns.push(conn);
+    }
+
+    Ok(conns)
 }

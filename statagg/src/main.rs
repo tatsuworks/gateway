@@ -18,15 +18,15 @@ type Tx = UnboundedSender<Message>;
 struct Server {
     conns: Mutex<Vec<GatewayClient>>,
     listeners: Mutex<HashMap<SocketAddr, Tx>>,
-    _last_stat: RwLock<()>,
+    _last_stats: RwLock<Vec<client::Stat>>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let server = Arc::new(Server {
-        conns: Mutex::new(Vec::new()),
+        conns: Mutex::new(client::get_clients(16).await?),
         listeners: Mutex::new(HashMap::new()),
-        _last_stat: RwLock::new(()),
+        _last_stats: RwLock::new(Vec::new()),
     });
 
     {
@@ -38,7 +38,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     while let Ok((stream, addr)) = listener.accept().await {
         let srv = Arc::clone(&server);
         tokio::spawn(async move {
-            srv.handle_connection(stream, addr).await;
+            if let Err(err) = srv.handle_connection(stream, addr).await {
+                println!("failed to handle ws connection: {}", err)
+            }
         });
     }
 
@@ -46,11 +48,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 impl Server {
-    async fn handle_connection(&self, stream: TcpStream, addr: SocketAddr) {
+    async fn handle_connection(
+        &self,
+        stream: TcpStream,
+        addr: SocketAddr,
+    ) -> Result<(), Box<dyn Error>> {
         println!("incoming connection from: {}", addr);
-        let ws_stream = tokio_tungstenite::accept_async(stream)
-            .await
-            .expect("failed to accept websocket");
+        let ws_stream = tokio_tungstenite::accept_async(stream).await?;
         println!("ws conn established with consumer: {}", addr);
 
         let (tx, rx) = unbounded();
@@ -64,6 +68,7 @@ impl Server {
         future::select(ignore_incoming, forward_outgoing).await;
         println!("user disconnected: {}", addr);
         self.listeners.lock().await.remove(&addr);
+        Ok(())
     }
 
     async fn refresh_loop(&self) {
@@ -76,7 +81,7 @@ impl Server {
                 let stat = conn.stats(client::EmptyRequest {}).await.map_or_else(
                     |err| {
                         println!("failed to check stats: {}", err);
-                        client::StatsResponse {}
+                        client::StatsResponse { stats: Vec::new() }
                     },
                     |v| v.into_inner(),
                 );

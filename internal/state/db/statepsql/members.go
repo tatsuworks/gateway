@@ -158,13 +158,13 @@ FROM
 	members
 WHERE
 	guild_id = $1 AND (
-		data->'user'->>'username' like '%$2%' OR
-		data->>'nick' like '%$2%'
+		data->'user'->>'username' ilike $2 OR
+		data->>'nick' ilike $2
 	)
 `
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, query)
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+query+"%")
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

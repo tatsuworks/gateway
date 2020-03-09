@@ -11,8 +11,8 @@ if [[ $VERSION == *-dirty ]]; then
 fi
 
 gateway_uri="rg.fr-par.scw.cloud/tatsu/gateway:$VERSION"
-docker build -t "$gateway_uri" -f Dockerfile.gateway .
-docker push "$gateway_uri" 
+# docker build -t "$gateway_uri" -f Dockerfile.gateway .
+# docker push "$gateway_uri" 
 
 state_uri="rg.fr-par.scw.cloud/tatsu/state:$VERSION"
 docker build -t "$state_uri" -f Dockerfile.state .

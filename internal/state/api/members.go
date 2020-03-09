@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"cdr.dev/slog"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
@@ -67,6 +68,7 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 		query = r.URL.Query().Get("query")
 	)
 
+	s.log.Info(ctx, "member query", slog.F("query", query))
 	ms, err := s.db.SearchGuildMembers(ctx, g, query)
 	if err != nil {
 		return xerrors.Errorf("search members: %w", err)

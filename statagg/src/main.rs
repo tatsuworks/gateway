@@ -1,7 +1,7 @@
 mod client;
 
 use client::GatewayClient;
-use std::{collections::HashMap, error::Error, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, env, error::Error, net::SocketAddr, sync::Arc, time::Duration};
 
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use futures_util::{future, pin_mut, stream::TryStreamExt, StreamExt};
@@ -23,8 +23,10 @@ struct Server {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let clusters = env::var("CLUSTERS")?;
+
     let server = Arc::new(Server {
-        conns: Mutex::new(client::get_clients(16).await?),
+        conns: Mutex::new(client::get_clients(clusters.parse()?).await?),
         listeners: Mutex::new(HashMap::new()),
         _last_stats: RwLock::new(Vec::new()),
     });
@@ -34,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::spawn(async move { srv.refresh_loop().await });
     }
 
-    let mut listener = TcpListener::bind("127.0.0.1").await?;
+    let mut listener = TcpListener::bind("0.0.0.0:80").await?;
     while let Ok((stream, addr)) = listener.accept().await {
         let srv = Arc::clone(&server);
         tokio::spawn(async move {

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    tatsu.deployment: statagg
+  name: statagg
+  namespace: tatsu
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      tatsu.deployment: statagg
+  template:
+    metadata:
+      labels:
+        tatsu.deployment: statagg
+    spec:
+      imagePullSecrets:
+        - name: scalewayauth
+      restartPolicy: Always
+      containers:
+        - name: statagg
+          image: rg.fr-par.scw.cloud/tatsu/statagg:6828ee1-dirty-4SBKERPZ
+          imagePullPolicy: Always
+          ports:
+            - name: statagg
+              containerPort: 80
+          tty: true
+          env:
+            - name: CLUSTERS
+              value: 16
+          # livenessProbe:
+          #   httpGet:
+          #     path: /healthz
+          #     port: stataggws
+            # initialDelaySeconds: 1
+            # failureThreshold: 4
+            # periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statagg
+  namespace: tatsu
+spec:
+  type: NodePort
+  externalTrafficPolicy: "Local"
+  selector:
+    tatsu.deployment: statagg
+  ports:
+    - name: statagg
+      port: 80
+      protocol: TCP
+---

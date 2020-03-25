@@ -81,30 +81,30 @@ func (c *Client) GuildDelete(d []byte) error {
 		return nil
 	})
 
-	eg.Go(func() error {
-		err := c.db.DeleteGuildRoles(defaultCtx, gc.ID)
-		if err != nil {
-			return xerrors.Errorf("delete guild roles: %w", err)
-		}
-
-		return nil
-	})
-	eg.Go(func() error {
-		err := c.db.DeleteGuildMembers(defaultCtx, gc.ID)
-		if err != nil {
-			return xerrors.Errorf("delete guild members: %w", err)
-		}
-
-		return nil
-	})
-	eg.Go(func() error {
-		err := c.db.DeleteChannels(defaultCtx, gc.ID)
-		if err != nil {
-			return xerrors.Errorf("delete channels: %w", err)
-		}
-
-		return nil
-	})
+	// eg.Go(func() error {
+	// 	err := c.db.DeleteGuildRoles(defaultCtx, gc.ID)
+	// 	if err != nil {
+	// 		return xerrors.Errorf("delete guild roles: %w", err)
+	// 	}
+	//
+	// 	return nil
+	// })
+	// eg.Go(func() error {
+	// 	err := c.db.DeleteGuildMembers(defaultCtx, gc.ID)
+	// 	if err != nil {
+	// 		return xerrors.Errorf("delete guild members: %w", err)
+	// 	}
+	//
+	// 	return nil
+	// })
+	// eg.Go(func() error {
+	// 	err := c.db.DeleteChannels(defaultCtx, gc.ID)
+	// 	if err != nil {
+	// 		return xerrors.Errorf("delete channels: %w", err)
+	// 	}
+	//
+	// 	return nil
+	// })
 
 	return eg.Wait()
 }

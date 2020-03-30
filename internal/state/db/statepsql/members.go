@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"database/sql"
 	"unsafe"
 
 	"golang.org/x/xerrors"
@@ -40,7 +41,7 @@ WHERE
 
 	c := RawJSON{}
 	err := db.sql.GetContext(ctx, &c, q, guildID, userID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
@@ -108,7 +109,7 @@ WHERE
 
 	var ms []RawJSON
 	err := db.sql.SelectContext(ctx, &ms, q, guildID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
@@ -143,7 +144,7 @@ LIMIT 1
 
 	var usr RawJSON
 	err := db.sql.GetContext(ctx, &usr, q, userID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 

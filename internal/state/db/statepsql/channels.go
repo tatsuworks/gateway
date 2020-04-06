@@ -56,7 +56,7 @@ WHERE
 
 	_, err := db.sql.ExecContext(ctx, q, id)
 	if err != nil {
-		return xerrors.Errorf("exec delete: %w")
+		return xerrors.Errorf("exec delete: %w", err)
 	}
 
 	return nil
@@ -73,7 +73,7 @@ FROM
 	var c int
 	err := db.sql.GetContext(ctx, &c, q)
 	if err != nil {
-		return 0, xerrors.Errorf("exec select: %w")
+		return 0, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return c, nil
@@ -122,7 +122,7 @@ FROM
 	var cs []RawJSON
 	err := db.sql.SelectContext(ctx, &cs, q)
 	if err != nil {
-		return nil, xerrors.Errorf("exec select: %w")
+		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&cs)), nil
@@ -141,7 +141,7 @@ WHERE
 	var cs []RawJSON
 	err := db.sql.SelectContext(ctx, &cs, q, guild)
 	if err != nil {
-		return nil, xerrors.Errorf("exec select: %w")
+		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&cs)), nil

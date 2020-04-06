@@ -92,7 +92,7 @@ WHERE
 	var es []RawJSON
 	err := db.sql.SelectContext(ctx, &es, q, guildID)
 	if err != nil {
-		return nil, xerrors.Errorf("exec select: %w")
+		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&es)), nil

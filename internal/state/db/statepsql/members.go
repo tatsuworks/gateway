@@ -58,7 +58,7 @@ WHERE
 
 	_, err := db.sql.ExecContext(ctx, q, guildID, userID)
 	if err != nil {
-		return xerrors.Errorf("exec delete: %w")
+		return xerrors.Errorf("exec delete: %w", err)
 	}
 
 	return nil

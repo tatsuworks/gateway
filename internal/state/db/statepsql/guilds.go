@@ -56,7 +56,7 @@ FROM
 	var c int
 	err := db.sql.GetContext(ctx, &c, q)
 	if err != nil {
-		return 0, xerrors.Errorf("exec select: %w")
+		return 0, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return c, nil
@@ -72,7 +72,7 @@ WHERE
 
 	_, err := db.sql.ExecContext(ctx, q, id)
 	if err != nil {
-		return xerrors.Errorf("exec delete: %w")
+		return xerrors.Errorf("exec delete: %w", err)
 	}
 
 	return nil

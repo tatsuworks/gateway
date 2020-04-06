@@ -57,7 +57,7 @@ WHERE
 
 	_, err := db.sql.ExecContext(ctx, q, roleID, guildID)
 	if err != nil {
-		return xerrors.Errorf("exec delete: %w")
+		return xerrors.Errorf("exec delete: %w", err)
 	}
 
 	return nil
@@ -108,7 +108,7 @@ WHERE
 	var rs []RawJSON
 	err := db.sql.SelectContext(ctx, &rs, q, guildID)
 	if err != nil {
-		return nil, xerrors.Errorf("exec select: %w")
+		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&rs)), nil

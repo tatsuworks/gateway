@@ -279,7 +279,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	}
 
 	s.persistSeq()
-	_ = c.Close(websocket.StatusNormalClosure, "")
+	_ = c.Close(4000, "")
 	s.log.Info(s.ctx, "closed")
 	return err
 }
@@ -346,6 +346,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	// RECONNECT
 	case 7:
 		s.log.Info(s.ctx, "reconnect requested")
+		s.persistSeq()
 
 		return true, xerrors.New("reconnect")
 

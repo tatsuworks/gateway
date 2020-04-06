@@ -11,6 +11,7 @@ use tokio::{
     sync::{Mutex, RwLock},
 };
 
+use serde::Serialize;
 use tungstenite::protocol::Message;
 
 type Tx = UnboundedSender<Message>;
@@ -20,6 +21,22 @@ struct Server {
     listeners: Mutex<HashMap<SocketAddr, Tx>>,
     _last_stats: RwLock<Vec<client::Stat>>,
 }
+
+#[derive(Serialize, Debug)]
+struct StatsMessage {
+    pub stats: Vec<WsStat>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(remote = "client::Stat")]
+struct SerdeStat {
+    pub shard: i32,
+    pub status: i32,
+    pub event_rate: i32,
+}
+
+#[derive(Serialize, Debug)]
+pub struct WsStat(#[serde(with = "SerdeStat")] client::Stat);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -75,20 +92,38 @@ impl Server {
 
     async fn refresh_loop(&self) {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
+        let mut stats: Vec<StatsMessage> = Vec::new();
 
         loop {
             interval.tick().await;
+            stats.truncate(0);
 
             for conn in self.conns.lock().await.iter_mut() {
                 let stat = conn.stats(client::EmptyRequest {}).await.map_or_else(
                     |err| {
                         println!("failed to check stats: {}", err);
-                        client::StatsResponse { stats: Vec::new() }
+                        StatsMessage { stats: Vec::new() }
                     },
-                    |v| v.into_inner(),
+                    |v| StatsMessage {
+                        stats: v
+                            .into_inner()
+                            .stats
+                            .into_iter()
+                            .map(|stat| WsStat(stat))
+                            .collect(),
+                    },
                 );
 
-                dbg!(stat);
+                stats.push(stat);
+            }
+
+            let list = self.listeners.lock().await;
+            for stat in &stats {
+                let raw = serde_json::to_string(&stat).unwrap();
+                for (_, recv) in list.iter() {
+                    recv.unbounded_send(Message::text(&raw))
+                        .unwrap_or_else(|err| println!("failed to send stat: {}", err));
+                }
             }
         }
     }

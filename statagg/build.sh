@@ -10,7 +10,8 @@ if [[ $VERSION == *-dirty ]]; then
   VERSION+="-$(head -c 5 < /dev/urandom | base32)"
 fi
 
-statagg_uri="rg.fr-par.scw.cloud/tatsu/statagg:$VERSION"
-docker build -t "$statagg_uri" -f Dockerfile ..
-docker push "$statagg_uri" 
+uri="gcr.io/tatsu-production/statagg:$VERSION"
+docker build -t "$uri" -f Dockerfile ..
+docker push "$uri" 
 
+echo "Pushed new image to: $uri"

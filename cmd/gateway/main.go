@@ -24,6 +24,7 @@ import (
 
 var (
 	name       string
+	token      string
 	redisHost  string
 	etcdHost   string
 	playedHost string
@@ -39,6 +40,7 @@ var (
 
 func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
+	flag.StringVar(&token, "token", "", "token for the bot")
 	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&playedHost, "played", "", "Played")
@@ -116,7 +118,7 @@ func main() {
 		Logger:     logger,
 		Wg:         wg,
 		DB:         statedb,
-		Token:      Token,
+		Token:      token,
 		Shards:     shards,
 		Intents:    ints,
 		RedisAddr:  redisHost,

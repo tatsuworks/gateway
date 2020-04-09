@@ -5,6 +5,8 @@ CREATE TABLE channels (
 	PRIMARY KEY("id", "guild_id")
 );
 
+CREATE INDEX CONCURRENTLY channels_guild_id ON channels("guild_id");
+
 CREATE TABLE guilds (
 	"id" int8 NOT NULL,
 	"data" jsonb NOT NULL,

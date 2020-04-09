@@ -5,7 +5,7 @@ START=$((POD_ID * SHARDS_PER_POD))
 STOP=$(((POD_ID+1) * SHARDS_PER_POD))
 
 exec /gateway \
-	--toen="$TOKEN" \
+	--token="$TOKEN" \
 	--name="$NAME" \
 	--prod="$PROD" \
 	--redis="$REDIS" \

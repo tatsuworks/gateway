@@ -22,13 +22,14 @@ func (db *db) GetShardInfo(ctx context.Context, shard int, name string) (sess st
 
 func (db *db) SetSequence(ctx context.Context, shard int, name string, seq int64) error {
 	const q = `
-UPDATE
-	shards
+INSERT INTO
+	shards (id, name, seq, sess)
+VALUES
+	($1, $2, $3, '')
+ON CONFLICT
+DO UPDATE
 SET
 	seq = $3
-WHERE
-	id = $1 AND
-	name = $2
 `
 
 	_, err := db.sql.ExecContext(ctx, q, shard, name, seq)
@@ -61,13 +62,14 @@ WHERE
 
 func (db *db) SetSessionID(ctx context.Context, shard int, name, sess string) error {
 	const q = `
-UPDATE
-	shards
+INSERT INTO
+	shards (id, name, seq, sess)
+VALUES
+	($1, $2, 0, $3)
+ON CONFLICT
+DO UPDATE
 SET
 	sess = $3
-WHERE
-	id = $1 AND
-	name = $2
 `
 
 	_, err := db.sql.ExecContext(ctx, q, shard, name, sess)

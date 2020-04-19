@@ -49,3 +49,11 @@ CREATE TABLE emojis (
 	"data" jsonb NOT NULL,
 	PRIMARY KEY("id", "guild_id")
 );
+
+CREATE TABLE shards (
+	"id" int NOT NULL,
+	"name" text NOT NULL,
+	"seq" int8 NOT NULL,
+	"sess" text NOT NULL,
+	PRIMARY KEY("id", name)
+);

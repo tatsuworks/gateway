@@ -93,6 +93,7 @@ type SessionConfig struct {
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
 	sess := &Session{
+		ctx:        context.Background(),
 		name:       cfg.Name,
 		wg:         cfg.WorkGroup,
 		log:        cfg.Logger.With(slog.F("name", cfg.Name), slog.F("shard", cfg.ShardID)),
@@ -213,6 +214,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
+	defer s.persistSeq()
 
 	for {
 		err = s.readMessage()
@@ -280,14 +282,13 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		}
 	}
 
-	s.persistSeq()
 	_ = c.Close(4000, "")
 	s.log.Info(s.ctx, "closed")
 	return err
 }
 
 func (s *Session) persistSeq() {
-	err := s.stateDB.SetSequence(s.ctx, s.shardID, s.name, s.seq)
+	err := s.stateDB.SetSequence(context.Background(), s.shardID, s.name, s.seq)
 	if err != nil {
 		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
@@ -295,14 +296,14 @@ func (s *Session) persistSeq() {
 
 func (s *Session) loadSeq() {
 	var err error
-	s.seq, err = s.stateDB.GetSequence(s.ctx, s.shardID, s.name)
+	s.seq, err = s.stateDB.GetSequence(context.Background(), s.shardID, s.name)
 	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(s.ctx, "load session id", slog.Error(err))
 	}
 }
 
 func (s *Session) persistSessID() {
-	err := s.stateDB.SetSessionID(s.ctx, s.shardID, s.name, s.sessID)
+	err := s.stateDB.SetSessionID(context.Background(), s.shardID, s.name, s.sessID)
 	if err != nil {
 		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
@@ -310,7 +311,7 @@ func (s *Session) persistSessID() {
 
 func (s *Session) loadSessID() {
 	var err error
-	s.sessID, err = s.stateDB.GetSessionID(s.ctx, s.shardID, s.name)
+	s.sessID, err = s.stateDB.GetSessionID(context.Background(), s.shardID, s.name)
 	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(s.ctx, "load session id", slog.Error(err))
 	}
@@ -331,7 +332,6 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	// RECONNECT
 	case 7:
 		s.log.Info(s.ctx, "reconnect requested")
-		s.persistSeq()
 
 		return true, xerrors.New("reconnect")
 

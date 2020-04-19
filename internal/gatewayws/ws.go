@@ -3,7 +3,7 @@ package gatewayws
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"database/sql"
 	"io"
 	"strconv"
 	"sync"
@@ -68,9 +68,10 @@ type Session struct {
 	etcdSess   *concurrency.Session
 	identifyMu *concurrency.Mutex
 
-	state  *handler.Client
-	rc     *redis.Client
-	played *played.Client
+	state   *handler.Client
+	stateDB state.DB
+	rc      *redis.Client
+	played  *played.Client
 }
 
 func (s *Session) GatewayURL() string {
@@ -108,9 +109,10 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 
 		etcd: cfg.Etcd,
 
-		state: handler.NewClient(cfg.Logger, cfg.DB),
-		enc:   cfg.DB.Encoding(),
-		rc:    cfg.Redis,
+		state:   handler.NewClient(cfg.Logger, cfg.DB),
+		stateDB: cfg.DB,
+		enc:     cfg.DB.Encoding(),
+		rc:      cfg.Redis,
 	}
 
 	sess.loadSessID()
@@ -285,50 +287,33 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 }
 
 func (s *Session) persistSeq() {
-	err := s.rc.Set(s.fmtSeqKey(), s.seq, 0).Err()
-	if err != nil && !xerrors.Is(err, redis.Nil) {
+	err := s.stateDB.SetSequence(s.ctx, s.shardID, s.name, s.seq)
+	if err != nil {
 		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSeq() {
-	sess, err := s.rc.Get(s.fmtSeqKey()).Result()
-	if err != nil && !xerrors.Is(err, redis.Nil) {
+	var err error
+	s.seq, err = s.stateDB.GetSequence(s.ctx, s.shardID, s.name)
+	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(s.ctx, "load session id", slog.Error(err))
-	}
-
-	if sess == "" {
-		return
-	}
-
-	s.seq, err = strconv.ParseInt(sess, 10, 64)
-	if err != nil {
-		s.log.Error(s.ctx, "parse session id", slog.Error(err))
 	}
 }
 
 func (s *Session) persistSessID() {
-	err := s.rc.Set(s.fmtSessIDKey(), s.sessID, 0).Err()
-	if err != nil && !xerrors.Is(err, redis.Nil) {
+	err := s.stateDB.SetSessionID(s.ctx, s.shardID, s.name, s.sessID)
+	if err != nil {
 		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
 }
 
 func (s *Session) loadSessID() {
-	sess, err := s.rc.Get(s.fmtSessIDKey()).Result()
-	if err != nil && !xerrors.Is(err, redis.Nil) {
+	var err error
+	s.sessID, err = s.stateDB.GetSessionID(s.ctx, s.shardID, s.name)
+	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(s.ctx, "load session id", slog.Error(err))
 	}
-
-	s.sessID = sess
-}
-
-func (s *Session) fmtSeqKey() string {
-	return fmt.Sprintf("gateway:seq:%s:%d", s.name, s.shardID)
-}
-
-func (s *Session) fmtSessIDKey() string {
-	return fmt.Sprintf("gateway:sess:%s:%d", s.name, s.shardID)
 }
 
 func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {

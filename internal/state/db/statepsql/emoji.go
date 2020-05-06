@@ -2,38 +2,43 @@ package statepsql
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"unsafe"
 
+	"github.com/lib/pq"
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetGuildEmojis(ctx context.Context, guild int64, emojis map[int64][]byte) error {
-	const q = `
+func (db *db) SetGuildEmojis(ctx context.Context, guildID int64, emojis map[int64][]byte) error {
+	var q strings.Builder
+
+	q.WriteString(`
 INSERT INTO
 	emojis (id, guild_id, data)
 VALUES
-	($1, $2, $3)
+`)
+
+	first := true
+	for i, e := range emojis {
+		if !first {
+			q.WriteString(", ")
+		}
+		first = false
+
+		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
+	}
+
+	q.WriteString(`
 ON CONFLICT
 	(id, guild_id)
 DO UPDATE SET
-	data = $3
-`
+	data = excluded.data
+`)
 
-	st, err := db.sql.PrepareContext(ctx, q)
+	_, err := db.sql.ExecContext(ctx, q.String())
 	if err != nil {
-		return xerrors.Errorf("prepare copy: %w", err)
-	}
-
-	for i, e := range emojis {
-		_, err := st.ExecContext(ctx, i, guild, e)
-		if err != nil {
-			return xerrors.Errorf("copy: %w", err)
-		}
-	}
-
-	err = st.Close()
-	if err != nil {
-		return xerrors.Errorf("close stmt: %w", err)
+		return xerrors.Errorf("copy: %w", err)
 	}
 
 	return nil

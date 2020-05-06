@@ -7,7 +7,7 @@ import (
 	"cdr.dev/slog"
 )
 
-const LogInterval = 5 * time.Minute
+const LogInterval = 3 * time.Minute
 
 func (s *Session) logTotalEvents() {
 	var (
@@ -33,6 +33,8 @@ func (s *Session) logTotalEvents() {
 			slog.F("events", since),
 			slog.F("/sec", float64(since)/LogInterval.Seconds()),
 			slog.F("write_queue", len(s.wch)),
+			slog.F("waiting", s.state.WaitingQueries()),
+			slog.F("state", s.curState),
 		)
 
 		s.last = seq

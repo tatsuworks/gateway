@@ -2,8 +2,12 @@ package statepsql
 
 import (
 	"context"
+	"reflect"
+	"strconv"
+	"strings"
 	"unsafe"
 
+	"github.com/lib/pq"
 	"golang.org/x/xerrors"
 )
 
@@ -79,42 +83,51 @@ FROM
 	return c, nil
 }
 
-func (db *db) SetChannels(ctx context.Context, guild int64, channels map[int64][]byte) error {
-	const q = `
+func (db *db) SetChannels(ctx context.Context, guildID int64, channels map[int64][]byte) error {
+	var q strings.Builder
+
+	q.WriteString(`
 INSERT INTO
 	channels (id, guild_id, data)
-VALUES
-	($1, $2, $3)
+VALUES 
+`)
+
+	first := true
+	for i, e := range channels {
+		if !first {
+			q.WriteString(", ")
+		}
+		first = false
+
+		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
+	}
+
+	q.WriteString(`
 ON CONFLICT
 	(id, guild_id)
 DO UPDATE SET
-	data = $3
-`
+	data = excluded.data
+`)
 
-	st, err := db.sql.PrepareContext(ctx, q)
+	_, err := db.sql.ExecContext(ctx, q.String())
 	if err != nil {
-		return xerrors.Errorf("prepare copy: %w", err)
-	}
-
-	for i, e := range channels {
-		_, err := st.ExecContext(ctx, i, guild, e)
-		if err != nil {
-			return xerrors.Errorf("copy: %w", err)
-		}
-	}
-
-	err = st.Close()
-	if err != nil {
-		return xerrors.Errorf("close stmt: %w", err)
+		return xerrors.Errorf("copy: %w", err)
 	}
 
 	return nil
 }
 
+func bytesToString(b []byte) string {
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := reflect.StringHeader{Data: bh.Data, Len: bh.Len}
+	str := *(*string)(unsafe.Pointer(&sh))
+	return strings.ToValidUTF8(str, "")
+}
+
 func (db *db) GetChannels(ctx context.Context) ([][]byte, error) {
 	const q = `
 SELECT
-	data
+	data || jsonb_build_object('guild_id', guild_id::text)
 FROM
 	channels
 `
@@ -131,7 +144,7 @@ FROM
 func (db *db) GetGuildChannels(ctx context.Context, guild int64) ([][]byte, error) {
 	const q = `
 SELECT
-	data
+	data || jsonb_build_object('guild_id', guild_id::text)
 FROM
 	channels
 WHERE

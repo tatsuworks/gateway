@@ -5,20 +5,17 @@ import (
 	"database/sql"
 	"net"
 	"net/http"
-	"os"
 	"time"
 	"unsafe"
 
 	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/sloghuman"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
 
 var ErrNotFound = sql.ErrNoRows
-var log = sloghuman.Make(os.Stdout)
 
-func wrapHandler(fn func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error) httprouter.Handle {
+func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error) httprouter.Handle {
 	return LogMW(log)(httprouter.Handle(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		err := fn(w, r, p)
 		if err != nil {
@@ -72,25 +69,23 @@ func LogMW(log slog.Logger) func(next httprouter.Handle) httprouter.Handle {
 			sw := &StatusWriter{ResponseWriter: w}
 			next(sw, r, p)
 
-			log := log.With(
-				slog.F("path", r.URL.Path),
-				slog.F("took", time.Since(start)),
-				slog.F("status_code", sw.Status),
-			)
-
 			if sw.Status >= 400 {
 				body := *(*string)(unsafe.Pointer(&sw.ErrorResponseBody))
-				log = log.With(
+				log := log.With(
+					slog.F("path", r.URL.Path),
+					slog.F("took", time.Since(start)),
+					slog.F("status_code", sw.Status),
 					slog.F("response_body", body),
 				)
+
+				logLevelFn := log.Info
+				if sw.Status >= 500 {
+					logLevelFn = log.Error
+				}
+
+				logLevelFn(r.Context(), r.Method)
 			}
 
-			logLevelFn := log.Info
-			if sw.Status >= 500 {
-				logLevelFn = log.Error
-			}
-
-			logLevelFn(r.Context(), r.Method)
 		})
 	}
 }

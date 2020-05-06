@@ -2,8 +2,11 @@ package statepsql
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"unsafe"
 
+	"github.com/lib/pq"
 	"golang.org/x/xerrors"
 )
 
@@ -65,32 +68,34 @@ WHERE
 }
 
 func (db *db) SetGuildMembers(ctx context.Context, guildID int64, members map[int64][]byte) error {
-	const q = `
+	var q strings.Builder
+
+	q.WriteString(`
 INSERT INTO
 	members (user_id, guild_id, data)
 VALUES
-	($1, $2, $3)
+`)
+
+	first := true
+	for i, e := range members {
+		if !first {
+			q.WriteString(", ")
+		}
+		first = false
+
+		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
+	}
+
+	q.WriteString(`
 ON CONFLICT
 	(user_id, guild_id)
 DO UPDATE SET
-	data = $3
-`
+	data = excluded.data
+`)
 
-	st, err := db.sql.PrepareContext(ctx, q)
+	_, err := db.sql.ExecContext(ctx, q.String())
 	if err != nil {
-		return xerrors.Errorf("prepare insert: %w", err)
-	}
-
-	for i, e := range members {
-		_, err := st.ExecContext(ctx, i, guildID, e)
-		if err != nil {
-			return xerrors.Errorf("insert member: %w", err)
-		}
-	}
-
-	err = st.Close()
-	if err != nil {
-		return xerrors.Errorf("close statement: %w", err)
+		return xerrors.Errorf("copy: %w", err)
 	}
 
 	return nil

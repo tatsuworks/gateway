@@ -3,7 +3,6 @@ package gatewayws
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"io"
 	"strconv"
 	"sync"
@@ -43,10 +42,10 @@ type Session struct {
 	shardID    int
 	shardCount int
 
-	sentAuth bool
-	seq      int64
-	sessID   string
-	last     int64
+	authed bool
+	seq    int64
+	sessID string
+	last   int64
 
 	wsConn *websocket.Conn
 	zr     io.ReadCloser
@@ -58,8 +57,10 @@ type Session struct {
 	wch    chan *Op
 	prioch chan *Op
 
-	lastHB  time.Time
-	lastAck time.Time
+	lastHB   time.Time
+	lastAck  time.Time
+	guilds   map[int64]struct{}
+	curState string
 
 	buf *bytes.Buffer
 	enc discord.Encoding
@@ -104,7 +105,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 
 		// start with a 1kb buffer
 		buf:    bytes.NewBuffer(make([]byte, 0, 1<<10)),
-		rl:     rate.NewLimiter(2, 2),
+		rl:     rate.NewLimiter(1.75, 2),
 		wch:    make(chan *Op, 2000),
 		prioch: make(chan *Op),
 
@@ -140,6 +141,11 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.wg.Add(1)
 	defer s.wg.Done()
 
+	defer func() {
+		s.authed = false
+	}()
+
+	s.curState = "begin"
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
 
@@ -154,7 +160,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.log.Info(ctx, "encoding", slog.F("name", s.enc.Name()))
 
 	s.lastAck = time.Time{}
-	s.sentAuth = false
 
 	var err error
 	err = s.initEtcd()
@@ -182,6 +187,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.zr = r
 	defer r.Close()
 
+	s.curState = "connecting"
 	c, _, err := websocket.Dial(s.ctx, s.GatewayURL(), nil)
 	if err != nil {
 		return xerrors.Errorf("dial gateway: %w", err)
@@ -189,6 +195,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.wsConn = c
 	s.wsConn.SetReadLimit(512 << 20)
 
+	s.curState = "read hello"
 	err = s.readHello()
 	if err != nil {
 		return xerrors.Errorf("handle hello message: %w", err)
@@ -208,7 +215,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		}
 	}
 
-	s.sentAuth = true
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
 	// go s.rotateStatuses()
@@ -217,6 +223,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	defer s.persistSeq()
 
 	for {
+		s.curState = "read message"
 		err = s.readMessage()
 		if err != nil {
 			var werr websocket.CloseError
@@ -236,6 +243,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			break
 		}
 
+		s.curState = "decode event"
 		var ev *discord.Event
 		ev, err = s.enc.DecodeT(s.buf.Bytes())
 		if err != nil {
@@ -247,6 +255,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			atomic.StoreInt64(&s.seq, ev.S)
 		}
 
+		s.curState = "handle internal event " + ev.T
 		if handled, err := s.handleInternalEvent(ev); handled {
 			if err != nil {
 				return err
@@ -263,58 +272,36 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			continue
 		}
 
+		s.curState = "handle state event " + ev.T
 		// this is jank, will fix soon
 		var requestMembers int64
-		requestMembers, err = s.state.HandleEvent(ev)
+		requestMembers, err = s.state.HandleEvent(ctx, ev)
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
-		err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-		if err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+		s.curState = "push event to redis"
+		if ev.T != "GUILD_CREATE" && ev.T != "GUILD_MEMBER_CHUNK" {
+			err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+			if err != nil {
+				s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+			}
 		}
 
+		s.curState = "request guild members"
+		// only request members from new guilds.
+		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
 		if requestMembers != 0 {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", requestMembers))
 			s.requestGuildMembers(requestMembers)
 		}
 	}
 
+	s.curState = "close"
 	_ = c.Close(4000, "")
 	s.log.Info(s.ctx, "closed")
 	return err
-}
-
-func (s *Session) persistSeq() {
-	err := s.stateDB.SetSequence(context.Background(), s.shardID, s.name, s.seq)
-	if err != nil {
-		s.log.Error(s.ctx, "save seq", slog.Error(err))
-	}
-}
-
-func (s *Session) loadSeq() {
-	var err error
-	s.seq, err = s.stateDB.GetSequence(context.Background(), s.shardID, s.name)
-	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
-		s.log.Error(s.ctx, "load session id", slog.Error(err))
-	}
-}
-
-func (s *Session) persistSessID() {
-	err := s.stateDB.SetSessionID(context.Background(), s.shardID, s.name, s.sessID)
-	if err != nil {
-		s.log.Error(s.ctx, "save seq", slog.Error(err))
-	}
-}
-
-func (s *Session) loadSessID() {
-	var err error
-	s.sessID, err = s.stateDB.GetSessionID(context.Background(), s.shardID, s.name)
-	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
-		s.log.Error(s.ctx, "load session id", slog.Error(err))
-	}
 }
 
 func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
@@ -326,6 +313,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	// RESUME
 	case 6:
 		s.log.Info(s.ctx, "resumed")
+		s.authed = true
 
 		return true, nil
 
@@ -342,6 +330,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.persistSessID()
 		s.seq = 0
 		s.persistSeq()
+		s.wch = make(chan *Op, 2000)
 
 		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
 			err := s.releaseIdentifyLock()
@@ -360,17 +349,23 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	switch ev.T {
 	case "READY":
-		_, sess, err := s.enc.DecodeReady(ev.D)
+		s.guilds = map[int64]struct{}{}
+		guilds, _, sess, err := s.enc.DecodeReady(ev.D)
 		if err != nil {
 			return true, xerrors.Errorf("decode ready: %w", err)
 		}
 
+		for i := range guilds {
+			s.guilds[i] = struct{}{}
+		}
+
 		s.sessID = sess
-		s.log.Info(s.ctx, "ready", slog.F("sess", sess))
+		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("guild_count", len(s.guilds)))
 		s.persistSessID()
+		s.authed = true
 
 		go func() {
-			time.Sleep(15 * time.Second)
+			time.Sleep(7 * time.Second)
 			err = s.releaseIdentifyLock()
 			if err != nil {
 				s.log.Error(s.ctx, "release identify lock after ready", slog.Error(err))
@@ -381,6 +376,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	case "RESUMED":
 		s.log.Info(s.ctx, "resumed")
+		s.authed = true
 		return true, nil
 	}
 

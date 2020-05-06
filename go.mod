@@ -15,7 +15,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
 	github.com/julienschmidt/httprouter v1.2.0
-	github.com/lib/pq v1.0.0
+	github.com/lib/pq v1.4.0
 	github.com/minio/simdjson-go v0.1.4
 	github.com/mmcloughlin/avo v0.0.0-20200303042253-6df701fe672f // indirect
 	github.com/pkg/errors v0.8.1
@@ -27,5 +27,5 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
 	google.golang.org/grpc v1.25.1
-	nhooyr.io/websocket v1.8.3
+	nhooyr.io/websocket v1.8.5
 )

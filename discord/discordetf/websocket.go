@@ -61,7 +61,7 @@ func (_ decoder) DecodeHello(buf []byte) (hbInterval int, trace string, _ error)
 	return hbInterval, trace, nil
 }
 
-func (_ decoder) DecodeReady(buf []byte) (version int, sessionID string, _ error) {
+func (_ decoder) DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string, _ error) {
 	var (
 		d      = &etfDecoder{buf: buf}
 		v      int
@@ -70,14 +70,14 @@ func (_ decoder) DecodeReady(buf []byte) (version int, sessionID string, _ error
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return 0, "", xerrors.Errorf("verify map byte: %s", err)
+		return nil, 0, "", xerrors.Errorf("verify map byte: %s", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return 0, "", xerrors.Errorf("read map key: %s", err)
+			return nil, 0, "", xerrors.Errorf("read map key: %s", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
@@ -85,13 +85,13 @@ func (_ decoder) DecodeReady(buf []byte) (version int, sessionID string, _ error
 		case "v":
 			v, err = d.readIntWithTagIntoInt()
 			if err != nil {
-				return 0, "", xerrors.Errorf("read version: %s", err)
+				return nil, 0, "", xerrors.Errorf("read version: %s", err)
 			}
 
 		case "session_id":
 			a, err := d.readAtomWithTag()
 			if err != nil {
-				return 0, "", xerrors.Errorf("read session_id: %s", err)
+				return nil, 0, "", xerrors.Errorf("read session_id: %s", err)
 			}
 
 			sessID = string(d.buf[d.off-a : d.off])
@@ -99,11 +99,11 @@ func (_ decoder) DecodeReady(buf []byte) (version int, sessionID string, _ error
 		default:
 			err := d.readTerm()
 			if err != nil {
-				return 0, "", xerrors.Errorf("read ready field %s: %w", key, err)
+				return nil, 0, "", xerrors.Errorf("read ready field %s: %w", key, err)
 			}
 		}
 
 	}
 
-	return v, sessID, nil
+	return nil, v, sessID, nil
 }

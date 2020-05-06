@@ -25,6 +25,5 @@ func (_ decoder) DecodeT(buf []byte) (*discord.Event, error) {
 		return nil, xerrors.Errorf("unmarshal event: %w", err)
 	}
 
-	// fmt.Printf("t: %s, s: %d, op: %d\n", e.T, e.S, e.Op)
 	return (*discord.Event)(unsafe.Pointer(&e)), nil
 }

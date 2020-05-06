@@ -1,19 +1,23 @@
 package handler
 
 import (
-	"context"
+	"sync/atomic"
 
 	"cdr.dev/slog"
 	"github.com/tatsuworks/gateway/discord"
 	"github.com/tatsuworks/gateway/internal/state"
 )
 
-var defaultCtx = context.Background()
-
 type Client struct {
 	log slog.Logger
 	db  state.DB
 	enc discord.Encoding
+
+	waitingQueries int64
+}
+
+func (c *Client) WaitingQueries() int64 {
+	return atomic.LoadInt64(&c.waitingQueries)
 }
 
 func NewClient(log slog.Logger, db state.DB) *Client {

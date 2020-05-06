@@ -39,19 +39,21 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 		ctx = r.Context()
 		g   = guildParam(p)
 		rs  = r.URL.Query()["id"]
-		ros = make([][]byte, len(rs))
+		ros = make([][]byte, 0, len(rs))
 	)
 
-	for i, e := range rs {
+	for _, e := range rs {
 		rr, err := strconv.ParseInt(e, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("parse role id: %w", err)
 		}
 
-		ros[i], err = s.db.GetGuildRole(ctx, g, rr)
-		if err != nil {
+		rol, err := s.db.GetGuildRole(ctx, g, rr)
+		if err != nil && !xerrors.Is(err, ErrNotFound) {
 			return xerrors.Errorf("get role: %w", err)
 		}
+
+		ros = append(ros, rol)
 	}
 
 	return s.writeTerms(w, ros)

@@ -16,34 +16,44 @@ type Op struct {
 }
 
 func (s *Session) writer() {
-	ctx := s.ctx
-	for {
-		err := s.rl.Wait(ctx)
-		if err != nil {
-			return
-		}
+	var (
+		ctx    = s.ctx
+		wch    = s.wch
+		prioch = s.prioch
+		isPrio bool
+	)
 
+	for {
 		var msg *Op
 		select {
 		case <-ctx.Done():
 			return
 		// we always check the prio channel first since that should
 		// take precedence over other messages
-		case msg = <-s.prioch:
-		case msg = <-s.wch:
-			if !s.sentAuth {
-				s.wch <- msg
+		case msg = <-prioch:
+			isPrio = true
+		case msg = <-wch:
+			if !s.authed {
+				wch <- msg
 				time.Sleep(25 * time.Millisecond)
 				continue
 			}
 		}
 
+		err := s.rl.Wait(ctx)
+		if err != nil {
+			return
+		}
+
 		err = s.writeOp(msg)
 		if err != nil {
-			s.wch <- msg
+			if !isPrio {
+				wch <- msg
+			}
 			s.log.Error(s.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
 			return
 		}
+		isPrio = false
 		time.Sleep(25 * time.Millisecond)
 	}
 }
@@ -58,14 +68,11 @@ func (s *Session) writeOp(op *Op) error {
 	if err != nil {
 		return xerrors.Errorf("get writer: %w", err)
 	}
+	defer w.Close()
 
 	_, err = w.Write(raw)
 	if err != nil {
 		return xerrors.Errorf("write payload: %w", err)
-	}
-
-	if err := w.Close(); err != nil {
-		return xerrors.Errorf("close writer: %w", err)
 	}
 
 	return nil
@@ -165,12 +172,17 @@ type RequestGuildMembers struct {
 }
 
 func (s *Session) requestGuildMembers(guild int64) {
-	s.wch <- &Op{
+	select {
+	case s.wch <- &Op{
 		Op: 8,
 		D: RequestGuildMembers{
 			GuildID: guild,
 		},
+	}:
+	default:
+		s.log.Error(s.ctx, "write channel full")
 	}
+
 }
 
 type status struct {

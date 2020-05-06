@@ -1,6 +1,8 @@
 package discordjson
 
 import (
+	"fmt"
+
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -10,9 +12,23 @@ func (_ decoder) DecodeHello(buf []byte) (hbInterval int, trace string, _ error)
 	return hbInterval, "", nil
 }
 
-func (_ decoder) DecodeReady(buf []byte) (version int, sessionID string, _ error) {
+func (_ decoder) DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string, _ error) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			fmt.Println("bad ready guilds:", err)
+		}
+	}()
+
 	version = jsoniter.Get(buf, "v").ToInt()
 	sessionID = jsoniter.Get(buf, "session_id").ToString()
 
-	return
+	var _guilds []jsoniter.RawMessage
+	jsoniter.Get(buf, "guilds").ToVal(&_guilds)
+	guilds, err := rawsToMapBySnowflake(_guilds, "id")
+	if err != nil {
+		return nil, 0, "", err
+	}
+
+	return guilds, version, sessionID, nil
 }

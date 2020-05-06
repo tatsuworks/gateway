@@ -27,6 +27,7 @@ INSERT INTO
 VALUES
 	($1, $2, $3, '')
 ON CONFLICT
+	(id, name)
 DO UPDATE
 SET
 	seq = $3
@@ -67,6 +68,7 @@ INSERT INTO
 VALUES
 	($1, $2, 0, $3)
 ON CONFLICT
+	(id, name)
 DO UPDATE
 SET
 	sess = $3

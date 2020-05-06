@@ -1,6 +1,10 @@
 package gatewayws
 
 import (
+	"context"
+	"time"
+
+	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/czlib"
@@ -9,7 +13,18 @@ import (
 // readMessage populates buf on *Session with the next message.
 func (s *Session) readMessage() error {
 	s.buf.Reset()
-	_, r, err := s.wsConn.Reader(s.ctx)
+	start := time.Now()
+	defer func() {
+		took := time.Since(start)
+		if took > 10*time.Second {
+			s.log.Error(s.ctx, "took more than 10s to get reader", slog.F("took", time.Since(start).String()))
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
+	defer cancel()
+
+	_, r, err := s.wsConn.Reader(ctx)
 	if err != nil {
 		return xerrors.Errorf("get ws reader: %w", err)
 	}

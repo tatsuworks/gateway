@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"cdr.dev/slog"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
@@ -43,19 +42,21 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 	var (
 		g   = guildParam(p)
 		ms  = r.URL.Query()["id"]
-		mrs = make([][]byte, len(ms))
+		mrs = make([][]byte, 0, len(ms))
 	)
 
-	for i, e := range ms {
+	for _, e := range ms {
 		mr, err := strconv.ParseInt(e, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("parse member id: %w", err)
 		}
 
-		mrs[i], err = s.db.GetGuildMember(r.Context(), g, mr)
+		mbmr, err := s.db.GetGuildMember(r.Context(), g, mr)
 		if err != nil {
 			return xerrors.Errorf("get member: %w", err)
 		}
+
+		mrs = append(mrs, mbmr)
 	}
 
 	return s.writeTerms(w, mrs)
@@ -68,7 +69,6 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 		query = r.URL.Query().Get("query")
 	)
 
-	s.log.Info(ctx, "member query", slog.F("query", query))
 	ms, err := s.db.SearchGuildMembers(ctx, g, query)
 	if err != nil {
 		return xerrors.Errorf("search members: %w", err)

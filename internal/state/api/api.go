@@ -45,24 +45,24 @@ func NewServer(
 func (s *Server) Init() {
 	base := "/v1/events"
 
-	s.router.GET("/healthz", wrapHandler(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	s.router.GET("/healthz", wrapHandler(s.log, func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Version: " + s.version))
 		return nil
 	}))
 
-	s.router.GET(path.Join(base, "users", ":user"), wrapHandler(s.getUser))
-	s.router.GET(path.Join(base, "channels"), wrapHandler(s.getChannels))
-	s.router.GET(path.Join(base, "channels", ":channel"), wrapHandler(s.getChannel))
-	s.router.GET(path.Join(base, "channels", ":channel", "messages", ":message"), wrapHandler(s.getChannelMessage))
-	s.router.GET(path.Join(base, "guilds", ":guild"), wrapHandler(s.getGuild))
-	s.router.GET(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.getGuildChannels))
-	s.router.GET(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.getGuildMembers))
-	s.router.GET(path.Join(base, "guilds", ":guild", "members", ":member"), wrapHandler(s.getGuildMember))
-	s.router.GET(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.getGuildRoles))
-	s.router.GET(path.Join(base, "guilds", ":guild", "roles", ":role"), wrapHandler(s.getGuildRole))
-	s.router.GET(path.Join(base, "guilds", ":guild", "emojis"), wrapHandler(s.getGuildEmojis))
-	s.router.GET(path.Join(base, "guilds", ":guild", "emojis", ":emoji"), wrapHandler(s.getGuildEmoji))
+	s.router.GET(path.Join(base, "users", ":user"), wrapHandler(s.log, s.getUser))
+	s.router.GET(path.Join(base, "channels"), wrapHandler(s.log, s.getChannels))
+	s.router.GET(path.Join(base, "channels", ":channel"), wrapHandler(s.log, s.getChannel))
+	s.router.GET(path.Join(base, "channels", ":channel", "messages", ":message"), wrapHandler(s.log, s.getChannelMessage))
+	s.router.GET(path.Join(base, "guilds", ":guild"), wrapHandler(s.log, s.getGuild))
+	s.router.GET(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.getGuildChannels))
+	s.router.GET(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.getGuildMembers))
+	s.router.GET(path.Join(base, "guilds", ":guild", "members", ":member"), wrapHandler(s.log, s.getGuildMember))
+	s.router.GET(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.getGuildRoles))
+	s.router.GET(path.Join(base, "guilds", ":guild", "roles", ":role"), wrapHandler(s.log, s.getGuildRole))
+	s.router.GET(path.Join(base, "guilds", ":guild", "emojis"), wrapHandler(s.log, s.getGuildEmojis))
+	s.router.GET(path.Join(base, "guilds", ":guild", "emojis", ":emoji"), wrapHandler(s.log, s.getGuildEmoji))
 }
 
 func (s *Server) Start(addr string) error {

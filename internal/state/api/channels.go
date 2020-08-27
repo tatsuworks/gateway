@@ -79,13 +79,9 @@ func (s *Server) writeTerms(w io.Writer, raws [][]byte) error {
 
 	for _, e := range raws {
 		writeComma()
-		if e == nil {
-			w.Write([]byte("null"))
-		} else {
-			_, err := w.Write(e)
-			if err != nil {
-				return xerrors.Errorf("write term: %w", err)
-			}
+		_, err := w.Write(e)
+		if err != nil {
+			return xerrors.Errorf("write term: %w", err)
 		}
 	}
 

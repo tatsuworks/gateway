@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -52,8 +53,12 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 		}
 
 		mbmr, err := s.db.GetGuildMember(r.Context(), g, mr)
-		if err != nil && !xerrors.Is(err, ErrNotFound) {
-			return xerrors.Errorf("get member: %w", err)
+		if err != nil {
+			if xerrors.Is(err, ErrNotFound) {
+				mbmr, _ = json.Marshal(EmptyObj{Id: e, IsEmpty: true})
+			} else {
+				return xerrors.Errorf("get member: %w", err)
+			}
 		}
 
 		mrs = append(mrs, mbmr)

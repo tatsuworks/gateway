@@ -49,8 +49,12 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 		}
 
 		rol, err := s.db.GetGuildRole(ctx, g, rr)
-		if err != nil && !xerrors.Is(err, ErrNotFound) {
-			return xerrors.Errorf("get role: %w", err)
+		if err != nil {
+			if err == ErrNotFound {
+				rol = nil
+			} else {
+				return xerrors.Errorf("get role: %w", err)
+			}
 		}
 
 		ros = append(ros, rol)

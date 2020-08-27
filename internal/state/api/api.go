@@ -28,6 +28,11 @@ type Server struct {
 	enc string
 }
 
+type EmptyObj struct {
+	Id      string `json:"id"`
+	IsEmpty bool   `json:"is_empty"`
+}
+
 func NewServer(
 	logger slog.Logger,
 	db state.DB,

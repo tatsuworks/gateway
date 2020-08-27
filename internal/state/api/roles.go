@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -49,8 +50,12 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 		}
 
 		rol, err := s.db.GetGuildRole(ctx, g, rr)
-		if err != nil && !xerrors.Is(err, ErrNotFound) {
-			return xerrors.Errorf("get role: %w", err)
+		if err != nil {
+			if xerrors.Is(err, ErrNotFound) {
+				rol, _ = json.Marshal(EmptyObj{Id: e, IsEmpty: true})
+			} else {
+				return xerrors.Errorf("get role: %w", err)
+			}
 		}
 
 		ros = append(ros, rol)

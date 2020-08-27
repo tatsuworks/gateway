@@ -52,7 +52,7 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 		}
 
 		mbmr, err := s.db.GetGuildMember(r.Context(), g, mr)
-		if err != nil {
+		if err != nil && !xerrors.Is(err, ErrNotFound) {
 			return xerrors.Errorf("get member: %w", err)
 		}
 

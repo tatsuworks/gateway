@@ -12,12 +12,8 @@ import (
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	c, err := s.db.GetChannel(r.Context(), channelParam(p))
-	if err != nil {
+	if err != nil && !xerrors.Is(err, ErrNotFound) {
 		return xerrors.Errorf("read channel: %w", err)
-	}
-
-	if c == nil {
-		return ErrNotFound
 	}
 
 	return s.writeTerm(w, c)

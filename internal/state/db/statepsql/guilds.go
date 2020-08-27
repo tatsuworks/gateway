@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"database/sql"
 
 	"golang.org/x/xerrors"
 )
@@ -39,6 +40,9 @@ WHERE
 	g := RawJSON{}
 	err := db.sql.GetContext(ctx, &g, q, id)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 

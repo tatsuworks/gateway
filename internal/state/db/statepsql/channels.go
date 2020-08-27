@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"database/sql"
 	"reflect"
 	"strconv"
 	"strings"
@@ -44,6 +45,9 @@ WHERE
 	c := RawJSON{}
 	err := db.sql.GetContext(ctx, &c, q, id)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 

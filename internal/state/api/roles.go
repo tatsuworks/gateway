@@ -10,12 +10,8 @@ import (
 
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	ro, err := s.db.GetGuildRole(r.Context(), guildParam(p), roleParam(p))
-	if err != nil {
+	if err != nil && !xerrors.Is(err, ErrNotFound) {
 		return xerrors.Errorf("read role: %w", err)
-	}
-
-	if ro == nil {
-		return ErrNotFound
 	}
 
 	return s.writeTerm(w, ro)
@@ -49,12 +45,8 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 		}
 
 		rol, err := s.db.GetGuildRole(ctx, g, rr)
-		if err != nil {
-			if err == ErrNotFound {
-				rol = nil
-			} else {
-				return xerrors.Errorf("get role: %w", err)
-			}
+		if err != nil && !xerrors.Is(err, ErrNotFound) {
+			return xerrors.Errorf("get role: %w", err)
 		}
 
 		ros = append(ros, rol)

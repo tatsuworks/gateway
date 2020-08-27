@@ -10,8 +10,12 @@ import (
 
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	ro, err := s.db.GetGuildRole(r.Context(), guildParam(p), roleParam(p))
-	if err != nil && !xerrors.Is(err, ErrNotFound) {
+	if err != nil {
 		return xerrors.Errorf("read role: %w", err)
+	}
+
+	if ro == nil {
+		return ErrNotFound
 	}
 
 	return s.writeTerm(w, ro)

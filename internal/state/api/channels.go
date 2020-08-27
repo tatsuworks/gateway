@@ -12,8 +12,12 @@ import (
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	c, err := s.db.GetChannel(r.Context(), channelParam(p))
-	if err != nil && !xerrors.Is(err, ErrNotFound) {
+	if err != nil {
 		return xerrors.Errorf("read channel: %w", err)
+	}
+
+	if c == nil {
+		return ErrNotFound
 	}
 
 	return s.writeTerm(w, c)
@@ -75,9 +79,13 @@ func (s *Server) writeTerms(w io.Writer, raws [][]byte) error {
 
 	for _, e := range raws {
 		writeComma()
-		_, err := w.Write(e)
-		if err != nil {
-			return xerrors.Errorf("write term: %w", err)
+		if e == nil {
+			w.Write([]byte("null"))
+		} else {
+			_, err := w.Write(e)
+			if err != nil {
+				return xerrors.Errorf("write term: %w", err)
+			}
 		}
 	}
 

@@ -10,8 +10,12 @@ import (
 
 func (s *Server) getGuildEmoji(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	c, err := s.db.GetGuildEmoji(r.Context(), guildParam(p), emojiParam(p))
-	if err != nil && !xerrors.Is(err, ErrNotFound) {
+	if err != nil {
 		return xerrors.Errorf("read emoji: %w", err)
+	}
+
+	if c == nil {
+		return ErrNotFound
 	}
 
 	return s.writeTerm(w, c)

@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/tatsuworks/gateway/discord"
 )
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (int64, error) {
+	// clear nulls
+	e.D = bytes.ToValidUTF8(e.D, nil)
+
 	switch e.T {
 	case "PRESENCE_UPDATE":
 		// return 0, c.PresenceUpdate(e.D)

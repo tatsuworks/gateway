@@ -25,7 +25,7 @@ func NewDB(ctx context.Context, addr string) (state.DB, error) {
 	}
 
 	sqlx.SetMaxOpenConns(4)
-	sqlx.SetMaxIdleConns(2)
+	sqlx.SetMaxIdleConns(4)
 
 	err = sqlx.Ping()
 	if err != nil {

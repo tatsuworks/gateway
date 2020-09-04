@@ -16,8 +16,8 @@ func (s *Session) readMessage() error {
 	start := time.Now()
 	defer func() {
 		took := time.Since(start)
-		if took > 10*time.Second {
-			s.log.Error(s.ctx, "took more than 10s to get reader", slog.F("took", time.Since(start).String()))
+		if took > 20*time.Second {
+			s.log.Error(s.ctx, "took more than 20s to get reader", slog.F("took", time.Since(start).String()))
 		}
 	}()
 

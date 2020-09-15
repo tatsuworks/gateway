@@ -79,7 +79,7 @@ type Session struct {
 }
 
 func (s *Session) Status() string {
-	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck)
+	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
 
 func (s *Session) GatewayURL() string {

@@ -3,6 +3,7 @@ package gatewayws
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -73,6 +74,10 @@ type Session struct {
 	stateDB state.DB
 	rc      *redis.Client
 	played  *played.Client
+}
+
+func (s *Session) Status() string {
+	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
 
 func (s *Session) GatewayURL() string {
@@ -384,7 +389,10 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 }
 
 func (s *Session) acquireIdentifyLock() error {
-	err := s.identifyMu.Lock(s.ctx)
+	timeoutLock, cancel := context.WithTimeout(s.ctx, time.Second*20)
+	defer cancel()
+
+	err := s.identifyMu.Lock(timeoutLock)
 	if err != nil {
 		return xerrors.Errorf("acquire identify lock: %w", err)
 	}
@@ -393,11 +401,13 @@ func (s *Session) acquireIdentifyLock() error {
 }
 
 func (s *Session) releaseIdentifyLock() error {
-	err := s.identifyMu.Unlock(s.ctx)
-	if err != nil {
-		return xerrors.Errorf("release identify lock: %w", err)
+	s.log.Info(s.ctx, "release identify lock", slog.F("key", s.identifyMu.Key()))
+	if s.identifyMu.Key() != "" {
+		err := s.identifyMu.Unlock(s.ctx)
+		if err != nil {
+			return xerrors.Errorf("release identify lock: %w", err)
+		}
 	}
-
 	return nil
 }
 

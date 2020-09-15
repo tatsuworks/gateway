@@ -74,8 +74,6 @@ type Session struct {
 	stateDB state.DB
 	rc      *redis.Client
 	played  *played.Client
-
-	lastConnected time.Time
 }
 
 func (s *Session) Status() string {
@@ -227,7 +225,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
-	s.lastConnected = time.Now()
 	defer s.persistSeq()
 
 	for {

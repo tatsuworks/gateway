@@ -400,12 +400,12 @@ func (s *Session) acquireIdentifyLock() error {
 
 func (s *Session) releaseIdentifyLock() error {
 	s.log.Info(s.ctx, "release identify lock", slog.F("key", s.identifyMu.Key()))
-
-	err := s.identifyMu.Unlock(s.ctx)
-	if err != nil {
-		return xerrors.Errorf("release identify lock: %w", err)
+	if s.identifyMu.Key() != "" {
+		err := s.identifyMu.Unlock(s.ctx)
+		if err != nil {
+			return xerrors.Errorf("release identify lock: %w", err)
+		}
 	}
-
 	return nil
 }
 

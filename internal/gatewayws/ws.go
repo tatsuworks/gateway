@@ -73,6 +73,8 @@ type Session struct {
 	stateDB state.DB
 	rc      *redis.Client
 	played  *played.Client
+
+	lastConnected time.Time
 }
 
 func (s *Session) GatewayURL() string {
@@ -220,6 +222,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
+	s.lastConnected = time.Now()
 	defer s.persistSeq()
 
 	for {
@@ -384,7 +387,10 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 }
 
 func (s *Session) acquireIdentifyLock() error {
-	err := s.identifyMu.Lock(s.ctx)
+	timeoutLock, cancel := context.WithTimeout(s.ctx, time.Second*20)
+	defer cancel()
+
+	err := s.identifyMu.Lock(timeoutLock)
 	if err != nil {
 		return xerrors.Errorf("acquire identify lock: %w", err)
 	}

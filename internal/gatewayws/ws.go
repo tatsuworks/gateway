@@ -3,6 +3,7 @@ package gatewayws
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -75,6 +76,10 @@ type Session struct {
 	played  *played.Client
 
 	lastConnected time.Time
+}
+
+func (s *Session) Status() string {
+	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck)
 }
 
 func (s *Session) GatewayURL() string {

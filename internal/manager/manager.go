@@ -95,6 +95,7 @@ func (m *Manager) Start(start, stop int) error {
 		}
 	}
 
+	go m.logHealth()
 	return nil
 }
 
@@ -139,4 +140,31 @@ func (m *Manager) startShard(shard int) {
 			time.Sleep(time.Second)
 		}
 	}()
+}
+
+const LogInterval = 3 * time.Minute
+
+func (m *Manager) logHealth() {
+	var (
+		t   = time.NewTicker(LogInterval)
+		ctx = m.ctx
+	)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		out := make([]string, m.shardCount)
+		for i, session := range m.shards {
+			out[i] = session.Status()
+		}
+		m.log.Info(
+			m.ctx,
+			"shard report",
+			slog.F("event", out),
+		)
+	}
 }

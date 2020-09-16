@@ -81,7 +81,7 @@ func (s *Session) Status() string {
 	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
 func (s *Session) LongLastAck(threshold time.Duration) bool {
-	cutoff := time.Now().Add(threshold)
+	cutoff := time.Now().Add(-threshold)
 	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
 }
 

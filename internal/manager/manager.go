@@ -142,11 +142,11 @@ func (m *Manager) startShard(shard int) {
 	}()
 }
 
-const LogInterval = 3 * time.Minute
+const ManagerLogInterval = 5 * time.Minute
 
 func (m *Manager) logHealth() {
 	var (
-		t   = time.NewTicker(LogInterval)
+		t   = time.NewTicker(ManagerLogInterval)
 		ctx = m.ctx
 	)
 	defer t.Stop()
@@ -157,14 +157,20 @@ func (m *Manager) logHealth() {
 			return
 		case <-t.C:
 		}
-		out := make([]string, m.shardCount)
-		for i, session := range m.shards {
-			out[i] = session.Status()
+
+		var out []string
+		for _, session := range m.shards {
+			if session != nil && session.LongLastAck(ManagerLogInterval) {
+				out = append(out, session.Status())
+			}
 		}
-		m.log.Info(
-			m.ctx,
-			"shard report",
-			slog.F("event", out),
-		)
+
+		if len(out) > 0 {
+			m.log.Info(
+				m.ctx,
+				"shard report",
+				slog.F("event", out),
+			)
+		}
 	}
 }

@@ -79,6 +79,9 @@ type Session struct {
 func (s *Session) Status() string {
 	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
+func (s *Session) LongLastAck(threshold time.Duration) bool {
+	return s.lastAck.Add(threshold).Before(time.Now())
+}
 
 func (s *Session) GatewayURL() string {
 	return "wss://gateway.discord.gg/?v=6&encoding=" + s.enc.Name() + "&compress=zlib-stream"

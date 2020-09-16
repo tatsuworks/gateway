@@ -392,7 +392,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 }
 
 func (s *Session) acquireIdentifyLock() error {
-	timeoutLock, cancel := context.WithTimeout(s.ctx, time.Second*20)
+	timeoutLock, cancel := context.WithTimeout(s.ctx, time.Second*160)
 	defer cancel()
 
 	err := s.identifyMu.Lock(timeoutLock)

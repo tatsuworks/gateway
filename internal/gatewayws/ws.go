@@ -60,6 +60,7 @@ type Session struct {
 
 	lastHB   time.Time
 	lastAck  time.Time
+	ready    time.Time
 	guilds   map[int64]struct{}
 	curState string
 
@@ -80,7 +81,8 @@ func (s *Session) Status() string {
 	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
 func (s *Session) LongLastAck(threshold time.Duration) bool {
-	return s.lastAck.Add(threshold).Before(time.Now())
+	cutoff := time.Now().Add(threshold)
+	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
 }
 
 func (s *Session) GatewayURL() string {
@@ -322,6 +324,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case 6:
 		s.log.Info(s.ctx, "resumed")
 		s.authed = true
+		s.ready = time.Now()
 
 		return true, nil
 
@@ -371,6 +374,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("guild_count", len(s.guilds)))
 		s.persistSessID()
 		s.authed = true
+		s.ready = time.Now()
 
 		go func() {
 			time.Sleep(7 * time.Second)
@@ -385,6 +389,8 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case "RESUMED":
 		s.log.Info(s.ctx, "resumed")
 		s.authed = true
+		s.ready = time.Now()
+
 		return true, nil
 	}
 

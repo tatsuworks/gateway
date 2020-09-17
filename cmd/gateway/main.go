@@ -61,7 +61,7 @@ func init() {
 
 func main() {
 	cfg := profiler.Config{
-		Service:        "atlas",
+		Service:        "gateway",
 		ServiceVersion: "1.0.0",
 	}
 

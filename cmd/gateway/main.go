@@ -12,6 +12,7 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
+	"cloud.google.com/go/profiler"
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
@@ -59,6 +60,16 @@ func init() {
 }
 
 func main() {
+	cfg := profiler.Config{
+		Service:        "atlas",
+		ServiceVersion: "1.0.0",
+	}
+
+	// Profiler initialization, best done as early as possible.
+	if err := profiler.Start(cfg); err != nil {
+		panic(err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

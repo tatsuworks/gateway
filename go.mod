@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	cdr.dev/slog v1.3.0
+	cloud.google.com/go v0.49.0
 	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
 	github.com/coadler/played v0.0.0-20200210001842-64fd9beb44f7
 	github.com/coreos/etcd v3.3.15+incompatible

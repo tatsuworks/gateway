@@ -244,10 +244,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		s.curState = "read message"
 
 		s.buf = s.bufferPool.Get().(*bytes.Buffer)
-		defer s.cleanupBuffer()
-
 		err = s.readMessage()
-
 		if err != nil {
 			var werr websocket.CloseError
 			if xerrors.As(err, &werr) {
@@ -261,7 +258,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 					s.persistSessID()
 				}
 			}
-
+			s.cleanupBuffer()
 			err = xerrors.Errorf("read message: %w", err)
 			break
 		}
@@ -270,6 +267,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		var ev *discord.Event
 		ev, err = s.enc.DecodeT(s.buf.Bytes())
 		if err != nil {
+			s.cleanupBuffer()
 			err = xerrors.Errorf("decode event: %w", err)
 			break
 		}

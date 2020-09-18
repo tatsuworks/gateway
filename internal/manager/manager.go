@@ -33,7 +33,7 @@ type Manager struct {
 	etcd       *clientv3.Client
 	playedAddr string
 
-	bufferPool sync.Pool
+	bufferPool *sync.Pool
 }
 
 type Config struct {
@@ -84,7 +84,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		etcd:       etcdc,
 		playedAddr: cfg.PlayedAddr,
 
-		bufferPool: sync.Pool{
+		bufferPool: &sync.Pool{
 			New: func() interface{} {
 				return new(bytes.Buffer)
 			},
@@ -120,7 +120,7 @@ func (m *Manager) startShard(shard int) {
 		Intents:    m.intents,
 		ShardID:    shard,
 		ShardCount: m.shardCount,
-		BufferPool: &m.bufferPool,
+		BufferPool: m.bufferPool,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

@@ -242,8 +242,11 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 	for {
 		s.curState = "read message"
-		err = s.readMessage()
+
+		s.buf = s.bufferPool.Get().(*bytes.Buffer)
 		defer s.cleanupBuffer()
+
+		err = s.readMessage()
 
 		if err != nil {
 			var werr websocket.CloseError

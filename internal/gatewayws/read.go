@@ -1,7 +1,6 @@
 package gatewayws
 
 import (
-	"bytes"
 	"context"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 
 // readMessage populates buf on *Session with the next message.
 func (s *Session) readMessage() error {
-	s.buf = s.bufferPool.Get().(*bytes.Buffer)
 	start := time.Now()
 	defer func() {
 		took := time.Since(start)

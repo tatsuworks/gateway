@@ -60,16 +60,6 @@ func init() {
 }
 
 func main() {
-	cfg := profiler.Config{
-		Service:        "gateway",
-		ServiceVersion: "1.0.0",
-	}
-
-	// Profiler initialization, best done as early as possible.
-	if err := profiler.Start(cfg); err != nil {
-		panic(err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -81,6 +71,16 @@ func main() {
 		logger = sloghuman.Make(os.Stderr)
 	}
 	defer logger.Sync()
+
+	cfg := profiler.Config{
+		Service:        "gateway",
+		ServiceVersion: "1.0.0",
+	}
+
+	// Profiler initialization, best done as early as possible.
+	if err := profiler.Start(cfg); err != nil {
+		logger.Error(ctx, "profiler could not start", slog.F("err", err))
+	}
 
 	var (
 		statedb state.DB

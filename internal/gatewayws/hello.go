@@ -1,12 +1,16 @@
 package gatewayws
 
 import (
+	"bytes"
 	"time"
 
 	"golang.org/x/xerrors"
 )
 
 func (s *Session) readHello() error {
+	s.buf = s.bufferPool.Get().(*bytes.Buffer)
+	defer s.cleanupBuffer()
+
 	err := s.readMessage()
 	if err != nil {
 		return xerrors.Errorf("read message: %w", err)

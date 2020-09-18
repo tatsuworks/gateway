@@ -122,10 +122,11 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 
 		etcd: cfg.Etcd,
 
-		state:   handler.NewClient(cfg.Logger, cfg.DB),
-		stateDB: cfg.DB,
-		enc:     cfg.DB.Encoding(),
-		rc:      cfg.Redis,
+		state:      handler.NewClient(cfg.Logger, cfg.DB),
+		stateDB:    cfg.DB,
+		enc:        cfg.DB.Encoding(),
+		rc:         cfg.Redis,
+		bufferPool: cfg.BufferPool,
 	}
 
 	sess.loadSessID()

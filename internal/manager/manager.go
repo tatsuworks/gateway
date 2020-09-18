@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"sync"
@@ -31,6 +32,8 @@ type Manager struct {
 	rdb        *redis.Client
 	etcd       *clientv3.Client
 	playedAddr string
+
+	bufferPool sync.Pool
 }
 
 type Config struct {
@@ -80,6 +83,12 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		rdb:        rc,
 		etcd:       etcdc,
 		playedAddr: cfg.PlayedAddr,
+
+		bufferPool: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 	}
 }
 
@@ -111,6 +120,7 @@ func (m *Manager) startShard(shard int) {
 		Intents:    m.intents,
 		ShardID:    shard,
 		ShardCount: m.shardCount,
+		BufferPool: &m.bufferPool,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

@@ -64,8 +64,9 @@ type Session struct {
 	guilds   map[int64]struct{}
 	curState string
 
-	buf *bytes.Buffer
-	enc discord.Encoding
+	bufferPool *sync.Pool
+	buf        *bytes.Buffer
+	enc        discord.Encoding
 
 	etcd       *clientv3.Client
 	etcdSess   *concurrency.Session
@@ -100,6 +101,7 @@ type SessionConfig struct {
 	Intents    Intents
 	ShardID    int
 	ShardCount int
+	BufferPool *sync.Pool
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -114,7 +116,6 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		intents:    cfg.Intents,
 
 		// start with a 1kb buffer
-		buf:    bytes.NewBuffer(make([]byte, 0, 1<<10)),
 		rl:     rate.NewLimiter(1.75, 2),
 		wch:    make(chan *Op, 2000),
 		prioch: make(chan *Op),
@@ -260,6 +261,9 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			err = xerrors.Errorf("decode event: %w", err)
 			break
 		}
+
+		s.buf.Reset()
+		s.bufferPool.Put(s.buf)
 
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)

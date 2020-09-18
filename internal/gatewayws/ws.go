@@ -85,7 +85,13 @@ func (s *Session) LongLastAck(threshold time.Duration) bool {
 	cutoff := time.Now().Add(-threshold)
 	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
 }
-
+func (s *Session) cleanupBuffer() {
+	if s.buf != nil {
+		s.buf.Reset()
+		s.bufferPool.Put(s.buf)
+		s.buf = nil
+	}
+}
 func (s *Session) GatewayURL() string {
 	return "wss://gateway.discord.gg/?v=6&encoding=" + s.enc.Name() + "&compress=zlib-stream"
 }
@@ -237,6 +243,8 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	for {
 		s.curState = "read message"
 		err = s.readMessage()
+		defer s.cleanupBuffer()
+
 		if err != nil {
 			var werr websocket.CloseError
 			if xerrors.As(err, &werr) {
@@ -263,8 +271,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			break
 		}
 
-		s.buf.Reset()
-		s.bufferPool.Put(s.buf)
+		s.cleanupBuffer()
 
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)

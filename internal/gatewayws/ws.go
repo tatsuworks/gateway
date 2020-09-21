@@ -87,10 +87,12 @@ func (s *Session) LongLastAck(threshold time.Duration) bool {
 }
 func (s *Session) cleanupBuffer() {
 	if s.buf != nil {
-		s.buf.Reset()
-		s.bufferPool.Put(s.buf)
-		s.buf = nil
+		if s.buf.Cap() < (1 << 24) {
+			s.buf.Reset()
+			s.bufferPool.Put(s.buf)
+		}
 	}
+	s.buf = nil
 }
 func (s *Session) GatewayURL() string {
 	return "wss://gateway.discord.gg/?v=6&encoding=" + s.enc.Name() + "&compress=zlib-stream"
@@ -241,38 +243,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	defer s.persistSeq()
 
 	for {
-		s.curState = "read message"
-
-		s.buf = s.bufferPool.Get().(*bytes.Buffer)
-		err = s.readMessage()
-		if err != nil {
-			var werr websocket.CloseError
-			if xerrors.As(err, &werr) {
-				// This somehow happens if you resume to a
-				// valid session associated with a different
-				// token.
-				if werr.Code == 4006 {
-					s.seq = 0
-					s.sessID = ""
-					s.persistSeq()
-					s.persistSessID()
-				}
-			}
-			s.cleanupBuffer()
-			err = xerrors.Errorf("read message: %w", err)
-			break
-		}
-
-		s.curState = "decode event"
-		var ev *discord.Event
-		ev, err = s.enc.DecodeT(s.buf.Bytes())
-		if err != nil {
-			s.cleanupBuffer()
-			err = xerrors.Errorf("decode event: %w", err)
-			break
-		}
-
-		s.cleanupBuffer()
+		ev, err := s.readAndDecodeEvent()
 
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
@@ -435,4 +406,36 @@ func (s *Session) releaseIdentifyLock() error {
 
 func (s *Session) Cancel() {
 	s.cancel()
+}
+
+func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
+	s.curState = "read message"
+	s.buf = s.bufferPool.Get().(*bytes.Buffer)
+	defer s.cleanupBuffer()
+
+	err := s.readMessage()
+	if err != nil {
+		var werr websocket.CloseError
+		if xerrors.As(err, &werr) {
+			// This somehow happens if you resume to a
+			// valid session associated with a different
+			// token.
+			if werr.Code == 4006 {
+				s.seq = 0
+				s.sessID = ""
+				s.persistSeq()
+				s.persistSessID()
+			}
+		}
+		return nil, xerrors.Errorf("read message: %w", err)
+	}
+
+	s.curState = "decode event"
+	var ev *discord.Event
+	ev, err = s.enc.DecodeT(s.buf.Bytes())
+	if err != nil {
+		return nil, xerrors.Errorf("decode event: %w", err)
+	}
+
+	return ev, nil
 }

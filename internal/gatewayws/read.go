@@ -29,6 +29,7 @@ func (s *Session) readMessage() error {
 	}
 
 	s.zr.(czlib.Resetter).Reset(r)
+	defer s.zr.Close()
 
 	_, err = s.buf.ReadFrom(s.zr)
 	if err != nil {

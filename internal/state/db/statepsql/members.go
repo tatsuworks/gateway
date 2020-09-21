@@ -140,22 +140,36 @@ WHERE
 }
 
 func (db *db) GetUser(ctx context.Context, userID int64) ([]byte, error) {
-	const q = `
+	q := `
 SELECT
 	data->'user'
 FROM
-	members
+	users
 WHERE
 	user_id = $1
-LIMIT 1
 `
 
 	var usr RawJSON
 	err := db.sql.GetContext(ctx, &usr, q, userID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
+	if err == sql.ErrNoRows {
+		q = `
+	SELECT
+		data->'user'
+	FROM
+		members
+	WHERE
+		user_id = $1
+	LIMIT 1
+	`
 
+		err := db.sql.GetContext(ctx, &usr, q, userID)
+		if err != nil {
+			return nil, xerrors.Errorf("exec select: %w", err)
+		}
+	}
 	return *(*[]byte)(unsafe.Pointer(&usr)), nil
 }
 

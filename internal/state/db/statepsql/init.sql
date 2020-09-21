@@ -69,3 +69,25 @@ CREATE UNLOGGED TABLE IF NOT EXISTS shards (
 	"sess" text NOT NULL,
 	PRIMARY KEY("id", "name")
 );
+
+-- create up to date user record
+CREATE UNLOGGED TABLE IF NOT EXISTS users (
+	"user_id" int8 NOT NULL,
+	"data" jsonb NOT NULL,
+	"last_updated" timestamptz NOT NULL,
+	PRIMARY KEY("user_id")
+);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS users_user_id ON users("user_id");
+
+CREATE OR REPLACE FUNCTION updateUserFunc() RETURNS TRIGGER AS $update_user_func$
+   BEGIN
+      INSERT INTO users(user_id,data,last_updated) VALUES (new.user_id,new.data,current_timestamp) ON CONFLICT(user_id) DO UPDATE
+	SET
+		data = EXCLUDED.data, last_updated = CURRENT_TIMESTAMP;
+      RETURN NEW;
+   END;
+$update_user_func$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_user AFTER INSERT OR UPDATE ON members
+FOR EACH ROW EXECUTE PROCEDURE updateUserFunc();

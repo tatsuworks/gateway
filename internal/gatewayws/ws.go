@@ -85,11 +85,14 @@ func (s *Session) LongLastAck(threshold time.Duration) bool {
 	cutoff := time.Now().Add(-threshold)
 	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
 }
-func (s *Session) cleanupBuffer() {
+func (s *Session) cleanupBuffer(ctx context.Context) {
 	if s.buf != nil {
 		if s.buf.Cap() < (1 << 24) {
 			s.buf.Reset()
 			s.bufferPool.Put(s.buf)
+		} else {
+			b := bytesize.New(s.buf.Cap())
+			s.log.Debug(ctx, "buffer evicted", slog.F("size", fmt.Sprintf("%s", b)))
 		}
 	}
 	s.buf = nil
@@ -408,10 +411,10 @@ func (s *Session) Cancel() {
 	s.cancel()
 }
 
-func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
+func (s *Session) readAndDecodeEvent(ctx context.Context) (*discord.Event, error) {
 	s.curState = "read message"
 	s.buf = s.bufferPool.Get().(*bytes.Buffer)
-	defer s.cleanupBuffer()
+	defer s.cleanupBuffer(ctx)
 
 	err := s.readMessage()
 	if err != nil {

@@ -246,7 +246,9 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 	for {
 		ev, err := s.readAndDecodeEvent()
-
+		if err != nil {
+			break
+		}
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
 		}

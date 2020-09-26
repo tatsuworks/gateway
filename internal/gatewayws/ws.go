@@ -214,10 +214,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	if err != nil {
 		return xerrors.Errorf("dial gateway: %w", err)
 	}
-	defer func() {
-		s.log.Debug(s.ctx, "Unexpected Close")
-		c.Close(websocket.StatusGoingAway, "Going Away")
-	}()
 	s.wsConn = c
 	s.wsConn.SetReadLimit(512 << 20)
 
@@ -251,6 +247,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	for {
 		ev, err := s.readAndDecodeEvent()
 		if err != nil {
+			s.log.Error(ctx, "read and decode event", slog.Error(err))
 			break
 		}
 		if ev.S != 0 {

@@ -52,6 +52,11 @@ type Config struct {
 func New(ctx context.Context, cfg *Config) *Manager {
 	rc := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisAddr,
+		OnConnect: func(c *redis.Conn) error {
+			c.ClientSetName(cfg.Name)
+
+			return nil
+		},
 	})
 
 	_, err := rc.Ping().Result()

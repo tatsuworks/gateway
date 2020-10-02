@@ -12,6 +12,7 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
+	"cdr.dev/slog/sloggers/slogstackdriver"
 	"cloud.google.com/go/profiler"
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
@@ -65,12 +66,10 @@ func main() {
 
 	var logger slog.Logger
 
-	if prod != "" {
-		logger = slogjson.Make(os.Stderr)
-	} else {
-		logger = sloghuman.Make(os.Stderr)
-	}
-	defer logger.Sync()
+	var (
+		statedb state.DB
+		err     error
+	)
 
 	cfg := profiler.Config{
 		Service:        "gateway",
@@ -78,14 +77,20 @@ func main() {
 	}
 
 	// Profiler initialization, best done as early as possible.
-	if err := profiler.Start(cfg); err != nil {
+	err = profiler.Start(cfg)
+	if err != nil {
+		if prod != "" {
+			logger = slogjson.Make(os.Stderr)
+		} else {
+			logger = sloghuman.Make(os.Stderr)
+		}
 		logger.Error(ctx, "profiler could not start", slog.F("err", err))
+	} else {
+		// running on gcp, so use slogstackdriver instead
+		logger = slogstackdriver.Make(os.Stderr)
 	}
+	defer logger.Sync()
 
-	var (
-		statedb state.DB
-		err     error
-	)
 	if psql {
 		statedb, err = statepsql.NewDB(ctx, psqlAddr)
 		if err != nil {

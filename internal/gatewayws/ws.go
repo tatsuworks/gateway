@@ -255,9 +255,10 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		}
 
 		s.curState = "handle internal event " + ev.T
-		if handled, err := s.handleInternalEvent(ev); handled {
+		var handled bool
+		if handled, err = s.handleInternalEvent(ev); handled {
 			if err != nil {
-				return err
+				break
 			}
 
 			continue

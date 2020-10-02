@@ -36,6 +36,7 @@ var (
 	psqlAddr   string
 	addr       string
 	intents    string
+	podId      string
 
 	shards, start, stop int
 )
@@ -51,6 +52,7 @@ func init() {
 	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
 	flag.StringVar(&intents, "intents", "default", "default, played, all")
+	flag.StringVar(&podId, "podId", "", "0, 1, 2, 3...")
 
 	flag.IntVar(&shards, "shards", 1, "Total shards")
 	flag.IntVar(&start, "start", 0, "First shard to start (inclusive)")
@@ -140,6 +142,7 @@ func main() {
 		RedisAddr:  redisHost,
 		EtcdAddr:   etcdHost,
 		PlayedAddr: playedHost,
+		PodID:      podId,
 	})
 
 	logger.Info(ctx, "starting manager",

@@ -47,13 +47,18 @@ type Config struct {
 	RedisAddr  string
 	EtcdAddr   string
 	PlayedAddr string
+	PodID      string
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
 	rc := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisAddr,
 		OnConnect: func(c *redis.Conn) error {
-			c.ClientSetName(cfg.Name)
+			if cfg.PodID != "" {
+				c.ClientSetName(cfg.Name + "-" + cfg.PodID)
+			} else {
+				c.ClientSetName(cfg.Name)
+			}
 
 			return nil
 		},

@@ -17,4 +17,5 @@ exec /gateway \
 	--start="$START" \
 	--stop="$STOP" \
 	--intents="$INTENTS" \
-	--psqlAddr="$PSQL"
+	--psqlAddr="$PSQL" \
+	--podId="$POD_ID"

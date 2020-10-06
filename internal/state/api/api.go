@@ -68,6 +68,8 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "roles", ":role"), wrapHandler(s.log, s.getGuildRole))
 	s.router.GET(path.Join(base, "guilds", ":guild", "emojis"), wrapHandler(s.log, s.getGuildEmojis))
 	s.router.GET(path.Join(base, "guilds", ":guild", "emojis", ":emoji"), wrapHandler(s.log, s.getGuildEmoji))
+
+	s.router.GET(path.Join(base, "guilds_count"), wrapHandler(s.log, s.getGuildCount))
 }
 
 func (s *Server) Start(addr string) error {

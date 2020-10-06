@@ -2,6 +2,7 @@ vendor
 rawetf
 hmm.js
 node_modules
+cmd/state/state
 cmd/gateway/gateway
 cmd/gateway/token.go
 dump.rdb

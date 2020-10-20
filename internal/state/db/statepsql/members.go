@@ -65,9 +65,9 @@ WHERE
 `
 
 	var mc int
-	err := db.sql.SelectContext(ctx, &mc, q, guildID)
+	err := db.sql.GetContext(ctx, &mc, q, guildID)
 	if err != nil {
-		return 0, xerrors.Errorf("exec select: %w", err)
+		return 0, xerrors.Errorf("exec get: %w", err)
 	}
 
 	return mc, nil

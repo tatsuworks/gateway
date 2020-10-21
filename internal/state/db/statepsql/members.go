@@ -54,6 +54,25 @@ WHERE
 	return c, nil
 }
 
+func (db *db) GetGuildMemberCount(ctx context.Context, guildID int64) (int, error) {
+	const q = `
+SELECT
+	count(*)
+FROM
+	members
+WHERE
+	guild_id = $1
+`
+
+	var mc int
+	err := db.sql.GetContext(ctx, &mc, q, guildID)
+	if err != nil {
+		return 0, xerrors.Errorf("exec get: %w", err)
+	}
+
+	return mc, nil
+}
+
 func (db *db) DeleteGuildMember(ctx context.Context, guildID, userID int64) error {
 	const q = `
 DELETE FROM

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
@@ -21,6 +22,22 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (guild int64, _ erro
 
 	eg := new(errgroup.Group)
 	eg.Go(func() error {
+		if gc.MemberCount == 0 {
+			mc, err := c.db.GetGuildMemberCount(ctx, guild)
+			if err != nil {
+				return xerrors.Errorf("GetGuildMemberCount: %w", err)
+			}
+			var data map[string]interface{}
+			err = json.Unmarshal(gc.Raw, &data)
+			if err != nil {
+				return xerrors.Errorf("GetGuildMemberCount json Unmarshal: %w", err)
+			}
+			data["member_count"] = mc
+			gc.Raw, err = json.Marshal(data)
+			if err != nil {
+				return xerrors.Errorf("GetGuildMemberCount json Marshal: %w", err)
+			}
+		}
 		err := c.db.SetGuild(ctx, gc.ID, gc.Raw)
 		if err != nil {
 			return xerrors.Errorf("set guild: %w", err)

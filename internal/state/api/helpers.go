@@ -78,7 +78,7 @@ func LogMW(log slog.Logger) func(next httprouter.Handle) httprouter.Handle {
 					slog.F("response_body", body),
 				)
 
-				logLevelFn := log.Info
+				logLevelFn := log.Debug
 				if sw.Status >= 500 {
 					logLevelFn = log.Error
 				}

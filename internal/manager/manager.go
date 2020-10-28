@@ -79,7 +79,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 	return &Manager{
 		ctx:  ctx,
-		name: cfg.Name,
+		name: cfg.Name + "-" + cfg.PodID,
 		log:  cfg.Logger,
 		wg:   cfg.Wg,
 		db:   cfg.DB,

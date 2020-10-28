@@ -28,5 +28,5 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
 	google.golang.org/grpc v1.25.1
-	nhooyr.io/websocket v1.8.5
+	nhooyr.io/websocket v1.8.6
 )

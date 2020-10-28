@@ -13,6 +13,7 @@ import (
 	"cdr.dev/slog/sloggers/slogjson"
 	"cdr.dev/slog/sloggers/slogstackdriver"
 	"cloud.google.com/go/profiler"
+	grmon "github.com/bcicen/grmon/agent"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"github.com/tatsuworks/gateway/internal/state"
@@ -61,7 +62,7 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	grmon.Start()
 	var logger slog.Logger
 
 	var (

@@ -14,14 +14,11 @@ import (
 	"cdr.dev/slog/sloggers/slogjson"
 	"cdr.dev/slog/sloggers/slogstackdriver"
 	"cloud.google.com/go/profiler"
-	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"github.com/tatsuworks/gateway/internal/state"
 	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
 	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -158,12 +155,12 @@ func main() {
 		logger.Fatal(ctx, "start shard manager", slog.Error(err))
 	}
 
-	go func() {
-		srv := grpc.NewServer()
-		gatewaypb.RegisterGatewayServer(srv, m)
-		reflection.Register(srv)
-		srv.Serve(lis)
-	}()
+	// go func() {
+	// 	srv := grpc.NewServer()
+	// 	gatewaypb.RegisterGatewayServer(srv, m)
+	// 	reflection.Register(srv)
+	// 	srv.Serve(lis)
+	// }()
 
 	<-ctx.Done()
 	logger.Info(ctx, "waiting for shards to disconnect")

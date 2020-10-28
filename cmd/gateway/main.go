@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sync"
@@ -13,7 +16,6 @@ import (
 	"cdr.dev/slog/sloggers/slogjson"
 	"cdr.dev/slog/sloggers/slogstackdriver"
 	"cloud.google.com/go/profiler"
-	grmon "github.com/bcicen/grmon/agent"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"github.com/tatsuworks/gateway/internal/state"
@@ -62,7 +64,11 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	grmon.Start()
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	var logger slog.Logger
 
 	var (

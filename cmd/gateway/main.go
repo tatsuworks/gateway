@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -33,7 +32,7 @@ var (
 	psqlAddr   string
 	addr       string
 	intents    string
-	podId      string
+	podID      string
 
 	shards, start, stop int
 )
@@ -49,7 +48,7 @@ func init() {
 	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
 	flag.StringVar(&intents, "intents", "default", "default, played, all")
-	flag.StringVar(&podId, "podId", "", "0, 1, 2, 3...")
+	flag.StringVar(&podID, "podId", "", "0, 1, 2, 3...")
 
 	flag.IntVar(&shards, "shards", 1, "Total shards")
 	flag.IntVar(&start, "start", 0, "First shard to start (inclusive)")
@@ -122,11 +121,6 @@ func main() {
 		cancel()
 	}()
 
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		logger.Fatal(ctx, "listen", slog.Error(err))
-	}
-
 	wg := &sync.WaitGroup{}
 	m := manager.New(ctx, &manager.Config{
 		Name:       name,
@@ -139,7 +133,7 @@ func main() {
 		RedisAddr:  redisHost,
 		EtcdAddr:   etcdHost,
 		PlayedAddr: playedHost,
-		PodID:      podId,
+		PodID:      podID,
 	})
 
 	logger.Info(ctx, "starting manager",
@@ -155,6 +149,11 @@ func main() {
 		logger.Fatal(ctx, "start shard manager", slog.Error(err))
 	}
 
+	// Shard Control GRPC Server
+	// lis, err := net.Listen("tcp", addr)
+	// if err != nil {
+	// 	logger.Fatal(ctx, "listen", slog.Error(err))
+	// }
 	// go func() {
 	// 	srv := grpc.NewServer()
 	// 	gatewaypb.RegisterGatewayServer(srv, m)

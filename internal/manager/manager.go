@@ -12,7 +12,6 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/state"
-	"golang.org/x/xerrors"
 )
 
 type Manager struct {
@@ -152,9 +151,9 @@ func (m *Manager) startShard(shard int) {
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
 			err := s.Open(m.ctx, m.token, m.playedAddr)
 			if err != nil {
-				if !xerrors.Is(err, context.Canceled) {
-					m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))
-				}
+				// if !xerrors.Is(err, context.Canceled) {
+				m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))
+				// }
 			}
 
 			time.Sleep(time.Second)

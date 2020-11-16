@@ -6,8 +6,8 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 )
 
-func (db *DB) SetGuild(_ context.Context, id int64, raw []byte) error {
-	return db.Transact(func(t fdb.Transaction) error {
+func (db *DB) SetGuild(_ context.Context, id int64, raw []byte) (bool, error) {
+	return false, db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildKey(id), raw)
 		return nil
 	})

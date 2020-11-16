@@ -81,3 +81,23 @@ CREATE UNLOGGED TABLE IF NOT EXISTS shards (
 	"sess" text NOT NULL,
 	PRIMARY KEY("id", "name")
 );
+
+CREATE TABLE "public"."guilds_persistent" ("id" int8, PRIMARY KEY ("id"));
+
+CREATE OR REPLACE FUNCTION addGuildToPersistent() RETURNS TRIGGER AS $joined_guild_trigger$
+   BEGIN
+      INSERT INTO guilds_persistent(id) VALUES (NEW.id) ON CONFLICT (id) DO NOTHING;
+      RETURN NEW;
+   END;
+$joined_guild_trigger$ LANGUAGE plpgsql;
+CREATE TRIGGER joined_guild AFTER INSERT ON guilds FOR EACH ROW EXECUTE PROCEDURE addGuildToPersistent();
+
+CREATE OR REPLACE FUNCTION removeGuildFromPersistent() RETURNS TRIGGER AS $left_guild_trigger$
+   BEGIN
+      delete from guilds_persistent where id = OLD.id;
+      RETURN OLD;
+   END;
+$left_guild_trigger$ LANGUAGE plpgsql;
+
+CREATE TRIGGER left_guild AFTER DELETE ON guilds FOR EACH ROW EXECUTE PROCEDURE removeGuildFromPersistent();
+

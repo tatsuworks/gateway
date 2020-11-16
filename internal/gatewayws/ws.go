@@ -273,16 +273,15 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		}
 
 		s.curState = "handle state event " + ev.T
-		// this is jank, will fix soon
-		var requestMembers int64
-		requestMembers, err = s.state.HandleEvent(ctx, ev)
+		evtPayload, err := s.state.HandleEvent(ctx, ev)
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
 		s.curState = "push event to redis"
-		if ev.T != "GUILD_CREATE" && ev.T != "GUILD_MEMBER_CHUNK" {
+		if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
+			ev.T != "GUILD_MEMBER_CHUNK" {
 			err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 			if err != nil {
 				s.log.Error(s.ctx, "push event to redis", slog.Error(err))
@@ -292,9 +291,9 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		s.curState = "request guild members"
 		// only request members from new guilds.
 		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
-		if requestMembers != 0 {
-			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", requestMembers))
-			s.requestGuildMembers(requestMembers)
+		if evtPayload.GuildID != 0 {
+			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
+			s.requestGuildMembers(evtPayload.GuildID)
 		}
 	}
 

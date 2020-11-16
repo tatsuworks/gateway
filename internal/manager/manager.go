@@ -69,6 +69,20 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		cfg.Logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
 	}
 
+	pubsub := rc.Subscribe("channel_bot_status")
+	statusChan := pubsub.Channel()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				pubsub.Close()
+				return
+			case statusMsg := <-statusChan:
+				cfg.Logger.Info(ctx, "payload", slog.F("pl", statusMsg.Payload)) //trigger update status
+			}
+		}
+	}()
+
 	etcdc, err := clientv3.New(clientv3.Config{
 		Endpoints:   strings.Split(cfg.EtcdAddr, ","),
 		DialTimeout: 5 * time.Second,

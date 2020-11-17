@@ -8,14 +8,16 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) GuildCreate(ctx context.Context, d []byte) (guild int64, _ error) {
+func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, error) {
 	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
-		return 0, xerrors.Errorf("parse guild create: %w", err)
+		return nil, xerrors.Errorf("parse guild create: %w", err)
 	}
 
-	guild = gc.ID
-
+	guild := gc.ID
+	result := &EventPayload{
+		GuildID: guild,
+	}
 	// if true {
 	// 	return guild, nil
 	// }
@@ -38,10 +40,11 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (guild int64, _ erro
 				return xerrors.Errorf("GetGuildMemberCount json Marshal: %w", err)
 			}
 		}
-		err := c.db.SetGuild(ctx, gc.ID, gc.Raw)
+		isNewGuild, err := c.db.SetGuild(ctx, gc.ID, gc.Raw)
 		if err != nil {
 			return xerrors.Errorf("set guild: %w", err)
 		}
+		result.IsNewGuild = isNewGuild
 		return nil
 	})
 	eg.Go(func() error {
@@ -81,8 +84,8 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (guild int64, _ erro
 		}
 		return nil
 	})
-
-	return guild, eg.Wait()
+	err = eg.Wait()
+	return result, err
 }
 
 func (c *Client) GuildDelete(ctx context.Context, d []byte) error {

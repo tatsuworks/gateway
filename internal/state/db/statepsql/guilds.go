@@ -6,24 +6,28 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) error {
+func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) (isNewGuild bool, _ error) {
+	const persistentCheck = `SELECT count(*) FROM guilds_persistent where id = $1`
+	var c int
+	err := db.sql.GetContext(ctx, &c, persistentCheck, id)
+	isNewGuild = c == 0
 	const q = `
-INSERT INTO
-	guilds (id, data)
-VALUES
-	($1, $2)
-ON CONFLICT (id)
-DO UPDATE
-SET
-	data = $2
-`
+	INSERT INTO
+		guilds (id, data)
+	VALUES
+		($1, $2)
+	ON CONFLICT (id)
+	DO UPDATE
+	SET
+		data = $2
+	`
 
-	_, err := db.sql.ExecContext(ctx, q, id, raw)
+	_, err = db.sql.ExecContext(ctx, q, id, raw)
 	if err != nil {
-		return xerrors.Errorf("exec insert: %w", err)
+		return false, xerrors.Errorf("exec insert: %w", err)
 	}
 
-	return nil
+	return isNewGuild, nil
 }
 
 func (db *db) GetGuild(ctx context.Context, id int64) ([]byte, error) {

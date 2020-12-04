@@ -9,7 +9,11 @@ import (
 )
 
 func (s *Server) getGuild(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	g, err := s.db.GetGuild(r.Context(), guildParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	g, err := s.db.GetGuild(r.Context(), guild)
 	if err != nil {
 		return xerrors.Errorf("read guild: %w", err)
 	}
@@ -30,12 +34,12 @@ func (s *Server) getGuildCount(w http.ResponseWriter, r *http.Request, p httprou
 	return s.writeTerm(w, []byte(strconv.Itoa(count)))
 }
 
-func guildParam(p httprouter.Params) int64 {
+func guildParam(p httprouter.Params) (int64, error) {
 	c := p.ByName("guild")
 	ci, err := strconv.ParseInt(c, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, err
 	}
 
-	return ci
+	return ci, nil
 }

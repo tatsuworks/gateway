@@ -10,7 +10,11 @@ import (
 )
 
 func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	ro, err := s.db.GetGuildRole(r.Context(), guildParam(p), roleParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	ro, err := s.db.GetGuildRole(r.Context(), guild, roleParam(p))
 	if err != nil {
 		return xerrors.Errorf("read role: %w", err)
 	}
@@ -26,8 +30,11 @@ func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprou
 	if len(r.URL.Query()["id"]) > 0 {
 		return s.getGuildRoleSlice(w, r, p)
 	}
-
-	ros, err := s.db.GetGuildRoles(r.Context(), guildParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	ros, err := s.db.GetGuildRoles(r.Context(), guild)
 	if err != nil {
 		return xerrors.Errorf("read roles: %w", err)
 	}
@@ -36,9 +43,12 @@ func (s *Server) getGuildRoles(w http.ResponseWriter, r *http.Request, p httprou
 }
 
 func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	g, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
 	var (
 		ctx = r.Context()
-		g   = guildParam(p)
 		rs  = r.URL.Query()["id"]
 		ros = make([][]byte, 0, len(rs))
 	)

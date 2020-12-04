@@ -10,7 +10,11 @@ import (
 )
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	m, err := s.db.GetGuildMember(r.Context(), guildParam(p), memberParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	m, err := s.db.GetGuildMember(r.Context(), guild, memberParam(p))
 	if err != nil {
 		return xerrors.Errorf("read member: %w", err)
 	}
@@ -30,8 +34,11 @@ func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	if r.URL.Query().Get("query") != "" {
 		return s.searchGuildMembers(w, r, p)
 	}
-
-	ms, err := s.db.GetGuildMembers(r.Context(), guildParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	ms, err := s.db.GetGuildMembers(r.Context(), guild)
 	if err != nil {
 		return xerrors.Errorf("read members: %w", err)
 	}
@@ -40,8 +47,12 @@ func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 }
 
 func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	g, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
 	var (
-		g   = guildParam(p)
 		ms  = r.URL.Query()["id"]
 		mrs = make([][]byte, 0, len(ms))
 	)
@@ -68,9 +79,12 @@ func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p h
 }
 
 func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	g, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
 	var (
 		ctx   = r.Context()
-		g     = guildParam(p)
 		query = r.URL.Query().Get("query")
 	)
 

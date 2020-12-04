@@ -43,7 +43,11 @@ func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httproute
 }
 
 func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	cs, err := s.db.GetGuildChannels(r.Context(), guildParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	cs, err := s.db.GetGuildChannels(r.Context(), guild)
 	if err != nil {
 		return xerrors.Errorf("read guild channels: %w", err)
 	}

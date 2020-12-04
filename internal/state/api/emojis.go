@@ -9,7 +9,11 @@ import (
 )
 
 func (s *Server) getGuildEmoji(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	c, err := s.db.GetGuildEmoji(r.Context(), guildParam(p), emojiParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	c, err := s.db.GetGuildEmoji(r.Context(), guild, emojiParam(p))
 	if err != nil {
 		return xerrors.Errorf("read emoji: %w", err)
 	}
@@ -32,7 +36,11 @@ func emojiParam(p httprouter.Params) int64 {
 }
 
 func (s *Server) getGuildEmojis(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	cs, err := s.db.GetGuildEmojis(r.Context(), guildParam(p))
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	cs, err := s.db.GetGuildEmojis(r.Context(), guild)
 	if err != nil {
 		return xerrors.Errorf("read guild emojis: %w", err)
 	}

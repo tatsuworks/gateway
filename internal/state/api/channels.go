@@ -11,7 +11,11 @@ import (
 )
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	c, err := s.db.GetChannel(r.Context(), channelParam(p))
+	channelID, err := channelParam(p)
+	if err != nil {
+		return xerrors.Errorf("channel param: %w", err)
+	}
+	c, err := s.db.GetChannel(r.Context(), channelID)
 	if err != nil {
 		return xerrors.Errorf("read channel: %w", err)
 	}
@@ -23,14 +27,14 @@ func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter
 	return s.writeTerm(w, c)
 }
 
-func channelParam(p httprouter.Params) int64 {
+func channelParam(p httprouter.Params) (int64, error) {
 	c := p.ByName("channel")
 	ci, err := strconv.ParseInt(c, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, err
 	}
 
-	return ci
+	return ci, nil
 }
 
 func (s *Server) getChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {

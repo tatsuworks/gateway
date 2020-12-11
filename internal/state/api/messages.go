@@ -9,7 +9,15 @@ import (
 )
 
 func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	m, err := s.db.GetChannelMessage(r.Context(), channelParam(p), messageParam(p))
+	channelID, err := channelParam(p)
+	if err != nil {
+		return xerrors.Errorf("channel param: %w", err)
+	}
+	messageID, err := messageParam(p)
+	if err != nil {
+		return xerrors.Errorf("message param: %w", err)
+	}
+	m, err := s.db.GetChannelMessage(r.Context(), channelID, messageID)
 	if err != nil {
 		return xerrors.Errorf("transact message: %w", err)
 	}
@@ -21,12 +29,12 @@ func (s *Server) getChannelMessage(w http.ResponseWriter, r *http.Request, p htt
 	return s.writeTerm(w, m)
 }
 
-func messageParam(p httprouter.Params) int64 {
+func messageParam(p httprouter.Params) (int64, error) {
 	m := p.ByName("message")
 	mi, err := strconv.ParseInt(m, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, err
 	}
 
-	return mi
+	return mi, nil
 }

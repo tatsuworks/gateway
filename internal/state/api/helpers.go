@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"time"
-	"unsafe"
 
 	"cdr.dev/slog"
 	"github.com/julienschmidt/httprouter"
@@ -16,7 +15,8 @@ import (
 var ErrNotFound = sql.ErrNoRows
 
 func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error) httprouter.Handle {
-	return LogMW(log)(httprouter.Handle(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	return httprouter.Handle(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		start := time.Now()
 		err := fn(w, r, p)
 		if err != nil {
 			var (
@@ -28,9 +28,22 @@ func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request
 				code = http.StatusNotFound
 			}
 
+			log := log.With(
+				slog.F("method", r.Method),
+				slog.F("path", r.URL.Path),
+				slog.F("took", time.Since(start)),
+				slog.F("status_code", code),
+			)
+
+			logLevelFn := log.Debug
+			if code >= 500 {
+				logLevelFn = log.Error
+			}
+
+			logLevelFn(r.Context(), msg, slog.Error(err))
 			http.Error(w, msg, code)
 		}
-	}))
+	})
 }
 
 // StatusWriter intercepts the status of the request.

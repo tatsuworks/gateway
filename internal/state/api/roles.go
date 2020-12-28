@@ -14,7 +14,12 @@ func (s *Server) getGuildRole(w http.ResponseWriter, r *http.Request, p httprout
 	if err != nil {
 		return xerrors.Errorf("read guild param: %w", err)
 	}
-	ro, err := s.db.GetGuildRole(r.Context(), guild, roleParam(p))
+	role, err := roleParam(p)
+	if err != nil {
+		return xerrors.Errorf("read role param: %w", err)
+	}
+
+	ro, err := s.db.GetGuildRole(r.Context(), guild, role)
 	if err != nil {
 		return xerrors.Errorf("read role: %w", err)
 	}
@@ -74,12 +79,12 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 	return s.writeTerms(w, ros)
 }
 
-func roleParam(p httprouter.Params) int64 {
+func roleParam(p httprouter.Params) (int64, error) {
 	r := p.ByName("role")
 	ri, err := strconv.ParseInt(r, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, ErrInvalidArgument
 	}
 
-	return ri
+	return ri, nil
 }

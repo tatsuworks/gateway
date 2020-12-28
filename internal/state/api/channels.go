@@ -31,7 +31,7 @@ func channelParam(p httprouter.Params) (int64, error) {
 	c := p.ByName("channel")
 	ci, err := strconv.ParseInt(c, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, ErrInvalidArgument
 	}
 
 	return ci, nil

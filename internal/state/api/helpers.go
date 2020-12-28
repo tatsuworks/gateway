@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var ErrNotFound = sql.ErrNoRows
+var ErrInvalidArgument = errors.New("invalid argument provided")
 
 func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request, p httprouter.Params) error) httprouter.Handle {
 	return httprouter.Handle(func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -24,6 +26,10 @@ func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request
 
 			if xerrors.Is(err, ErrNotFound) {
 				code = http.StatusNotFound
+			}
+
+			if xerrors.Is(err, ErrInvalidArgument) {
+				code = http.StatusBadRequest
 			}
 
 			log := log.With(

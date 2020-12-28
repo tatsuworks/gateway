@@ -33,7 +33,7 @@ func messageParam(p httprouter.Params) (int64, error) {
 	m := p.ByName("message")
 	mi, err := strconv.ParseInt(m, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, ErrInvalidArgument
 	}
 
 	return mi, nil

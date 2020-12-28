@@ -14,7 +14,11 @@ func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httpro
 	if err != nil {
 		return xerrors.Errorf("read guild param: %w", err)
 	}
-	m, err := s.db.GetGuildMember(r.Context(), guild, memberParam(p))
+	member, err := memberParam(p)
+	if err != nil {
+		return xerrors.Errorf("read member param: %w", err)
+	}
+	m, err := s.db.GetGuildMember(r.Context(), guild, member)
 	if err != nil {
 		return xerrors.Errorf("read member: %w", err)
 	}
@@ -96,28 +100,32 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 	return s.writeTerms(w, ms)
 }
 
-func memberParam(p httprouter.Params) int64 {
+func memberParam(p httprouter.Params) (int64, error) {
 	m := p.ByName("member")
 	mi, err := strconv.ParseInt(m, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, ErrInvalidArgument
 	}
 
-	return mi
+	return mi, nil
 }
 
-func userParam(p httprouter.Params) int64 {
+func userParam(p httprouter.Params) (int64, error) {
 	u := p.ByName("user")
 	ui, err := strconv.ParseInt(u, 10, 64)
 	if err != nil {
-		panic(err.Error())
+		return 0, ErrInvalidArgument
 	}
 
-	return ui
+	return ui, nil
 }
 
 func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	m, err := s.db.GetUser(r.Context(), userParam(p))
+	user, err := userParam(p)
+	if err != nil {
+		return xerrors.Errorf("read user param: %w", err)
+	}
+	m, err := s.db.GetUser(r.Context(), user)
 	if err != nil {
 		return xerrors.Errorf("read user: %w", err)
 	}

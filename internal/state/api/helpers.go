@@ -33,6 +33,7 @@ func wrapHandler(log slog.Logger, fn func(w http.ResponseWriter, r *http.Request
 			}
 
 			log := log.With(
+				slog.F("query", r.URL.Query().Encode()),
 				slog.F("method", r.Method),
 				slog.F("path", r.URL.Path),
 				slog.F("took", time.Since(start)),

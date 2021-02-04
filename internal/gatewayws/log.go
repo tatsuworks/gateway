@@ -7,7 +7,7 @@ import (
 	"cdr.dev/slog"
 )
 
-const LogInterval = 3 * time.Minute
+const LogInterval = 10 * time.Minute
 
 func (s *Session) logTotalEvents() {
 	var (

@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"path"
+	"time"
 
 	"cdr.dev/slog"
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -57,7 +58,7 @@ func (s *Server) Init() {
 	}))
 
 	s.router.GET(path.Join(base, "users", ":user"), wrapHandler(s.log, s.getUser))
-	// s.router.GET(path.Join(base, "channels"), wrapHandler(s.log, s.getChannels))
+
 	s.router.GET(path.Join(base, "channels", ":channel"), wrapHandler(s.log, s.getChannel))
 	s.router.GET(path.Join(base, "channels", ":channel", "messages", ":message"), wrapHandler(s.log, s.getChannelMessage))
 	s.router.GET(path.Join(base, "guilds", ":guild"), wrapHandler(s.log, s.getGuild))
@@ -73,11 +74,11 @@ func (s *Server) Init() {
 }
 
 func (s *Server) Start(addr string) error {
-	var (
-		h1s = new(http.Server)
-		h2s = new(http2.Server)
-	)
-
+	var h2s = new(http2.Server)
+	h1s := &http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 20 * time.Second,
+	}
 	ln, err := reuseport.Listen("tcp4", addr)
 	if err != nil {
 		return err

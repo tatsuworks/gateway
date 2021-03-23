@@ -133,7 +133,6 @@ FROM
 	members
 WHERE
 	guild_id = $1
-LIMIT 100
 `
 
 	var ms []RawJSON

@@ -180,11 +180,11 @@ ORDER BY last_updated desc nulls last limit 1
 }
 
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
-	re, err := regexp.Compile("^[^a-zA-Z0-9]$")
+	re, err := regexp.Compile(`[-!$%^&*()_+|~=\x60{}\[\]:";'<>?,.\/]`)
 	if err != nil {
 		return nil, xerrors.Errorf("regex compile: %w", err)
 	}
-	if query == "" || re.Match([]byte(query)) {
+	if query == "" || (len(query) == 1 && re.Match([]byte(query))) {
 		return nil, xerrors.Errorf("empty query and single non alphanumberic not allowed: %w", err)
 	}
 	const q = `

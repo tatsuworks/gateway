@@ -3,6 +3,7 @@ package statepsql
 import (
 	"context"
 	"database/sql"
+	"regexp"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -132,6 +133,7 @@ FROM
 	members
 WHERE
 	guild_id = $1
+LIMIT 100
 `
 
 	var ms []RawJSON
@@ -178,6 +180,13 @@ ORDER BY last_updated desc nulls last limit 1
 }
 
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
+	re, err := regexp.Compile("^[^a-zA-Z0-9]$")
+	if err != nil {
+		return nil, xerrors.Errorf("regex compile: %w", err)
+	}
+	if query == "" || re.Match([]byte(query)) {
+		return nil, xerrors.Errorf("empty query and single non alphanumberic not allowed: %w", err)
+	}
 	const q = `
 SELECT
 	data
@@ -191,7 +200,7 @@ WHERE
 `
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+query+"%")
+	err = db.sql.SelectContext(ctx, &ms, q, guildID, "%"+query+"%")
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

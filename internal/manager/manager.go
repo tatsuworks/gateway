@@ -123,17 +123,18 @@ func (m *Manager) Start(start, stop int) error {
 
 func (m *Manager) startShard(shard int) {
 	s, err := gatewayws.NewSession(&gatewayws.SessionConfig{
-		Name:       m.name,
-		Logger:     m.log,
-		DB:         m.db,
-		WorkGroup:  m.wg,
-		Redis:      m.rdb,
-		Etcd:       m.etcd,
-		Token:      m.token,
-		Intents:    m.intents,
-		ShardID:    shard,
-		ShardCount: m.shardCount,
-		BufferPool: m.bufferPool,
+		Name:              m.name,
+		Logger:            m.log,
+		DB:                m.db,
+		WorkGroup:         m.wg,
+		Redis:             m.rdb,
+		Etcd:              m.etcd,
+		Token:             m.token,
+		Intents:           m.intents,
+		ShardID:           shard,
+		ShardCount:        m.shardCount,
+		BufferPool:        m.bufferPool,
+		WhitelistedEvents: m.whitelistedEvents,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

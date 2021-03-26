@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -134,11 +134,7 @@ func main() {
 	events := os.Getenv("WHITELIST_EVENTS")
 	var whitelistedEventLookup map[string]struct{}
 	if events != "" {
-		var whitelistedEvents []string
-		err := json.Unmarshal([]byte(events), &whitelistedEvents)
-		if err != nil {
-			logger.Fatal(ctx, "whitelisted events unmarshal", slog.Error(err))
-		}
+		whitelistedEvents := strings.Split(events, ",")
 		whitelistedEventLookup = make(map[string]struct{}, len(whitelistedEvents))
 		var empty struct{}
 		for _, evt := range whitelistedEvents {

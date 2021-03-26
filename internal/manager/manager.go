@@ -32,21 +32,23 @@ type Manager struct {
 	etcd       *clientv3.Client
 	playedAddr string
 
-	bufferPool *sync.Pool
+	bufferPool        *sync.Pool
+	whitelistedEvents map[string]struct{}
 }
 
 type Config struct {
-	Name       string
-	Logger     slog.Logger
-	DB         state.DB
-	Wg         *sync.WaitGroup
-	Token      string
-	Shards     int
-	Intents    gatewayws.Intents
-	RedisAddr  string
-	EtcdAddr   string
-	PlayedAddr string
-	PodID      string
+	Name              string
+	Logger            slog.Logger
+	DB                state.DB
+	Wg                *sync.WaitGroup
+	Token             string
+	Shards            int
+	Intents           gatewayws.Intents
+	RedisAddr         string
+	EtcdAddr          string
+	PlayedAddr        string
+	PodID             string
+	WhitelistedEvents map[string]struct{}
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
@@ -98,6 +100,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 				return new(bytes.Buffer)
 			},
 		},
+
+		whitelistedEvents: cfg.WhitelistedEvents,
 	}
 }
 

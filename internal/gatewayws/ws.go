@@ -76,6 +76,8 @@ type Session struct {
 	stateDB state.DB
 	rc      *redis.Client
 	played  *played.Client
+
+	whitelistedEvents map[string]struct{}
 }
 
 func (s *Session) Status() string {
@@ -101,17 +103,18 @@ func (s *Session) GatewayURL() string {
 }
 
 type SessionConfig struct {
-	Name       string
-	Logger     slog.Logger
-	DB         state.DB
-	WorkGroup  *sync.WaitGroup
-	Redis      *redis.Client
-	Etcd       *clientv3.Client
-	Token      string
-	Intents    Intents
-	ShardID    int
-	ShardCount int
-	BufferPool *sync.Pool
+	Name              string
+	Logger            slog.Logger
+	DB                state.DB
+	WorkGroup         *sync.WaitGroup
+	Redis             *redis.Client
+	Etcd              *clientv3.Client
+	Token             string
+	Intents           Intents
+	ShardID           int
+	ShardCount        int
+	BufferPool        *sync.Pool
+	WhitelistedEvents map[string]struct{}
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -280,13 +283,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		}
 
 		s.curState = "push event to redis"
-		if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
-			ev.T != "GUILD_MEMBER_CHUNK" {
-			err = s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-			if err != nil {
-				s.log.Error(s.ctx, "push event to redis", slog.Error(err))
-			}
-		}
+		s.pushEventToRedis(ev, evtPayload)
 
 		s.curState = "request guild members"
 		// only request members from new guilds.
@@ -301,6 +298,22 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	_ = c.Close(4000, "")
 	s.log.Info(s.ctx, "closed")
 	return err
+}
+
+func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
+	if s.whitelistedEvents != nil {
+		if _, ok := s.whitelistedEvents[ev.T]; !ok {
+			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
+			return
+		}
+	}
+	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
+		ev.T != "GUILD_MEMBER_CHUNK" {
+		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+		if err != nil {
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+		}
+	}
 }
 
 func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {

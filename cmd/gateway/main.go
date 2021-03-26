@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"net"
 	"os"
@@ -130,19 +131,35 @@ func main() {
 		logger.Fatal(ctx, "listen", slog.Error(err))
 	}
 
+	events := os.Getenv("WHITELIST_EVENTS")
+	var whitelistedEventLookup map[string]struct{}
+	if events != "" {
+		var whitelistedEvents []string
+		err := json.Unmarshal([]byte(events), &whitelistedEvents)
+		if err != nil {
+			logger.Fatal(ctx, "whitelisted events unmarshal", slog.Error(err))
+		}
+		whitelistedEventLookup = make(map[string]struct{}, len(whitelistedEvents))
+		var empty struct{}
+		for _, evt := range whitelistedEvents {
+			whitelistedEventLookup[evt] = empty
+		}
+	}
+
 	wg := &sync.WaitGroup{}
 	m := manager.New(ctx, &manager.Config{
-		Name:       name,
-		Logger:     logger,
-		Wg:         wg,
-		DB:         statedb,
-		Token:      token,
-		Shards:     shards,
-		Intents:    ints,
-		RedisAddr:  redisHost,
-		EtcdAddr:   etcdHost,
-		PlayedAddr: playedHost,
-		PodID:      podId,
+		Name:              name,
+		Logger:            logger,
+		Wg:                wg,
+		DB:                statedb,
+		Token:             token,
+		Shards:            shards,
+		Intents:           ints,
+		RedisAddr:         redisHost,
+		EtcdAddr:          etcdHost,
+		PlayedAddr:        playedHost,
+		PodID:             podId,
+		WhitelistedEvents: whitelistedEventLookup,
 	})
 
 	logger.Info(ctx, "starting manager",

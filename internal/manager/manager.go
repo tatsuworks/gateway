@@ -32,21 +32,23 @@ type Manager struct {
 	etcd       *clientv3.Client
 	playedAddr string
 
-	bufferPool *sync.Pool
+	bufferPool        *sync.Pool
+	whitelistedEvents map[string]struct{}
 }
 
 type Config struct {
-	Name       string
-	Logger     slog.Logger
-	DB         state.DB
-	Wg         *sync.WaitGroup
-	Token      string
-	Shards     int
-	Intents    gatewayws.Intents
-	RedisAddr  string
-	EtcdAddr   string
-	PlayedAddr string
-	PodID      string
+	Name              string
+	Logger            slog.Logger
+	DB                state.DB
+	Wg                *sync.WaitGroup
+	Token             string
+	Shards            int
+	Intents           gatewayws.Intents
+	RedisAddr         string
+	EtcdAddr          string
+	PlayedAddr        string
+	PodID             string
+	WhitelistedEvents map[string]struct{}
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
@@ -98,6 +100,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 				return new(bytes.Buffer)
 			},
 		},
+
+		whitelistedEvents: cfg.WhitelistedEvents,
 	}
 }
 
@@ -119,17 +123,18 @@ func (m *Manager) Start(start, stop int) error {
 
 func (m *Manager) startShard(shard int) {
 	s, err := gatewayws.NewSession(&gatewayws.SessionConfig{
-		Name:       m.name,
-		Logger:     m.log,
-		DB:         m.db,
-		WorkGroup:  m.wg,
-		Redis:      m.rdb,
-		Etcd:       m.etcd,
-		Token:      m.token,
-		Intents:    m.intents,
-		ShardID:    shard,
-		ShardCount: m.shardCount,
-		BufferPool: m.bufferPool,
+		Name:              m.name,
+		Logger:            m.log,
+		DB:                m.db,
+		WorkGroup:         m.wg,
+		Redis:             m.rdb,
+		Etcd:              m.etcd,
+		Token:             m.token,
+		Intents:           m.intents,
+		ShardID:           shard,
+		ShardCount:        m.shardCount,
+		BufferPool:        m.bufferPool,
+		WhitelistedEvents: m.whitelistedEvents,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

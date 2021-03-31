@@ -140,7 +140,7 @@ func (s *Session) writeHeartbeat() {
 
 func (s *Session) listenOpCodes() {
 	var (
-		t   = time.NewTicker(s.interval)
+		t   = time.NewTicker(time.Second)
 		ctx = s.ctx
 	)
 	defer t.Stop()
@@ -156,11 +156,13 @@ func (s *Session) listenOpCodes() {
 			continue
 		}
 		opjson := ssCmd.String()
+		s.log.Debug(ctx, "opjson", slog.F("opjson", opjson))
 		var op Op
 		err := json.Unmarshal([]byte(opjson), &op)
 		if err != nil {
 			continue
 		}
+		s.log.Debug(ctx, "unmarshaled", slog.F("op", op))
 		s.prioch <- &op
 	}
 }

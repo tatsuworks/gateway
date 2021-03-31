@@ -1,6 +1,7 @@
 package gatewayws
 
 import (
+	"encoding/json"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -134,6 +135,33 @@ func (s *Session) writeHeartbeat() {
 	s.prioch <- &Op{
 		Op: 1,
 		D:  atomic.LoadInt64(&s.seq),
+	}
+}
+
+func (s *Session) listenOpCodes() {
+	var (
+		t   = time.NewTicker(s.interval)
+		ctx = s.ctx
+	)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		ssCmd := s.rc.BLPop(time.Second, "gateway:op")
+		if ssCmd.Err() != nil {
+			continue
+		}
+		opjson := ssCmd.String()
+		var op Op
+		err := json.Unmarshal([]byte(opjson), &op)
+		if err != nil {
+			continue
+		}
+		s.prioch <- &op
 	}
 }
 

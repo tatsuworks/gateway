@@ -239,6 +239,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
+	go s.listenOpCodes()
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")

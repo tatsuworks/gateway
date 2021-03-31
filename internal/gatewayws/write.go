@@ -156,13 +156,13 @@ func (s *Session) listenOpCodes() {
 			continue
 		}
 		opjson := ssCmd.String()
-		s.log.Debug(ctx, "opjson", slog.F("opjson", opjson))
+		s.log.Info(ctx, "opjson", slog.F("opjson", opjson))
 		var op Op
 		err := json.Unmarshal([]byte(opjson), &op)
 		if err != nil {
 			continue
 		}
-		s.log.Debug(ctx, "unmarshaled", slog.F("op", op))
+		s.log.Info(ctx, "unmarshaled", slog.F("op", op))
 		s.prioch <- &op
 	}
 }

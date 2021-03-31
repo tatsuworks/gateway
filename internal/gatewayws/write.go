@@ -160,6 +160,7 @@ func (s *Session) listenOpCodes() {
 		var op Op
 		err := json.Unmarshal([]byte(opjson), &op)
 		if err != nil {
+			s.log.Error(ctx, "json.Unmarshal", slog.Error(err))
 			continue
 		}
 		s.log.Info(ctx, "unmarshaled", slog.F("op", op))

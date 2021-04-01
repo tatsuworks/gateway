@@ -8,7 +8,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/discord"
-	"github.com/tatsuworks/gateway/discord/discordetf"
+	"github.com/tatsuworks/gateway/discord/discordjson"
 	"github.com/tatsuworks/gateway/internal/state"
 )
 
@@ -35,7 +35,7 @@ func NewDB() (state.DB, error) {
 }
 
 func (db *DB) Encoding() discord.Encoding {
-	return discordetf.Encoding
+	return discordjson.Encoding
 }
 
 // Transact is a helper around (fdb.Database).Transact which accepts a function

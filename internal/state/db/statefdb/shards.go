@@ -10,7 +10,10 @@ import (
 func (db *DB) GetShardInfo(ctx context.Context, shard int, name string) (sess string, seq int64, err error) {
 	err = db.Transact(func(t fdb.Transaction) error {
 		sess = string(t.Get(db.fmtShardSessKey(shard, name)).MustGet())
-		seq = int64(binary.LittleEndian.Uint64(t.Get(db.fmtShardSeqKey(shard, name)).MustGet()))
+		val := t.Get(db.fmtShardSeqKey(shard, name)).MustGet()
+		if val != nil {
+			seq = int64(binary.LittleEndian.Uint64(val))
+		}
 		return nil
 	})
 	if err != nil {
@@ -33,7 +36,10 @@ func (db *DB) SetSequence(ctx context.Context, shard int, name string, seq int64
 func (db *DB) GetSequence(ctx context.Context, shard int, name string) (int64, error) {
 	var seq int64
 	err := db.Transact(func(t fdb.Transaction) error {
-		seq = int64(binary.LittleEndian.Uint64(t.Get(db.fmtShardSeqKey(shard, name)).MustGet()))
+		val := t.Get(db.fmtShardSeqKey(shard, name)).MustGet()
+		if val != nil {
+			seq = int64(binary.LittleEndian.Uint64(val))
+		}
 		return nil
 	})
 	if err != nil {

@@ -141,7 +141,7 @@ func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query strin
 	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
 		ropt := fdb.RangeOptions{Mode: fdb.StreamingModeSerial}
 		i := t.Snapshot().GetRange(pre, ropt).Iterator()
-
+		q := strings.ToLower(query)
 		for i.Advance() {
 			raw := i.MustGet()
 			var d MemberData
@@ -150,7 +150,7 @@ func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query strin
 			if err != nil {
 				return err
 			}
-			if strings.Contains(d.Nick, query) || strings.Contains(d.User.Username, query) {
+			if strings.Contains(strings.ToLower(d.Nick), q) || strings.Contains(strings.ToLower(d.User.Username), q) {
 				out = append(out, raw.Value)
 			}
 		}

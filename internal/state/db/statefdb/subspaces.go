@@ -7,15 +7,16 @@ import (
 
 // Subspaces is a struct containing all of the different subspaces used.
 type Subspaces struct {
-	Channels    subspace.Subspace
-	Guilds      subspace.Subspace
-	Members     subspace.Subspace
-	Messages    subspace.Subspace
-	Presences   subspace.Subspace
-	Users       subspace.Subspace
-	Roles       subspace.Subspace
-	VoiceStates subspace.Subspace
-	Emojis      subspace.Subspace
+	Channels     subspace.Subspace
+	Guilds       subspace.Subspace
+	Members      subspace.Subspace
+	MembersIndex subspace.Subspace
+	Messages     subspace.Subspace
+	Presences    subspace.Subspace
+	Users        subspace.Subspace
+	Roles        subspace.Subspace
+	VoiceStates  subspace.Subspace
+	Emojis       subspace.Subspace
 }
 
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
@@ -38,19 +39,21 @@ const (
 	VoiceStateSubspaceName
 	// EmojiSubspaceName is the enum for the emoji subspace.
 	EmojiSubspaceName
+	MemberIndexSubspaceName
 )
 
 // NewSubspaces returns an instantiated Subspaces with the correct subspaces.
 func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 	return &Subspaces{
-		Channels:    dir.Sub(ChannelSubspaceName),
-		Guilds:      dir.Sub(GuildSubspaceName),
-		Members:     dir.Sub(MemberSubspaceName),
-		Messages:    dir.Sub(MessageSubspaceName),
-		Presences:   dir.Sub(PresenceSubspaceName),
-		Users:       dir.Sub(UserSubspaceName),
-		Roles:       dir.Sub(RoleSubspaceName),
-		VoiceStates: dir.Sub(VoiceStateSubspaceName),
-		Emojis:      dir.Sub(EmojiSubspaceName),
+		Channels:     dir.Sub(ChannelSubspaceName),
+		Guilds:       dir.Sub(GuildSubspaceName),
+		Members:      dir.Sub(MemberSubspaceName),
+		MembersIndex: dir.Sub(MemberIndexSubspaceName),
+		Messages:     dir.Sub(MessageSubspaceName),
+		Presences:    dir.Sub(PresenceSubspaceName),
+		Users:        dir.Sub(UserSubspaceName),
+		Roles:        dir.Sub(RoleSubspaceName),
+		VoiceStates:  dir.Sub(VoiceStateSubspaceName),
+		Emojis:       dir.Sub(EmojiSubspaceName),
 	}
 }

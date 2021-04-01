@@ -116,7 +116,10 @@ func (db *DB) SetChannels(_ context.Context, guild int64, channels map[int64][]b
 		return xerrors.Errorf("set channels: %w", err)
 	}
 
-	err = db.setGuildETFs(guild, channels, db.fmtGuildChannelKey)
+	err = db.setGuildETFs(guild, channels, func(t fdb.Transaction, guild, id int64, e []byte) {
+		t.Set(db.fmtGuildChannelKey(guild, id), e)
+	})
+
 	if err != nil {
 		return xerrors.Errorf("set guild channels: %w", err)
 	}

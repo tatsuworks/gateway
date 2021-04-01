@@ -7,7 +7,9 @@ import (
 )
 
 func (db *DB) SetGuildEmojis(_ context.Context, guild int64, raws map[int64][]byte) error {
-	return db.setGuildETFs(guild, raws, db.fmtGuildEmojiKey)
+	return db.setGuildETFs(guild, raws, func(t fdb.Transaction, guild, id int64, e []byte) {
+		t.Set(db.fmtGuildEmojiKey(guild, id), e)
+	})
 }
 
 func (db *DB) DeleteGuildEmojis(_ context.Context, guild int64) error {

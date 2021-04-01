@@ -2,12 +2,20 @@ package statefdb
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/json"
+	"strings"
+	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"golang.org/x/xerrors"
 )
 
 func (db *DB) SetGuildMembers(_ context.Context, guild int64, raws map[int64][]byte) error {
-	return db.setGuildETFs(guild, raws, db.fmtGuildMemberKey)
+	return db.setGuildETFs(guild, raws, func(t fdb.Transaction, guild, id int64, e []byte) {
+		db.SetGuildMemberInTxn(t, guild, id, e)
+	})
+
 }
 
 func (db *DB) DeleteGuildMembers(_ context.Context, guild int64) error {
@@ -19,9 +27,22 @@ func (db *DB) DeleteGuildMembers(_ context.Context, guild int64) error {
 	})
 }
 
+func (db *DB) SetGuildMemberInTxn(t fdb.Transaction, guild, user int64, raw []byte) error {
+	t.Set(db.fmtGuildMemberKey(guild, user), raw)
+
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(time.Now().Unix()))
+	t.Set(db.fmtMemberGuildKey(guild, user), b)
+
+	return nil
+}
+
 func (db *DB) SetGuildMember(_ context.Context, guild, user int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
-		t.Set(db.fmtGuildMemberKey(guild, user), raw)
+		err := db.SetGuildMemberInTxn(t, guild, user, raw)
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 }
@@ -66,17 +87,90 @@ func (db *DB) GetGuildMembers(_ context.Context, guild int64) ([][]byte, error) 
 func (db *DB) DeleteGuildMember(_ context.Context, guild, user int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildMemberKey(guild, user))
+		t.Clear(db.fmtMemberGuildKey(guild, user))
 		return nil
 	})
 }
 func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
-	panic("unimplemented")
+	var (
+		m []byte
+	)
+	rr, err := fdb.PrefixRange(db.fmtMemberGuildPrefix(userID))
+	if err != nil {
+		return nil, err
+	}
+	err = db.Transact(func(t fdb.Transaction) error {
+		raws := t.Snapshot().GetRange(rr, FDBRangeWantAll).GetSliceOrPanic()
+
+		latestTime := uint64(0)
+		var keyToUse fdb.Key
+		for _, raw := range raws {
+			unixTime := binary.LittleEndian.Uint64(raw.Value)
+			if unixTime > latestTime {
+				keyToUse = raw.Key
+				latestTime = unixTime
+			}
+		}
+		if keyToUse == nil {
+			return xerrors.Errorf("no key found for user %v", userID)
+		}
+		guild, err := db.guildFromMembersIndexKey(keyToUse)
+		if err != nil {
+			return err
+		}
+		m = t.Snapshot().Get(db.fmtGuildMemberKey(guild, userID)).MustGet()
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+type MemberUserData struct {
+	Username string `json:"username"`
+}
+type MemberData struct {
+	Nick string         `json:"nick"`
+	User MemberUserData `json:"user"`
 }
 
 func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
-	panic("unimplemented")
+	var (
+		out    [][]byte
+		pre, _ = fdb.PrefixRange(db.fmtGuildMemberPrefix(guildID))
+	)
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		ropt := fdb.RangeOptions{Mode: fdb.StreamingModeSerial}
+		i := t.Snapshot().GetRange(pre, ropt).Iterator()
+
+		for i.Advance() {
+			raw := i.MustGet()
+			var d MemberData
+			err := json.Unmarshal(raw.Value, &d)
+
+			if err != nil {
+				return err
+			}
+			if strings.Contains(d.Nick, query) || strings.Contains(d.User.Username, query) {
+				out = append(out, raw.Value)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return out, err
 }
 
 func (db *DB) GetGuildMemberCount(ctx context.Context, guildID int64) (int, error) {
-	panic("unimplemented")
+	rr, _ := fdb.PrefixRange(db.fmtGuildMemberPrefix(guildID))
+	return db.keyCountForPrefix(rr)
+
 }

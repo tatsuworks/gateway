@@ -28,7 +28,9 @@ func (db *DB) GetGuildRole(_ context.Context, guild, role int64) ([]byte, error)
 }
 
 func (db *DB) SetGuildRoles(_ context.Context, guild int64, roles map[int64][]byte) error {
-	return db.setGuildETFs(guild, roles, db.fmtGuildRoleKey)
+	return db.setGuildETFs(guild, roles, func(t fdb.Transaction, guild, id int64, e []byte) {
+		t.Set(db.fmtGuildRoleKey(guild, id), e)
+	})
 }
 
 func (db *DB) GetGuildRoles(_ context.Context, guild int64) ([][]byte, error) {

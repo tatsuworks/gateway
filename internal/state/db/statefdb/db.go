@@ -4,6 +4,7 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/directory"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
+	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
 	"github.com/tatsuworks/gateway/discord"
@@ -90,6 +91,27 @@ func (db *DB) fmtGuildPrefix() fdb.Key {
 
 func (db *DB) fmtGuildBanKey(guild, user int64) fdb.Key {
 	return db.subs.Guilds.Pack(tuple.Tuple{guild, "bans", user})
+}
+
+func (db *DB) fmtMemberGuildKey(guild, user int64) fdb.Key {
+	return db.subs.MembersIndex.Pack(tuple.Tuple{user, guild})
+}
+
+func (db *DB) fmtMemberGuildPrefix(user int64) fdb.Key {
+	return db.subs.MembersIndex.Pack(tuple.Tuple{user})
+}
+func (db *DB) guildFromMembersIndexKey(k fdb.Key) (int64, error) {
+	eles, err := db.subs.MembersIndex.Unpack(k)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to unpack role key")
+	}
+
+	id, ok := eles[len(eles)-1].(int64)
+	if !ok {
+		return 0, errors.Errorf("expected tuple element of type int64, got %T", eles[len(eles)-1])
+	}
+
+	return id, nil
 }
 
 func (db *DB) fmtGuildMemberKey(guild, id int64) fdb.Key {

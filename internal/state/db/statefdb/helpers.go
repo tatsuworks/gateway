@@ -50,10 +50,10 @@ func (db *DB) setETFs(etfs map[int64][]byte, key func(id int64) fdb.Key) error {
 	return eg.Wait()
 }
 
-func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) error {
+func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, keySetter func(t fdb.Transaction, guild, id int64, e []byte)) error {
 	eg := new(errgroup.Group)
 
-	send := func(guild int64, etfs map[int64][]byte, key func(guild, id int64) fdb.Key) {
+	send := func(guild int64, etfs map[int64][]byte, keySetter func(t fdb.Transaction, guild, id int64, e []byte)) {
 		eg.Go(func() error {
 			return db.Transact(func(t fdb.Transaction) error {
 				opts := t.Options()
@@ -62,7 +62,7 @@ func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, key func(guild, i
 
 				for id, e := range etfs {
 					opts.SetNextWriteNoWriteConflictRange()
-					t.Set(key(guild, id), e)
+					keySetter(t, guild, id, e)
 				}
 
 				return nil
@@ -82,12 +82,12 @@ func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, key func(guild, i
 			bufMap[i] = e
 
 			if len(bufMap) >= maxPerTxn {
-				send(guild, bufMap, key)
+				send(guild, bufMap, keySetter)
 				bufMap = make(map[int64][]byte, maxPerTxn)
 			}
 		}
 	}
 
-	send(guild, bufMap, key)
+	send(guild, bufMap, keySetter)
 	return eg.Wait()
 }

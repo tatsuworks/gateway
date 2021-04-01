@@ -2,7 +2,6 @@ package statefdb
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"strings"
 	"time"
@@ -29,10 +28,7 @@ func (db *DB) DeleteGuildMembers(_ context.Context, guild int64) error {
 
 func (db *DB) SetGuildMemberInTxn(t fdb.Transaction, guild, user int64, raw []byte) error {
 	t.Set(db.fmtGuildMemberKey(guild, user), raw)
-
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(time.Now().Unix()))
-	t.Set(db.fmtMemberGuildKey(guild, user), b)
+	t.Set(db.fmtMemberGuildKey(guild, user), int64ToBytes(time.Now().Unix()))
 
 	return nil
 }
@@ -102,10 +98,10 @@ func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
 	err = db.Transact(func(t fdb.Transaction) error {
 		raws := t.Snapshot().GetRange(rr, FDBRangeWantAll).GetSliceOrPanic()
 
-		latestTime := uint64(0)
+		latestTime := int64(0)
 		var keyToUse fdb.Key
 		for _, raw := range raws {
-			unixTime := binary.LittleEndian.Uint64(raw.Value)
+			unixTime := bytesToInt64(raw.Value)
 			if unixTime > latestTime {
 				keyToUse = raw.Key
 				latestTime = unixTime

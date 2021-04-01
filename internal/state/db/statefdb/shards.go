@@ -2,7 +2,6 @@ package statefdb
 
 import (
 	"context"
-	"encoding/binary"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 )
@@ -12,7 +11,7 @@ func (db *DB) GetShardInfo(ctx context.Context, shard int, name string) (sess st
 		sess = string(t.Get(db.fmtShardSessKey(shard, name)).MustGet())
 		val := t.Get(db.fmtShardSeqKey(shard, name)).MustGet()
 		if val != nil {
-			seq = int64(binary.LittleEndian.Uint64(val))
+			seq = bytesToInt64(val)
 		}
 		return nil
 	})
@@ -23,9 +22,7 @@ func (db *DB) GetShardInfo(ctx context.Context, shard int, name string) (sess st
 }
 func (db *DB) SetSequence(ctx context.Context, shard int, name string, seq int64) error {
 	err := db.Transact(func(t fdb.Transaction) error {
-		var v []byte
-		binary.LittleEndian.PutUint64(v, uint64(seq))
-		t.Set(db.fmtShardSeqKey(shard, name), v)
+		t.Set(db.fmtShardSeqKey(shard, name), int64ToBytes(seq))
 		return nil
 	})
 	if err != nil {
@@ -38,7 +35,7 @@ func (db *DB) GetSequence(ctx context.Context, shard int, name string) (int64, e
 	err := db.Transact(func(t fdb.Transaction) error {
 		val := t.Get(db.fmtShardSeqKey(shard, name)).MustGet()
 		if val != nil {
-			seq = int64(binary.LittleEndian.Uint64(val))
+			seq = bytesToInt64(val)
 		}
 		return nil
 	})

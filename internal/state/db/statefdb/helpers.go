@@ -1,6 +1,8 @@
 package statefdb
 
 import (
+	"encoding/binary"
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"golang.org/x/sync/errgroup"
 )
@@ -90,4 +92,23 @@ func (db *DB) setGuildETFs(guild int64, etfs map[int64][]byte, keySetter func(t 
 
 	send(guild, bufMap, keySetter)
 	return eg.Wait()
+}
+
+func int64ToBytes(i int64) []byte {
+	var b [8]byte
+	// it is OK to use PutUint64 because it doesn't break negative numbers
+	// we just need to do int64(...) when retrieving it back
+	binary.LittleEndian.PutUint64(b[:], uint64(i))
+	return b[:]
+}
+
+func bytesToInt64(b []byte) int64 {
+	return int64(bytesToUint64(b))
+}
+
+func bytesToUint64(b []byte) uint64 {
+	if len(b) != 8 {
+		return 0
+	}
+	return binary.LittleEndian.Uint64(b)
 }

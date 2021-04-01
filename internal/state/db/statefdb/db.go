@@ -193,3 +193,10 @@ func (db *DB) fmtGuildEmojiPrefix(guild int64) fdb.Key {
 func (db *DB) fmtEmojiPrefix(guild int64, emoji int64) fdb.Key {
 	return db.subs.Emojis.FDBKey()
 }
+
+func (db *DB) fmtShardSessKey(shard int, name string) fdb.Key {
+	return db.subs.Shards.Pack(tuple.Tuple{"sid", shard, name})
+}
+func (db *DB) fmtShardSeqKey(shard int, name string) fdb.Key {
+	return db.subs.Shards.Pack(tuple.Tuple{"seq", shard, name})
+}

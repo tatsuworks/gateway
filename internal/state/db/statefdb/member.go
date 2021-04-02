@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
-	"golang.org/x/xerrors"
 )
 
 func (db *DB) SetGuildMembers(_ context.Context, guild int64, raws map[int64][]byte) error {
@@ -108,7 +107,7 @@ func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
 			}
 		}
 		if keyToUse == nil {
-			return xerrors.Errorf("no key found for user %v", userID)
+			return nil
 		}
 		guild, err := db.guildFromMembersIndexKey(keyToUse)
 		if err != nil {

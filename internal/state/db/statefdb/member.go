@@ -10,10 +10,16 @@ import (
 )
 
 func (db *DB) SetGuildMembers(_ context.Context, guild int64, raws map[int64][]byte) error {
-	return db.setGuildETFs(guild, raws, func(t fdb.Transaction, guild, id int64, e []byte) {
-		db.SetGuildMemberInTxn(t, guild, id, e)
+	err := db.Transact(func(t fdb.Transaction) error {
+		for k, v := range raws {
+			err := db.SetGuildMemberInTxn(t, guild, k, v)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
-
+	return err
 }
 
 func (db *DB) DeleteGuildMembers(_ context.Context, guild int64) error {

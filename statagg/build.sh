@@ -10,7 +10,9 @@ if [[ $VERSION == *-dirty ]]; then
   VERSION+="-$(head -c 5 < /dev/urandom | base32)"
 fi
 
-uri="gcr.io/tatsu-production/statagg:$VERSION"
+# uri="gcr.io/tatsu-production/statagg:$VERSION"
+uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/statagg:$VERSION"
+
 docker build -t "$uri" -f Dockerfile ..
 docker push "$uri" 
 

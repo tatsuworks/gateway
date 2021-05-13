@@ -14,6 +14,7 @@ require (
 	github.com/gogo/protobuf v1.3.0
 	github.com/google/gops v0.3.6
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/lib/pq v1.4.0

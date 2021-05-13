@@ -12,6 +12,7 @@ type GuildCreate struct {
 	Raw         []byte
 	MemberCount int64
 	Channels    map[int64][]byte
+	Threads     map[int64][]byte
 	Emojis      map[int64][]byte
 	Members     map[int64][]byte
 	Presences   map[int64][]byte

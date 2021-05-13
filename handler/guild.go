@@ -84,6 +84,16 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 		}
 		return nil
 	})
+	eg.Go(func() error {
+		if len(gc.Threads) > 0 {
+			err := c.db.SetThreads(ctx, gc.ID, gc.Threads)
+			if err != nil {
+				return xerrors.Errorf("set guild threads: %w", err)
+			}
+
+		}
+		return nil
+	})
 	err = eg.Wait()
 	return result, err
 }

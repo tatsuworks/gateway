@@ -94,6 +94,12 @@ func (_ decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 			gBuf = append(gBuf, d.buf[start:d.off]...)
 			gKeys++
 
+		case "threads":
+			gc.Threads, err = d.readListIntoMapByIDFixGuildID(id)
+			if err != nil {
+				return nil, xerrors.Errorf("read threads: %w", err)
+			}
+
 		default:
 			err := d.readTerm()
 			if err != nil {

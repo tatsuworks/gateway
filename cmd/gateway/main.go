@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -61,6 +62,14 @@ func init() {
 
 	flag.Parse()
 	psql = psqlAddr != ""
+
+	// // load .env file
+	// err := godotenv.Load("../../.env")
+
+	// if err != nil {
+	// 	log.Fatalf("Error loading .env file")
+	// }
+
 }
 
 func main() {
@@ -132,6 +141,7 @@ func main() {
 	}
 
 	events := os.Getenv("WHITELIST_EVENTS")
+	fmt.Println("events", events)
 	var whitelistedEventLookup map[string]struct{}
 	if events != "" {
 		whitelistedEvents := strings.Split(events, ",")

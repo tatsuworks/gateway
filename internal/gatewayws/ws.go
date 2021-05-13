@@ -302,15 +302,20 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 }
 
 func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
+	fmt.Println("ev T", ev.T)
 	if s.whitelistedEvents != nil {
+		fmt.Println("whitelist events", s.whitelistedEvents)
 		if _, ok := s.whitelistedEvents[ev.T]; !ok {
+			fmt.Println("what? should be here")
 			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
 			return
 		}
 	}
 	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
 		ev.T != "GUILD_MEMBER_CHUNK" {
+		fmt.Println("lol. of course it's not gonna be here")
 		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+		fmt.Println("error", err)
 		if err != nil {
 			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 		}

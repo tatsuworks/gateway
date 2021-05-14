@@ -2,7 +2,6 @@ package statepsql
 
 import (
 	"context"
-	"reflect"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -115,13 +114,6 @@ func (db *db) SetThreads(ctx context.Context, guildID int64, threads map[int64][
 	}
 
 	return nil
-}
-
-func bytesToString(b []byte) string {
-	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	sh := reflect.StringHeader{Data: bh.Data, Len: bh.Len}
-	str := *(*string)(unsafe.Pointer(&sh))
-	return strings.ToValidUTF8(str, "")
 }
 
 func (db *db) GetThreads(ctx context.Context) ([][]byte, error) {

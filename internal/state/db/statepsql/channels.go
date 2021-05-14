@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -109,6 +110,7 @@ DO UPDATE SET
 	data = excluded.data
 `)
 
+	fmt.Println("q.String()", q.String())
 	_, err := db.sql.ExecContext(ctx, q.String())
 	if err != nil {
 		return xerrors.Errorf("copy: %w", err)

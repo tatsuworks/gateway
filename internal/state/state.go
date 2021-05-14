@@ -67,7 +67,7 @@ type DB interface {
 	SetThreads(ctx context.Context, guild int64, threads map[int64][]byte) error
 	SetThread(ctx context.Context, guild, parent, id int64, raw []byte) error
 	GetThread(ctx context.Context, id int64) ([]byte, error)
-	GetThreadCount(ctx context.Context) (int, error)
+	GetThreadsCount(ctx context.Context) (int, error)
 	GetThreads(ctx context.Context) ([][]byte, error)
 	GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteThread(ctx context.Context, guild, id int64) error

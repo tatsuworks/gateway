@@ -3,7 +3,6 @@ package manager
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +52,6 @@ type Config struct {
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
-	fmt.Println("redis config", cfg.RedisAddr)
 	rc := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisAddr,
 		OnConnect: func(c *redis.Conn) error {

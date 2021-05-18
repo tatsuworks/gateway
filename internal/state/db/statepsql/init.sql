@@ -172,9 +172,9 @@ IF NOT EXISTS threads
 	"guild_id" int8 NOT NULL,
 	"data" jsonb NOT NULL,
 	PRIMARY KEY
-("id", "parent_id", "guild_id")
+("id")
 );
 
 CREATE INDEX CONCURRENTLY
 IF NOT EXISTS threads_guild_id ON threads
-("thread_id");
+("guild_id");

@@ -10,19 +10,19 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetThread(ctx context.Context, guildID, parentID, id int64, raw []byte) error {
+func (db *db) SetThread(ctx context.Context, guildID, parentID, ownerID, id int64, raw []byte) error {
 	const q = `
 			INSERT INTO
-				threads (id, parent_id, guild_id, data)
+				threads (id, owner_id, parent_id, guild_id, data)
 			VALUES
-				($1, $2, $3, $4)
-			ON CONFLICT (id, parent_id, guild_id)
+				($1, $2, $3, $4, $5)
+			ON CONFLICT (id)
 			DO UPDATE
 			SET
-				data = $4
+				data = $5
 			`
 
-	_, err := db.sql.ExecContext(ctx, q, id, guildID, parentID, raw)
+	_, err := db.sql.ExecContext(ctx, q, id, ownerID, parentID, guildID, raw)
 	if err != nil {
 		return xerrors.Errorf("exec insert: %w", err)
 	}
@@ -33,7 +33,7 @@ func (db *db) SetThread(ctx context.Context, guildID, parentID, id int64, raw []
 func (db *db) GetThread(ctx context.Context, id int64) ([]byte, error) {
 	const q = `
 			SELECT
-				data || jsonb_build_object('guild_id', guild_id::text)
+				data
 			FROM
 				threads
 			WHERE
@@ -49,7 +49,7 @@ func (db *db) GetThread(ctx context.Context, id int64) ([]byte, error) {
 	return c, nil
 }
 
-func (db *db) DeleteThread(ctx context.Context, guild, id int64) error {
+func (db *db) DeleteThread(ctx context.Context, id int64) error {
 	const q = `
 			DELETE FROM
 				threads
@@ -87,7 +87,7 @@ func (db *db) SetThreads(ctx context.Context, guildID int64, threads map[int64][
 
 	q.WriteString(`
 			INSERT INTO
-				threads (id, parent_id, guild_id, data)
+				threads (id, owner_id, parent_id, guild_id, data)
 			VALUES 
 			`)
 
@@ -103,7 +103,7 @@ func (db *db) SetThreads(ctx context.Context, guildID int64, threads map[int64][
 
 	q.WriteString(`
 			ON CONFLICT
-				(id, parent_id, guild_id)
+				(id)
 			DO UPDATE SET
 				data = excluded.data
 			`)
@@ -119,7 +119,7 @@ func (db *db) SetThreads(ctx context.Context, guildID int64, threads map[int64][
 func (db *db) GetThreads(ctx context.Context) ([][]byte, error) {
 	const q = `
 			SELECT
-				data || jsonb_build_object('guild_id', guild_id::text)
+				data
 			FROM
 				threads
 			`
@@ -136,7 +136,7 @@ func (db *db) GetThreads(ctx context.Context) ([][]byte, error) {
 func (db *db) GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error) {
 	const q = `
 			SELECT
-				data || jsonb_build_object('guild_id', guild_id::text)
+				data
 			FROM
 				threads
 			WHERE

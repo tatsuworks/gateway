@@ -32,6 +32,14 @@ type Channel struct {
 	Raw     []byte
 }
 
+type Thread struct {
+	ID       int64
+	OwnerID  int64
+	ParentID int64
+	GuildID  int64
+	Raw      []byte
+}
+
 type VoiceState struct {
 	UserID  int64
 	GuildID int64

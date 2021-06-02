@@ -174,6 +174,15 @@ func (_ *decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 				return false
 			}
 
+		case "threads":
+			var threads []jsoniter.RawMessage
+			iter.ReadVal(&threads)
+			gc.Threads, err = rawsToMapBySnowflake(threads, "id")
+			if err != nil {
+				err = xerrors.Errorf("map threads by id: %w", err)
+				return false
+			}
+
 		default:
 			writeComma()
 			gStream.WriteObjectField(key)

@@ -188,10 +188,10 @@ func (db *DB) fmtGuildThreadPrefix(guild int64) fdb.Key {
 	return db.subs.Threads.Pack(tuple.Tuple{guild})
 }
 
-func (db *DB) fmtGuildChannelThreadKey(guild, channel, id int64) fdb.Key {
-	return db.subs.Threads.Pack(tuple.Tuple{guild, channel, id})
+func (db *DB) fmtGuildChannelThreadKey(guild, channel, owner, id int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild, channel, owner, id})
 }
 
-func (db *DB) fmtGuildChannelThreadPrefix(guild, channel int64) fdb.Key {
-	return db.subs.Threads.Pack(tuple.Tuple{guild, channel})
+func (db *DB) fmtGuildChannelThreadPrefix(guild, channel, owner int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild, channel, owner})
 }

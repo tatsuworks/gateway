@@ -65,11 +65,11 @@ type DB interface {
 	GetUser(ctx context.Context, userID int64) ([]byte, error)
 
 	SetThreads(ctx context.Context, guild int64, threads map[int64][]byte) error
-	SetThread(ctx context.Context, guild, parent, id int64, raw []byte) error
+	SetThread(ctx context.Context, guild, parent, owner, id int64, raw []byte) error
 	GetThread(ctx context.Context, id int64) ([]byte, error)
 	GetThreadsCount(ctx context.Context) (int, error)
 	GetThreads(ctx context.Context) ([][]byte, error)
 	GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error)
-	DeleteThread(ctx context.Context, guild, id int64) error
+	DeleteThread(ctx context.Context, id int64) error
 	DeleteThreads(ctx context.Context, guild int64) error
 }

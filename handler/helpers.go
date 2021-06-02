@@ -55,6 +55,12 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 		return nil, c.ChannelDelete(ctx, e.D)
 	case "VOICE_STATE_UPDATE":
 		return nil, c.VoiceStateUpdate(ctx, e.D)
+	case "THREAD_CREATE":
+		return nil, c.ThreadCreate(ctx, e.D)
+	case "THREAD_UPDATE":
+		return nil, c.ThreadCreate(ctx, e.D)
+	case "THREAD_DELETE":
+		return nil, c.ThreadDelete(ctx, e.D)
 	case "MESSAGE_CREATE":
 		return nil, nil
 	case "MESSAGE_UPDATE":

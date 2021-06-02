@@ -168,6 +168,7 @@ CREATE UNLOGGED TABLE
 IF NOT EXISTS threads
 (
 	"id" int8 NOT NULL,
+	"owner_id" int8 NOT NULL,
 	"parent_id" int8 NOT NULL,
 	"guild_id" int8 NOT NULL,
 	"data" jsonb NOT NULL,

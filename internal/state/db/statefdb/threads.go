@@ -7,10 +7,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (db *DB) SetThread(_ context.Context, guild, channel, id int64, raw []byte) error {
+func (db *DB) SetThread(_ context.Context, guild, channel, owner, id int64, raw []byte) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtThreadKey(id), raw)
-		t.Set(db.fmtGuildChannelThreadKey(guild, channel, id), raw)
+		t.Set(db.fmtGuildChannelThreadKey(guild, channel, owner, id), raw)
 		return nil
 	})
 }

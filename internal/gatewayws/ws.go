@@ -244,7 +244,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	go s.sendHeartbeats()
 	go s.logTotalEvents()
 	// go s.rotateStatuses()
-	s.updatePresence()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
 	defer s.persistSeq()

@@ -186,9 +186,9 @@ func (s *Session) requestGuildMembers(guild int64) {
 }
 
 type status struct {
-	Activities activity `json:"activities"`
-	Status     string   `json:"status"`
-	AFK        bool     `json:"afk"`
+	Activities []*activity `json:"activities"`
+	Status     string      `json:"status"`
+	AFK        bool        `json:"afk"`
 }
 type activity struct {
 	Name      string `json:"name"`
@@ -220,9 +220,12 @@ func (s *Session) rotateStatuses() {
 			s.wch <- &Op{
 				Op: 3,
 				D: status{
-					Activities: activity{
-						Name: e,
-						Type: 0,
+					Activities: []*activity{
+						{
+							Name:      e,
+							Type:      0,
+							CreatedAt: time.Now().Unix() * 1000, //millis
+						},
 					},
 					Status: "online",
 				},
@@ -233,13 +236,16 @@ func (s *Session) rotateStatuses() {
 }
 
 func (s *Session) updatePresence() {
-	s.log.Debug(s.ctx, "updating presence")
+	s.log.Info(s.ctx, "updating presence")
 	s.wch <- &Op{
 		Op: 3,
 		D: status{
-			Activities: activity{
-				Name: ":TWoldlogo: https://tatsu.gg",
-				Type: 4, // custom
+			Activities: []*activity{
+				{
+					Name:      ":TWoldlogo: https://tatsu.gg",
+					Type:      4,                        // custom
+					CreatedAt: time.Now().Unix() * 1000, //millis
+				},
 			},
 			Status: "online",
 		},

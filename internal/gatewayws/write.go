@@ -186,13 +186,14 @@ func (s *Session) requestGuildMembers(guild int64) {
 }
 
 type status struct {
-	Game   game   `json:"game"`
-	Status string `json:"status"`
+	Activities activity `json:"activities"`
+	Status     string   `json:"status"`
+	AFK        bool     `json:"afk"`
 }
-
-type game struct {
-	Name string `json:"name"`
-	Type int    `json:"type"`
+type activity struct {
+	Name      string `json:"name"`
+	Type      int    `json:"type"`
+	CreatedAt int64  `json:"created_at"` // in millis
 }
 
 func (s *Session) rotateStatuses() {
@@ -200,7 +201,7 @@ func (s *Session) rotateStatuses() {
 		ctx      = s.ctx
 		statuses = []string{
 			"Use t!help",
-			"https://tatsumaki.xyz",
+			"https://tatsu.gg",
 		}
 	)
 
@@ -219,7 +220,7 @@ func (s *Session) rotateStatuses() {
 			s.wch <- &Op{
 				Op: 3,
 				D: status{
-					Game: game{
+					Activities: activity{
 						Name: e,
 						Type: 0,
 					},
@@ -229,7 +230,20 @@ func (s *Session) rotateStatuses() {
 			time.Sleep(time.Minute)
 		}
 	}
+}
 
+func (s *Session) updatePresence() {
+	s.log.Debug(s.ctx, "updating presence")
+	s.wch <- &Op{
+		Op: 3,
+		D: status{
+			Activities: activity{
+				Name: ":TWoldlogo: https://tatsu.gg",
+				Type: 4, // custom
+			},
+			Status: "online",
+		},
+	}
 }
 
 func (s *Session) RequestGuildMembers(guildID int64) {

@@ -63,6 +63,7 @@ func (s *Session) writeOp(op *Op) error {
 	if err != nil {
 		return xerrors.Errorf("encode op: %w", err)
 	}
+	s.log.Info(s.ctx, "writing", slog.F("raw", raw))
 
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {
@@ -194,6 +195,11 @@ type activity struct {
 	Name      string `json:"name"`
 	Type      int    `json:"type"`
 	CreatedAt int64  `json:"created_at"` // in millis
+	Emoji     emoji  `json:"emoji"`
+}
+type emoji struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
 }
 
 func (s *Session) rotateStatuses() {
@@ -242,8 +248,12 @@ func (s *Session) updatePresence() {
 		D: status{
 			Activities: []*activity{
 				{
-					Name:      ":TWoldlogo: https://tatsu.gg",
-					Type:      4,                        // custom
+					Name: "https://tatsu.gg",
+					Type: 4, // custom
+					Emoji: emoji{
+						Name: "TWoldlogo",
+						ID:   "861772622143684638",
+					},
 					CreatedAt: time.Now().Unix() * 1000, //millis
 				},
 			},

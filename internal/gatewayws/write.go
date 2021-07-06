@@ -63,7 +63,6 @@ func (s *Session) writeOp(op *Op) error {
 	if err != nil {
 		return xerrors.Errorf("encode op: %w", err)
 	}
-	s.log.Info(s.ctx, "writing", slog.F("raw", string(raw)))
 
 	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
 	if err != nil {

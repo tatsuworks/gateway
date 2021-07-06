@@ -249,12 +249,7 @@ func (s *Session) updatePresence() {
 			Activities: []*activity{
 				{
 					Name: "https://tatsu.gg",
-					Type: 4, // custom
-					Emoji: emoji{
-						Name: "TWoldlogo",
-						ID:   "861772622143684638",
-					},
-					CreatedAt: time.Now().Unix() * 1000, //millis
+					Type: 0, // game
 				},
 			},
 			Status: "online",

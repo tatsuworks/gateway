@@ -80,12 +80,13 @@ func (s *Session) writeOp(op *Op) error {
 }
 
 type Identify struct {
-	Token          string `json:"token"`
-	Properties     Props  `json:"properties"`
-	Compress       bool   `json:"compress"`
-	LargeThreshold int    `json:"large_threshold"`
-	Shard          []int  `json:"shard"`
-	Intents        int    `json:"intents,omitempty"`
+	Token          string         `json:"token"`
+	Properties     Props          `json:"properties"`
+	Compress       bool           `json:"compress"`
+	LargeThreshold int            `json:"large_threshold"`
+	Shard          []int          `json:"shard"`
+	Intents        int            `json:"intents,omitempty"`
+	Presence       updatePresence `json:"presence"`
 }
 
 type Props struct {
@@ -94,6 +95,11 @@ type Props struct {
 	Device          string `json:"$device"`
 	Referer         string `json:"$referer"`
 	ReferringDomain string `json:"$referring_domain"`
+}
+type updatePresence struct {
+	Activities []*activity `json:"activities"`
+	Status     string      `json:"status"`
+	AFK        bool        `json:"afk"`
 }
 
 func (s *Session) writeIdentify() {
@@ -110,6 +116,15 @@ func (s *Session) writeIdentify() {
 			LargeThreshold: 250,
 			Shard:          []int{s.shardID, s.shardCount},
 			Intents:        s.intents.Collect(),
+			Presence: updatePresence{
+				Activities: []*activity{
+					{
+						Name: "https://tatsu.gg",
+						Type: 0,
+					},
+				},
+				Status: "online",
+			},
 		},
 	}
 }
@@ -186,11 +201,6 @@ func (s *Session) requestGuildMembers(guild int64) {
 
 }
 
-type status struct {
-	Activities []*activity `json:"activities"`
-	Status     string      `json:"status"`
-	AFK        bool        `json:"afk"`
-}
 type activity struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
@@ -219,7 +229,7 @@ func (s *Session) rotateStatuses() {
 
 			s.wch <- &Op{
 				Op: 3,
-				D: status{
+				D: updatePresence{
 					Activities: []*activity{
 						{
 							Name: e,
@@ -231,22 +241,6 @@ func (s *Session) rotateStatuses() {
 			}
 			time.Sleep(time.Minute)
 		}
-	}
-}
-
-func (s *Session) updatePresence() {
-	s.log.Info(s.ctx, "updating presence")
-	s.wch <- &Op{
-		Op: 3,
-		D: status{
-			Activities: []*activity{
-				{
-					Name: "https://tatsu.gg",
-					Type: 0,
-				},
-			},
-			Status: "online",
-		},
 	}
 }
 

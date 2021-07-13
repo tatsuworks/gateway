@@ -80,10 +80,10 @@ func (db *DB) GetGuildThreads(_ context.Context, guild int64) ([][]byte, error) 
 	return out, err
 }
 
-func (db *DB) DeleteThread(_ context.Context, guild, id int64) error {
+func (db *DB) DeleteThread(_ context.Context, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtThreadKey(id))
-		t.Clear(db.fmtGuildThreadKey(guild, id))
+		// t.Clear(db.fmtGuildThreadKey(guild, id))
 		return nil
 	})
 }

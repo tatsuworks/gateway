@@ -34,7 +34,7 @@ type Channel struct {
 
 type Thread struct {
 	ID       int64
-	OwnerID  int64
+	OwnerID  int64 // user who started the thread
 	ParentID int64
 	GuildID  int64
 	Raw      []byte

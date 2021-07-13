@@ -11,12 +11,12 @@ func (_ decoder) DecodeThread(buf []byte) (*discord.Thread, error) {
 		return nil, xerrors.Errorf("extract id from thread: %w", err)
 	}
 
-	ownerID, err := snowflakeFromObject(buf, "owner_id") // user who start the thread
+	ownerID, err := snowflakeFromObjectOptional(buf, "owner_id") // user who start the thread
 	if err != nil {
 		return nil, xerrors.Errorf("extract owner id: %w", err)
 	}
 
-	parentID, err := snowflakeFromObject(buf, "parent_id") //  id of the GUILD_TEXT or GUILD_NEWS channel the thread was created in
+	parentID, err := snowflakeFromObjectOptional(buf, "parent_id") //  id of the GUILD_TEXT or GUILD_NEWS channel the thread was created in
 	if err != nil {
 		return nil, xerrors.Errorf("extract parent id: %w", err)
 	}

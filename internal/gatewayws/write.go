@@ -79,12 +79,13 @@ func (s *Session) writeOp(op *Op) error {
 }
 
 type Identify struct {
-	Token          string `json:"token"`
-	Properties     Props  `json:"properties"`
-	Compress       bool   `json:"compress"`
-	LargeThreshold int    `json:"large_threshold"`
-	Shard          []int  `json:"shard"`
-	Intents        int    `json:"intents,omitempty"`
+	Token          string         `json:"token"`
+	Properties     Props          `json:"properties"`
+	Compress       bool           `json:"compress"`
+	LargeThreshold int            `json:"large_threshold"`
+	Shard          []int          `json:"shard"`
+	Intents        int            `json:"intents,omitempty"`
+	Presence       updatePresence `json:"presence"`
 }
 
 type Props struct {
@@ -93,6 +94,11 @@ type Props struct {
 	Device          string `json:"$device"`
 	Referer         string `json:"$referer"`
 	ReferringDomain string `json:"$referring_domain"`
+}
+type updatePresence struct {
+	Activities []*activity `json:"activities"`
+	Status     string      `json:"status"`
+	AFK        bool        `json:"afk"`
 }
 
 func (s *Session) writeIdentify() {
@@ -109,6 +115,15 @@ func (s *Session) writeIdentify() {
 			LargeThreshold: 250,
 			Shard:          []int{s.shardID, s.shardCount},
 			Intents:        s.intents.Collect(),
+			Presence: updatePresence{
+				Activities: []*activity{
+					{
+						Name: "https://tatsu.gg",
+						Type: 0,
+					},
+				},
+				Status: "online",
+			},
 		},
 	}
 }
@@ -185,12 +200,7 @@ func (s *Session) requestGuildMembers(guild int64) {
 
 }
 
-type status struct {
-	Game   game   `json:"game"`
-	Status string `json:"status"`
-}
-
-type game struct {
+type activity struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
 }
@@ -200,7 +210,7 @@ func (s *Session) rotateStatuses() {
 		ctx      = s.ctx
 		statuses = []string{
 			"Use t!help",
-			"https://tatsumaki.xyz",
+			"https://tatsu.gg",
 		}
 	)
 
@@ -218,10 +228,12 @@ func (s *Session) rotateStatuses() {
 
 			s.wch <- &Op{
 				Op: 3,
-				D: status{
-					Game: game{
-						Name: e,
-						Type: 0,
+				D: updatePresence{
+					Activities: []*activity{
+						{
+							Name: e,
+							Type: 0,
+						},
 					},
 					Status: "online",
 				},
@@ -229,7 +241,6 @@ func (s *Session) rotateStatuses() {
 			time.Sleep(time.Minute)
 		}
 	}
-
 }
 
 func (s *Session) RequestGuildMembers(guildID int64) {

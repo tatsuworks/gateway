@@ -152,6 +152,25 @@ func (db *db) GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error
 	return *(*[][]byte)(unsafe.Pointer(&cs)), nil
 }
 
+func (db *db) GetChannelThreads(ctx context.Context, channel int64) ([][]byte, error) {
+	const q = `
+			SELECT
+				data
+			FROM
+				threads
+			WHERE
+				parent_id = $1
+			`
+
+	var cs []RawJSON
+	err := db.sql.SelectContext(ctx, &cs, q, channel)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return *(*[][]byte)(unsafe.Pointer(&cs)), nil
+}
+
 func (db *db) DeleteThreads(ctx context.Context, guild int64) error {
 	const q = `
 			DELETE FROM

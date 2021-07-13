@@ -80,6 +80,29 @@ func (db *DB) GetGuildThreads(_ context.Context, guild int64) ([][]byte, error) 
 	return out, err
 }
 
+func (db *DB) GetChannelThreads(_ context.Context, channel int64) ([][]byte, error) {
+	var (
+		raws   []fdb.KeyValue
+		out    [][]byte
+		pre, _ = fdb.PrefixRange(db.fmtGuildThreadPrefix(channel))
+	)
+
+	err := db.ReadTransact(func(t fdb.ReadTransaction) error {
+		raws = t.Snapshot().GetRange(pre, FDBRangeWantAll).GetSliceOrPanic()
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("read threads: %w", err)
+	}
+
+	out = make([][]byte, len(raws))
+	for i, e := range raws {
+		out[i] = e.Value
+	}
+
+	return out, err
+}
+
 func (db *DB) DeleteThread(_ context.Context, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtThreadKey(id))

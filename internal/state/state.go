@@ -70,6 +70,7 @@ type DB interface {
 	GetThreadsCount(ctx context.Context) (int, error)
 	GetThreads(ctx context.Context) ([][]byte, error)
 	GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error)
+	GetChannelThreads(ctx context.Context, channel int64) ([][]byte, error)
 	DeleteThread(ctx context.Context, id int64) error
 	DeleteThreads(ctx context.Context, guild int64) error
 }

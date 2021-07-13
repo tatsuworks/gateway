@@ -56,3 +56,16 @@ func (s *Server) getGuildThreads(w http.ResponseWriter, r *http.Request, p httpr
 
 	return s.writeTerms(w, cs)
 }
+
+func (s *Server) getChannelThreads(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	channel, err := channelParam(p)
+	if err != nil {
+		return xerrors.Errorf("read channel param: %w", err)
+	}
+	cs, err := s.db.GetChannelThreads(r.Context(), channel)
+	if err != nil {
+		return xerrors.Errorf("read channel threads: %w", err)
+	}
+
+	return s.writeTerms(w, cs)
+}

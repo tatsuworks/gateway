@@ -93,12 +93,16 @@ func (db *db) SetThreads(ctx context.Context, guildID int64, threads map[int64][
 
 	first := true
 	for i, e := range threads {
+		th, err := db.Encoding().DecodeThread(e)
+		if err != nil {
+			return xerrors.Errorf("decode thread: %w", err)
+		}
 		if !first {
 			q.WriteString(", ")
 		}
 		first = false
 
-		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
+		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(th.OwnerID, 10) + ", " + strconv.FormatInt(th.ParentID, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
 	}
 
 	q.WriteString(`

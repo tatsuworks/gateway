@@ -171,3 +171,27 @@ func (db *DB) fmtGuildEmojiPrefix(guild int64) fdb.Key {
 func (db *DB) fmtEmojiPrefix(guild int64, emoji int64) fdb.Key {
 	return db.subs.Emojis.FDBKey()
 }
+
+func (db *DB) fmtThreadKey(id int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{id})
+}
+
+func (db *DB) fmtThreadPrefix() fdb.Key {
+	return db.subs.Threads.FDBKey()
+}
+
+func (db *DB) fmtGuildThreadKey(guild, id int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild, id})
+}
+
+func (db *DB) fmtGuildThreadPrefix(guild int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild})
+}
+
+func (db *DB) fmtGuildChannelThreadKey(guild, channel, owner, id int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild, channel, owner, id})
+}
+
+func (db *DB) fmtGuildChannelThreadPrefix(guild, channel, owner int64) fdb.Key {
+	return db.subs.Threads.Pack(tuple.Tuple{guild, channel, owner})
+}

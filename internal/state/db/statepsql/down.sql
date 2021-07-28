@@ -4,3 +4,4 @@ drop TABLE voice_states;
 drop TABLE members;
 drop TABLE messages;
 drop TABLE roles;
+drop TABLE threads;

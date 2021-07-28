@@ -16,6 +16,7 @@ type Subspaces struct {
 	Roles       subspace.Subspace
 	VoiceStates subspace.Subspace
 	Emojis      subspace.Subspace
+	Threads     subspace.Subspace
 }
 
 // If new enums need to be added, always append. If you are deprecating an enum never delete it.
@@ -38,6 +39,8 @@ const (
 	VoiceStateSubspaceName
 	// EmojiSubspaceName is the enum for the emoji subspace.
 	EmojiSubspaceName
+	// ThreadsSubspaceName is the enum for the threads subspace.
+	ThreadsSubspaceName
 )
 
 // NewSubspaces returns an instantiated Subspaces with the correct subspaces.
@@ -52,5 +55,6 @@ func NewSubspaces(dir directory.DirectorySubspace) *Subspaces {
 		Roles:       dir.Sub(RoleSubspaceName),
 		VoiceStates: dir.Sub(VoiceStateSubspaceName),
 		Emojis:      dir.Sub(EmojiSubspaceName),
+		Threads:     dir.Sub(ThreadsSubspaceName),
 	}
 }

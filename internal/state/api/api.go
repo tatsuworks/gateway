@@ -70,6 +70,11 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "emojis", ":emoji"), wrapHandler(s.log, s.getGuildEmoji))
 
 	s.router.GET(path.Join(base, "guilds_count"), wrapHandler(s.log, s.getGuildCount))
+
+	s.router.GET(path.Join(base, "threads"), wrapHandler(s.log, s.getThreads))
+	s.router.GET(path.Join(base, "guilds", ":guild", "threads"), wrapHandler(s.log, s.getGuildThreads))
+	s.router.GET(path.Join(base, "channels", ":channel", "threads"), wrapHandler(s.log, s.getChannelThreads))
+	s.router.GET(path.Join(base, "threads", ":thread"), wrapHandler(s.log, s.getThread))
 }
 
 func (s *Server) Start(addr string) error {

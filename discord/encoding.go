@@ -11,6 +11,8 @@ type Encoding interface {
 	DecodeChannel(buf []byte) (*Channel, error)
 	DecodeVoiceState(buf []byte) (*VoiceState, error)
 
+	DecodeThread(buf []byte) (*Thread, error)
+
 	DecodeGuildCreate(buf []byte) (*GuildCreate, error)
 	DecodeGuildBan(buf []byte) (*GuildBan, error)
 

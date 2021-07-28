@@ -63,4 +63,14 @@ type DB interface {
 	DeleteGuildEmoji(ctx context.Context, guild, emoji int64) error
 
 	GetUser(ctx context.Context, userID int64) ([]byte, error)
+
+	SetThreads(ctx context.Context, guild int64, threads map[int64][]byte) error
+	SetThread(ctx context.Context, guild, parent, owner, id int64, raw []byte) error
+	GetThread(ctx context.Context, id int64) ([]byte, error)
+	GetThreadsCount(ctx context.Context) (int, error)
+	GetThreads(ctx context.Context) ([][]byte, error)
+	GetGuildThreads(ctx context.Context, guild int64) ([][]byte, error)
+	GetChannelThreads(ctx context.Context, channel int64) ([][]byte, error)
+	DeleteThread(ctx context.Context, id int64) error
+	DeleteThreads(ctx context.Context, guild int64) error
 }

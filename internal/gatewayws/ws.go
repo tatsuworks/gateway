@@ -58,9 +58,11 @@ type Session struct {
 	wch    chan *Op
 	prioch chan *Op
 
-	lastHB   time.Time
-	lastAck  time.Time
-	ready    time.Time
+	lastHB       time.Time
+	lastAck      time.Time
+	ready        time.Time
+	lastIdentify time.Time
+
 	guilds   map[int64]struct{}
 	curState string
 
@@ -239,6 +241,7 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 			s.wch = make(chan *Op, 2000)
 			s.prioch = make(chan *Op)
 		}
+		s.lastIdentify = time.Now()
 	}
 
 	go s.sendHeartbeats()
@@ -289,7 +292,8 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 		s.curState = "request guild members"
 		// only request members from new guilds.
 		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
-		if evtPayload != nil && evtPayload.GuildID != 0 {
+		shouldDoGuildMemberRequest := s.lastIdentify.IsZero() || s.lastIdentify.Add(15*time.Minute).Before(time.Now())
+		if evtPayload != nil && evtPayload.GuildID != 0 && shouldDoGuildMemberRequest {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)
 		}

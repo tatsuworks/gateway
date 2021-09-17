@@ -75,6 +75,7 @@ type Session struct {
 	state   *handler.Client
 	stateDB state.DB
 	rc      *redis.Client
+	multirc []*redis.Client
 	played  *played.Client
 
 	whitelistedEvents map[string]struct{}
@@ -108,6 +109,7 @@ type SessionConfig struct {
 	DB                state.DB
 	WorkGroup         *sync.WaitGroup
 	Redis             *redis.Client
+	MultiRedis        []*redis.Client
 	Etcd              *clientv3.Client
 	Token             string
 	Intents           Intents
@@ -139,6 +141,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stateDB:           cfg.DB,
 		enc:               cfg.DB.Encoding(),
 		rc:                cfg.Redis,
+		multirc:           cfg.MultiRedis,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
 	}
@@ -310,9 +313,18 @@ func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventP
 	}
 	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
 		ev.T != "GUILD_MEMBER_CHUNK" {
-		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-		if err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+		if s.multirc != nil {
+			for _, rc := range s.multirc {
+				err := rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+				if err != nil {
+					s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+				}
+			}
+		} else {
+			err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+			if err != nil {
+				s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+			}
 		}
 	}
 }

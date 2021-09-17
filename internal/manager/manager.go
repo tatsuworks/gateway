@@ -3,6 +3,8 @@ package manager
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +31,7 @@ type Manager struct {
 	shards  map[int]*gatewayws.Session
 
 	rdb        *redis.Client
+	rdbClients []*redis.Client
 	etcd       *clientv3.Client
 	playedAddr string
 
@@ -52,22 +55,26 @@ type Config struct {
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
-	rc := redis.NewClient(&redis.Options{
-		Addr: cfg.RedisAddr,
-		OnConnect: func(c *redis.Conn) error {
-			if cfg.PodID != "" {
-				c.ClientSetName(cfg.Name + "-" + cfg.PodID)
-			} else {
-				c.ClientSetName(cfg.Name)
-			}
+	multiRedisEnv := os.Getenv("multi_redis")
+	var multiRedisAddresses []string
+	var rc *redis.Client
+	var rdbClients []*redis.Client
+	var err error
 
-			return nil
-		},
-	})
-
-	_, err := rc.Ping().Result()
-	if err != nil {
-		cfg.Logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
+	if multiRedisEnv != "" {
+		err := json.Unmarshal([]byte(multiRedisEnv), &multiRedisAddresses)
+		if err != nil {
+			cfg.Logger.Fatal(ctx, "invalid multi_redis", slog.Error(err))
+		}
+		for _, addr := range multiRedisAddresses {
+			rc, err = createRedisClient(addr, cfg.Name, cfg.PodID)
+			rdbClients = append(rdbClients, rc)
+		}
+	} else {
+		rc, err = createRedisClient(cfg.RedisAddr, cfg.Name, cfg.PodID)
+		if err != nil {
+			cfg.Logger.Fatal(ctx, "createRedisClient", slog.Error(err))
+		}
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{
@@ -92,6 +99,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		shards: map[int]*gatewayws.Session{},
 
 		rdb:        rc,
+		rdbClients: rdbClients,
 		etcd:       etcdc,
 		playedAddr: cfg.PlayedAddr,
 
@@ -128,6 +136,7 @@ func (m *Manager) startShard(shard int) {
 		DB:                m.db,
 		WorkGroup:         m.wg,
 		Redis:             m.rdb,
+		MultiRedis:        m.rdbClients,
 		Etcd:              m.etcd,
 		Token:             m.token,
 		Intents:           m.intents,
@@ -197,4 +206,26 @@ func (m *Manager) logHealth() {
 			)
 		}
 	}
+}
+
+func createRedisClient(addr, name, podID string) (*redis.Client, error) {
+	rc := redis.NewClient(&redis.Options{
+		Addr: addr,
+		OnConnect: func(c *redis.Conn) error {
+			if podID != "" {
+				c.ClientSetName(name + "-" + podID)
+			} else {
+				c.ClientSetName(name)
+			}
+
+			return nil
+		},
+	})
+
+	_, err := rc.Ping().Result()
+	if err != nil {
+		return nil, err
+	}
+
+	return rc, nil
 }

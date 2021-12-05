@@ -1,7 +1,6 @@
 package discordjson
 
 import (
-	"fmt"
 	"strconv"
 
 	jsoniter "github.com/json-iterator/go"
@@ -156,7 +155,6 @@ func (_ *decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 				err = xerrors.Errorf("map presences by id: %w", err)
 				return false
 			}
-			fmt.Println("gc.Presences", gc.Presences)
 
 		case "roles":
 			var roles []jsoniter.RawMessage

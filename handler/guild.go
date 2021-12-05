@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
@@ -14,7 +13,6 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 	if err != nil {
 		return nil, xerrors.Errorf("parse guild create: %w", err)
 	}
-	fmt.Println("gc", gc)
 
 	guild := gc.ID
 	result := &EventPayload{

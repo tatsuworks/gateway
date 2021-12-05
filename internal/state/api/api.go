@@ -64,6 +64,7 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.getGuildChannels))
 	s.router.GET(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.getGuildMembers))
 	s.router.GET(path.Join(base, "guilds", ":guild", "members", ":member"), wrapHandler(s.log, s.getGuildMember))
+	s.router.GET(path.Join(base, "guilds", ":guild", "members", ":member", "presence"), wrapHandler(s.log, s.getUserPresence))
 	s.router.GET(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.getGuildRoles))
 	s.router.GET(path.Join(base, "guilds", ":guild", "roles", ":role"), wrapHandler(s.log, s.getGuildRole))
 	s.router.GET(path.Join(base, "guilds", ":guild", "emojis"), wrapHandler(s.log, s.getGuildEmojis))

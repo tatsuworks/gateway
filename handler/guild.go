@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
@@ -13,6 +14,7 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 	if err != nil {
 		return nil, xerrors.Errorf("parse guild create: %w", err)
 	}
+	fmt.Println("gc", gc)
 
 	guild := gc.ID
 	result := &EventPayload{
@@ -87,6 +89,16 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 	eg.Go(func() error {
 		if len(gc.Threads) > 0 {
 			err := c.db.SetThreads(ctx, gc.ID, gc.Threads)
+			if err != nil {
+				return xerrors.Errorf("set guild threads: %w", err)
+			}
+
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		if len(gc.Presences) > 0 {
+			err := c.db.SetPresences(ctx, gc.ID, gc.Presences)
 			if err != nil {
 				return xerrors.Errorf("set guild threads: %w", err)
 			}

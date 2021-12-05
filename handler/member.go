@@ -48,3 +48,17 @@ func (c *Client) MemberRemove(ctx context.Context, d []byte) error {
 
 	return nil
 }
+
+func (c *Client) PresenceCreate(ctx context.Context, d []byte) error {
+	th, err := c.enc.DecodePresence(d)
+	if err != nil {
+		return err
+	}
+
+	err = c.db.SetPresence(ctx, th.GuildID, th.ID, th.Raw)
+	if err != nil {
+		return xerrors.Errorf("set user presence: %w", err)
+	}
+
+	return nil
+}

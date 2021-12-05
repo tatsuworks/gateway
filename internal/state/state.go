@@ -42,6 +42,9 @@ type DB interface {
 	GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteGuildMember(ctx context.Context, guild, user int64) error
 	SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error)
+	SetPresence(ctx context.Context, guild, user int64, raw []byte) error
+	GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error)
+	SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error
 
 	SetChannelMessage(ctx context.Context, channel, id int64, raw []byte) error
 	GetChannelMessage(ctx context.Context, channel, id int64) ([]byte, error)

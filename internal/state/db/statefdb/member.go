@@ -80,3 +80,15 @@ func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query strin
 func (db *DB) GetGuildMemberCount(ctx context.Context, guildID int64) (int, error) {
 	panic("unimplemented")
 }
+
+func (db *DB) SetPresence(ctx context.Context, guildID, userID int64, data []byte) error {
+	panic("unimplemented")
+}
+
+func (db *DB) GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error) {
+	panic("unimplemented")
+}
+
+func (db *DB) SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error {
+	panic("unimplemented")
+}

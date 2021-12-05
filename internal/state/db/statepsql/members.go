@@ -226,7 +226,7 @@ SELECT
 FROM
 	presence
 WHERE
-	user_id = $1 & guild_id = $2
+	user_id = $1 AND guild_id = $2
 `
 
 	var presence RawJSON

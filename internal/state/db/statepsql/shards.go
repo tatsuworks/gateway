@@ -101,3 +101,24 @@ WHERE
 
 	return sess, nil
 }
+
+func (db *db) SetStatus(ctx context.Context, shard int, name, status string) error {
+	const q = `
+INSERT INTO
+	shards (id, name, status)
+VALUES
+	($1, $2)
+ON CONFLICT
+	(id, name)
+DO UPDATE
+SET
+status = $3
+`
+
+	_, err := db.sql.ExecContext(ctx, q, shard, name, status)
+	if err != nil {
+		return xerrors.Errorf("exec update: %w", err)
+	}
+
+	return nil
+}

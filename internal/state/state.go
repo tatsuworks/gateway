@@ -14,6 +14,7 @@ type DB interface {
 	GetSequence(ctx context.Context, shard int, name string) (int64, error)
 	SetSessionID(ctx context.Context, shard int, name string, sess string) error
 	GetSessionID(ctx context.Context, shard int, name string) (string, error)
+	SetStatus(ctx context.Context, shard int, name string, status string) error
 
 	SetGuild(ctx context.Context, id int64, raw []byte) (bool, error)
 	GetGuild(ctx context.Context, id int64) ([]byte, error)

@@ -36,7 +36,7 @@ func (s *Session) logTotalEvents() {
 			slog.F("waiting", s.state.WaitingQueries()),
 			slog.F("state", s.curState),
 		)
-
+		s.persistStatus()
 		s.last = seq
 	}
 }

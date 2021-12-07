@@ -17,3 +17,6 @@ func (db *DB) SetSessionID(ctx context.Context, shard int, name, sess string) er
 func (db *DB) GetSessionID(ctx context.Context, shard int, name string) (string, error) {
 	panic("unimplemented")
 }
+func (db *DB) SetStatus(ctx context.Context, shard int, name, sess string) error {
+	panic("unimplemented")
+}

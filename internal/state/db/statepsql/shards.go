@@ -107,7 +107,7 @@ func (db *db) SetStatus(ctx context.Context, shard int, name, status string) err
 INSERT INTO
 	shards (id, name, status)
 VALUES
-	($1, $2)
+	($1, $2, $3)
 ON CONFLICT
 	(id, name)
 DO UPDATE

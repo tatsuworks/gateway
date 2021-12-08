@@ -45,6 +45,6 @@ func (s *Session) loadSessID() {
 func (s *Session) persistStatus() {
 	err := s.stateDB.SetStatus(context.Background(), s.shardID, s.name, s.curState)
 	if err != nil {
-		s.log.Error(s.ctx, "save seq", slog.Error(err))
+		s.log.Error(s.ctx, "save status", slog.Error(err))
 	}
 }

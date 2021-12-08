@@ -103,17 +103,7 @@ WHERE
 }
 
 func (db *db) SetStatus(ctx context.Context, shard int, name, status string) error {
-	const q = `
-INSERT INTO
-	shards (id, name, status)
-VALUES
-	($1, $2, $3)
-ON CONFLICT
-	(id, name)
-DO UPDATE
-SET
-status = $3
-`
+	const q = `UPDATE shards SET status = $3 where id = $1 and name = $2`
 
 	_, err := db.sql.ExecContext(ctx, q, shard, name, status)
 	if err != nil {

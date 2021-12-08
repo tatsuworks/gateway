@@ -119,6 +119,7 @@ IF NOT EXISTS shards
 	"name" text NOT NULL,
 	"seq" int8 NOT NULL,
 	"sess" text NOT NULL,
+	"status" text NOT NULL DEFAULT '',
 	PRIMARY KEY
 ("id", "name")
 );

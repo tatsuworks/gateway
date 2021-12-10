@@ -91,10 +91,12 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 		ctx   = r.Context()
 		query = r.URL.Query().Get("query")
 	)
-
-	ms, err := s.db.SearchGuildMembers(ctx, g, query)
-	if err != nil {
-		return xerrors.Errorf("search members: %w", err)
+	var ms [][]byte
+	if query != "" && len(query) > 2 {
+		ms, err = s.db.SearchGuildMembers(ctx, g, query)
+		if err != nil {
+			return xerrors.Errorf("search members: %w", err)
+		}
 	}
 
 	return s.writeTerms(w, ms)

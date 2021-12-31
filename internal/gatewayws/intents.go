@@ -57,7 +57,5 @@ var DefaultIntents = Intents{
 	IntentGuildInvites,
 	IntentGuildVoiceStates,
 	IntentGuildMessages,
-	IntentGuildMessageReactions,
 	IntentDirectMessages,
-	IntentDirectMessageReactions,
 }

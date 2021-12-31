@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"cdr.dev/slog"
-	"github.com/coadler/played"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
@@ -77,7 +76,6 @@ type Session struct {
 	state   *handler.Client
 	stateDB state.DB
 	rc      *redis.Client
-	played  *played.Client
 
 	whitelistedEvents map[string]struct{}
 }
@@ -165,7 +163,7 @@ func (s *Session) shouldResume() bool {
 	return s.seq != 0 && s.sessID != ""
 }
 
-func (s *Session) Open(ctx context.Context, token string, playedAddr string) error {
+func (s *Session) Open(ctx context.Context, token string) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -176,14 +174,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 	s.curState = "begin"
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
-
-	if playedAddr != "" {
-		played, err := played.NewClient(s.ctx, playedAddr)
-		if err != nil {
-			return xerrors.Errorf("connect to played: %w", err)
-		}
-		s.played = played
-	}
 
 	s.log.Info(ctx, "encoding", slog.F("name", s.enc.Name()))
 
@@ -268,14 +258,6 @@ func (s *Session) Open(ctx context.Context, token string, playedAddr string) err
 				break
 			}
 
-			continue
-		}
-
-		if ev.T == "PRESENCE_UPDATE" && playedAddr != "" {
-			err := s.played.WritePresence(s.ctx, ev.D)
-			if err != nil {
-				s.log.Error(s.ctx, "send played event", slog.Error(err))
-			}
 			continue
 		}
 

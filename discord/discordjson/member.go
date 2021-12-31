@@ -67,7 +67,3 @@ func (_ decoder) DecodePresence(buf []byte) (*discord.Presence, error) {
 	m.Raw = buf
 	return &m, nil
 }
-
-func (_ decoder) DecodePlayedPresence(buf []byte) (*discord.PlayedPresence, error) {
-	panic("unimplemented")
-}

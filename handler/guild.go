@@ -98,7 +98,7 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 		if len(gc.Presences) > 0 {
 			err := c.db.SetPresences(ctx, gc.ID, gc.Presences)
 			if err != nil {
-				return xerrors.Errorf("set guild threads: %w", err)
+				return xerrors.Errorf("set guild presences: %w", err)
 			}
 
 		}

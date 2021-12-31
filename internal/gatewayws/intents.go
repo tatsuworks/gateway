@@ -61,7 +61,3 @@ var DefaultIntents = Intents{
 	IntentDirectMessages,
 	IntentDirectMessageReactions,
 }
-
-var PresencesOnly = Intents{
-	IntentGuildPresences,
-}

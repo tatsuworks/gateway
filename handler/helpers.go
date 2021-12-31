@@ -19,7 +19,6 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	switch e.T {
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
-		// return nil, nil
 	case "GUILD_CREATE":
 		return c.GuildCreate(ctx, e.D)
 	case "GUILD_UPDATE":

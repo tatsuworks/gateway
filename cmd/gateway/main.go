@@ -26,18 +26,17 @@ import (
 )
 
 var (
-	name       string
-	token      string
-	redisHost  string
-	etcdHost   string
-	playedHost string
-	pprof      string
-	prod       string
-	psql       bool
-	psqlAddr   string
-	addr       string
-	intents    string
-	podId      string
+	name      string
+	token     string
+	redisHost string
+	etcdHost  string
+	pprof     string
+	prod      string
+	psql      bool
+	psqlAddr  string
+	addr      string
+	intents   string
+	podId     string
 
 	shards, start, stop int
 )
@@ -47,12 +46,11 @@ func init() {
 	flag.StringVar(&token, "token", "", "token for the bot")
 	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
-	flag.StringVar(&playedHost, "played", "", "Played")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
 	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
-	flag.StringVar(&intents, "intents", "default", "default, played, all")
+	flag.StringVar(&intents, "intents", "default", "default, all")
 	flag.StringVar(&podId, "podId", "", "0, 1, 2, 3...")
 
 	flag.IntVar(&shards, "shards", 1, "Total shards")
@@ -110,8 +108,6 @@ func main() {
 	switch intents {
 	case "default":
 		ints = gatewayws.DefaultIntents
-	case "played":
-		ints = gatewayws.PresencesOnly
 	case "all":
 		ints = gatewayws.AllIntents
 	default:
@@ -153,7 +149,6 @@ func main() {
 		Intents:           ints,
 		RedisAddr:         redisHost,
 		EtcdAddr:          etcdHost,
-		PlayedAddr:        playedHost,
 		PodID:             podId,
 		WhitelistedEvents: whitelistedEventLookup,
 	})

@@ -12,7 +12,6 @@ exec /gateway \
 	--etcd="$ETCD" \
 	--pprof="$PPROF" \
 	--addr="$ADDR" \
-	--played="$PLAYED" \
 	--shards="$SHARDS" \
 	--start="$START" \
 	--stop="$STOP" \

@@ -28,9 +28,8 @@ type Manager struct {
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
 
-	rdb        *redis.Client
-	etcd       *clientv3.Client
-	playedAddr string
+	rdb  *redis.Client
+	etcd *clientv3.Client
 
 	bufferPool        *sync.Pool
 	whitelistedEvents map[string]struct{}
@@ -46,7 +45,6 @@ type Config struct {
 	Intents           gatewayws.Intents
 	RedisAddr         string
 	EtcdAddr          string
-	PlayedAddr        string
 	PodID             string
 	WhitelistedEvents map[string]struct{}
 }
@@ -91,9 +89,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		shards: map[int]*gatewayws.Session{},
 
-		rdb:        rc,
-		etcd:       etcdc,
-		playedAddr: cfg.PlayedAddr,
+		rdb:  rc,
+		etcd: etcdc,
 
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -154,7 +151,7 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
-			err := s.Open(m.ctx, m.token, m.playedAddr)
+			err := s.Open(m.ctx, m.token)
 			if err != nil {
 				// if !xerrors.Is(err, context.Canceled) {
 				m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))

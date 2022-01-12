@@ -198,3 +198,75 @@ WHERE
 
 	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
 }
+
+func (db *db) SetPresence(ctx context.Context, guildID, userID int64, raw []byte) error {
+	const q = `
+INSERT INTO
+	presence (user_id, guild_id, data)
+VALUES
+	($1, $2, $3)
+ON CONFLICT (user_id, guild_id)
+DO UPDATE
+SET
+	data = $3
+`
+
+	_, err := db.sql.ExecContext(ctx, q, userID, guildID, raw)
+	if err != nil {
+		return xerrors.Errorf("exec insert: %w", err)
+	}
+
+	return nil
+}
+
+func (db *db) GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error) {
+	q := `
+SELECT
+	data
+FROM
+	presence
+WHERE
+	user_id = $1 AND guild_id = $2
+`
+
+	var presence RawJSON
+	err := db.sql.GetContext(ctx, &presence, q, userID, guildID)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+	return *(*[]byte)(unsafe.Pointer(&presence)), nil
+}
+
+func (db *db) SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error {
+	var q strings.Builder
+
+	q.WriteString(`
+			INSERT INTO
+				presence (user_id, guild_id, data)
+			VALUES 
+			`)
+
+	first := true
+	for i, e := range presences {
+		if !first {
+			q.WriteString(", ")
+		}
+		first = false
+
+		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
+	}
+
+	q.WriteString(`
+			ON CONFLICT
+				(user_id, guild_id)
+			DO UPDATE SET
+				data = excluded.data
+			`)
+
+	_, err := db.sql.ExecContext(ctx, q.String())
+	if err != nil {
+		return xerrors.Errorf("copy: %w", err)
+	}
+
+	return nil
+}

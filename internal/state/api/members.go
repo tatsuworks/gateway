@@ -102,6 +102,27 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 	return s.writeTerms(w, ms)
 }
 
+func (s *Server) getUserPresence(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	member, err := memberParam(p)
+	if err != nil {
+		return xerrors.Errorf("read member param: %w", err)
+	}
+	presence, err := s.db.GetUserPresence(r.Context(), guild, member)
+	if err != nil {
+		return xerrors.Errorf("read user presence: %w", err)
+	}
+
+	if presence == nil {
+		return ErrNotFound
+	}
+
+	return s.writeTerm(w, presence)
+}
+
 func memberParam(p httprouter.Params) (int64, error) {
 	m := p.ByName("member")
 	mi, err := strconv.ParseInt(m, 10, 64)

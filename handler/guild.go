@@ -94,6 +94,16 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 		}
 		return nil
 	})
+	eg.Go(func() error {
+		if len(gc.Presences) > 0 {
+			err := c.db.SetPresences(ctx, gc.ID, gc.Presences)
+			if err != nil {
+				return xerrors.Errorf("set guild presences: %w", err)
+			}
+
+		}
+		return nil
+	})
 	err = eg.Wait()
 	return result, err
 }

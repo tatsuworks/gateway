@@ -20,7 +20,6 @@ type Encoding interface {
 	DecodeMember(buf []byte) (*Member, error)
 
 	DecodePresence(buf []byte) (*Presence, error)
-	DecodePlayedPresence(buf []byte) (*PlayedPresence, error)
 
 	DecodeMessage(buf []byte) (*Message, error)
 	DecodeMessageReaction(buf []byte) (*MessageReaction, error)

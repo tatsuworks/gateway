@@ -180,3 +180,17 @@ IF NOT EXISTS threads
 CREATE INDEX CONCURRENTLY
 IF NOT EXISTS threads_guild_id ON threads
 ("guild_id");
+
+CREATE UNLOGGED TABLE
+IF NOT EXISTS presence
+(
+	"user_id" int8 NOT NULL,
+	"guild_id" int8 NOT NULL,
+	"data" jsonb NOT NULL,
+	PRIMARY KEY
+("user_id", "guild_id")
+);
+
+CREATE INDEX CONCURRENTLY
+IF NOT EXISTS presence_guild_id ON presence
+("guild_id");

@@ -63,11 +63,6 @@ type Presence struct {
 	Raw     []byte
 }
 
-type PlayedPresence struct {
-	UserID int64
-	Game   string
-}
-
 type Message struct {
 	ID        int64
 	ChannelID int64

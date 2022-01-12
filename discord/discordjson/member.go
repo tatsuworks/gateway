@@ -48,7 +48,22 @@ func (_ decoder) DecodeMember(buf []byte) (*discord.Member, error) {
 	return &m, nil
 }
 
-func (_ decoder) DecodePresence(buf []byte) (*discord.Presence, error) { panic("unimplemented") }
-func (_ decoder) DecodePlayedPresence(buf []byte) (*discord.PlayedPresence, error) {
-	panic("unimplemented")
+func (_ decoder) DecodePresence(buf []byte) (*discord.Presence, error) {
+	var (
+		m   discord.Presence
+		err error
+	)
+
+	m.ID, err = idFromNestedObject(buf, "user")
+	if err != nil {
+		return nil, xerrors.Errorf("extract user id: %w", err)
+	}
+
+	m.GuildID, err = snowflakeFromObject(buf, "guild_id")
+	if err != nil {
+		return nil, xerrors.Errorf("extract guild id: %w", err)
+	}
+
+	m.Raw = buf
+	return &m, nil
 }

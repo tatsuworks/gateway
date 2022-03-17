@@ -160,7 +160,6 @@ func (db *db) GetGuildMembersWithRole(ctx context.Context, guildID, roleID int64
 			return nil, xerrors.Errorf("json marshal: %w", err)
 		}
 		res[i] = jsonUser
-		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 	return res, nil
 }

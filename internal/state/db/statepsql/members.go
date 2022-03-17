@@ -143,6 +143,18 @@ WHERE
 	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
 }
 
+func (db *db) GetGuildMembersWithRole(ctx context.Context, guildID, roleID int64) ([][]byte, error) {
+	const q = `select count(*) from members where guild_id = $1 and  data->'roles' ? $2`
+
+	var ms []RawJSON
+	err := db.sql.SelectContext(ctx, &ms, q, guildID)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
+}
+
 func (db *db) DeleteGuildMembers(ctx context.Context, guildID int64) error {
 	const q = `
 DELETE FROM

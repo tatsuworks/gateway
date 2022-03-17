@@ -11,8 +11,6 @@ import (
 	"cdr.dev/slog"
 	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
-	"cdr.dev/slog/sloggers/slogstackdriver"
-	"cloud.google.com/go/profiler"
 	"github.com/google/gops/agent"
 	"github.com/tatsuworks/gateway/internal/state"
 	"github.com/tatsuworks/gateway/internal/state/api"
@@ -42,25 +40,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := profiler.Config{
-		Service:        "state",
-		ServiceVersion: "1.0.0",
+	var logger slog.Logger
+	var err error
+	if prod != "" {
+		logger = slogjson.Make(os.Stderr)
+	} else {
+		logger = sloghuman.Make(os.Stderr)
 	}
 
-	var logger slog.Logger
-	// Profiler initialization, best done as early as possible.
-	err := profiler.Start(cfg)
-	if err != nil {
-		if prod != "" {
-			logger = slogjson.Make(os.Stderr)
-		} else {
-			logger = sloghuman.Make(os.Stderr)
-		}
-		logger.Error(ctx, "profiler could not start", slog.F("err", err))
-	} else {
-		// running on gcp, so use slogstackdriver instead
-		logger = slogstackdriver.Make(os.Stderr)
-	}
 	defer logger.Sync()
 
 	var statedb state.DB

@@ -144,10 +144,10 @@ WHERE
 }
 
 func (db *db) GetGuildMembersWithRole(ctx context.Context, guildID, roleID int64) ([][]byte, error) {
-	const q = `select count(*) from members where guild_id = $1 and  data->'roles' ? $2`
+	const q = `select data from members where guild_id = $1 and  data->'roles' ? $2`
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, roleID)
+	err := db.sql.GetContext(ctx, &ms, q, guildID, roleID)
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

@@ -40,6 +40,7 @@ type DB interface {
 	GetGuildMember(ctx context.Context, guild, user int64) ([]byte, error)
 	GetGuildMemberCount(ctx context.Context, guild int64) (int, error)
 	GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error)
+	GetGuildMembersWithRole(ctx context.Context, guild, role int64) ([][]byte, error)
 	DeleteGuildMember(ctx context.Context, guild, user int64) error
 	SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error)
 	SetPresence(ctx context.Context, guild, user int64, raw []byte) error

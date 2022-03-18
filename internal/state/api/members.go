@@ -50,6 +50,23 @@ func (s *Server) getGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	return s.writeTerms(w, ms)
 }
 
+func (s *Server) getGuildMembersWithRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+	role, err := roleParam(p)
+	if err != nil {
+		return xerrors.Errorf("read role param: %w", err)
+	}
+	ms, err := s.db.GetGuildMembersWithRole(r.Context(), guild, role)
+	if err != nil {
+		return xerrors.Errorf("read members: %w", err)
+	}
+
+	return s.writeTerms(w, ms)
+}
+
 func (s *Server) getGuildMemberSlice(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	g, err := guildParam(p)
 	if err != nil {

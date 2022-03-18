@@ -3,6 +3,7 @@ package statepsql
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -141,6 +142,26 @@ WHERE
 	}
 
 	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
+}
+
+func (db *db) GetGuildMembersWithRole(ctx context.Context, guildID, roleID int64) ([][]byte, error) {
+	const q = `select user_id::TEXT from members where guild_id = $1 and  data->'roles' ? $2`
+
+	var ms []string
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, roleID)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+	res := make([][]byte, len(ms))
+	for i, id := range ms {
+		user := map[string]string{"id": id}
+		jsonUser, err := json.Marshal(user)
+		if err != nil {
+			return nil, xerrors.Errorf("json marshal: %w", err)
+		}
+		res[i] = jsonUser
+	}
+	return res, nil
 }
 
 func (db *db) DeleteGuildMembers(ctx context.Context, guildID int64) error {

@@ -3,7 +3,7 @@ FROM golang:1.13.7
 COPY go.mod go.sum /go/src/github.com/tatsuworks/gateway/
 RUN cd /go/src/github.com/tatsuworks/gateway && go mod download
 
-ENV FDB_URL "https://www.foundationdb.org/downloads/6.2.27/ubuntu/installers/foundationdb-clients_6.2.27-1_amd64.deb"
+ENV FDB_URL "https://github.com/apple/foundationdb/releases/download/6.2.27/foundationdb-clients_6.2.27-1_amd64.deb"
 RUN apt update && apt install -y wget zlib1g zlib1g-dev
 RUN wget -O fdb.deb $FDB_URL &&  dpkg -i fdb.deb
 
@@ -14,7 +14,7 @@ RUN cd /go/src/github.com/tatsuworks/gateway/cmd/state && go build -o /go/state 
 
 FROM ubuntu:18.04
 
-ENV FDB_URL "https://www.foundationdb.org/downloads/6.2.27/ubuntu/installers/foundationdb-clients_6.2.27-1_amd64.deb"
+ENV FDB_URL "https://github.com/apple/foundationdb/releases/download/6.2.27/foundationdb-clients_6.2.27-1_amd64.deb"
 RUN apt update && apt install -y wget zlib1g zlib1g-dev
 RUN wget -O fdb.deb $FDB_URL &&  dpkg -i fdb.deb
 

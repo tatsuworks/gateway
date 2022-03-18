@@ -92,3 +92,7 @@ func (db *DB) GetUserPresence(ctx context.Context, guildID, userID int64) ([]byt
 func (db *DB) SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error {
 	panic("unimplemented")
 }
+
+func (db *DB) GetGuildMembersWithRole(ctx context.Context, guild, role int64) ([][]byte, error) {
+	panic("unimplemented")
+}

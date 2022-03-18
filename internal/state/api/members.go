@@ -57,7 +57,7 @@ func (s *Server) getGuildMembersWithRole(w http.ResponseWriter, r *http.Request,
 	}
 	role, err := roleParam(p)
 	if err != nil {
-		return xerrors.Errorf("read guild param: %w", err)
+		return xerrors.Errorf("read role param: %w", err)
 	}
 	ms, err := s.db.GetGuildMembersWithRole(r.Context(), guild, role)
 	if err != nil {

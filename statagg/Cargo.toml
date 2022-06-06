@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 tonic = "0.1"
 prost = "0.6"
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.8", features = ["full"] }
 futures-util = { version = "0.3", default-features = false, features = ["async-await", "sink", "std"] }
 futures-channel = "0.3"
 tungstenite = "0.10"

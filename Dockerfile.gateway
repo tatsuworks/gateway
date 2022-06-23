@@ -1,4 +1,4 @@
-FROM golang:1.13.7
+FROM golang:1.18.3
 
 COPY go.mod go.sum /go/src/github.com/tatsuworks/gateway/
 RUN cd /go/src/github.com/tatsuworks/gateway && go mod download

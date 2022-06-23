@@ -89,11 +89,9 @@ type Identify struct {
 }
 
 type Props struct {
-	Os              string `json:"$os"`
-	Browser         string `json:"$browser"`
-	Device          string `json:"$device"`
-	Referer         string `json:"$referer"`
-	ReferringDomain string `json:"$referring_domain"`
+	Os      string `json:"os"`
+	Browser string `json:"browser"`
+	Device  string `json:"device"`
 }
 type updatePresence struct {
 	Activities []*activity `json:"activities"`

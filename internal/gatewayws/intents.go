@@ -19,6 +19,7 @@ const (
 	IntentDirectMessages
 	IntentDirectMessageReactions
 	IntentDirectMessageTyping
+	IntentMessageContent
 )
 
 func (i Intents) Collect() (n int) {
@@ -45,6 +46,7 @@ var AllIntents = Intents{
 	IntentDirectMessages,
 	IntentDirectMessageReactions,
 	IntentDirectMessageTyping,
+	IntentMessageContent,
 }
 
 var DefaultIntents = Intents{
@@ -60,4 +62,5 @@ var DefaultIntents = Intents{
 	IntentGuildMessageReactions,
 	IntentDirectMessages,
 	IntentDirectMessageReactions,
+	IntentMessageContent,
 }

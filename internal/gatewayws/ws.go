@@ -99,7 +99,7 @@ func (s *Session) cleanupBuffer() {
 	s.buf = nil
 }
 func (s *Session) GatewayURL() string {
-	return "wss://gateway.discord.gg/?v=9&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+	return "wss://gateway.discord.gg/?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
 }
 
 type SessionConfig struct {

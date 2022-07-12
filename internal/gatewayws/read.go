@@ -10,7 +10,7 @@ import (
 	"github.com/tatsuworks/czlib"
 )
 
-const connectionTimeout = 10
+const connectionTimeout = 20
 
 // readMessage populates buf on *Session with the next message.
 func (s *Session) readMessage() error {

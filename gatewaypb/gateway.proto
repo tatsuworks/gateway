@@ -1,6 +1,6 @@
 syntax = "proto3";
 package gateway;
-option go_package = "gatewaypb";
+option go_package = "gatewaypb/";
 
 service Gateway {
     rpc Version(EmptyRequest) returns (VersionResponse);

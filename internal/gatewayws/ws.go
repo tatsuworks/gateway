@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"cdr.dev/slog"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/go-redis/redis"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/concurrency"
 	"golang.org/x/time/rate"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"

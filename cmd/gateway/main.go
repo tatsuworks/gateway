@@ -83,14 +83,14 @@ func main() {
 	err = profiler.Start(cfg)
 	if err != nil {
 		if prod != "" {
-			logger = slogjson.Make(os.Stderr)
+			logger = slog.Make(slogjson.Sink(os.Stdout))
 		} else {
-			logger = sloghuman.Make(os.Stderr)
+			logger = slog.Make(sloghuman.Sink(os.Stdout))
 		}
 		logger.Error(ctx, "profiler could not start", slog.F("err", err))
 	} else {
 		// running on gcp, so use slogstackdriver instead
-		logger = slogstackdriver.Make(os.Stderr)
+		logger = slog.Make(slogstackdriver.Sink(os.Stderr))
 	}
 	defer logger.Sync()
 
@@ -171,10 +171,10 @@ func main() {
 	}
 
 	go func() {
-		srv := grpc.NewServer()
-		gatewaypb.RegisterGatewayServer(srv, m)
-		reflection.Register(srv)
-		srv.Serve(lis)
+		s := grpc.NewServer()
+		gatewaypb.RegisterGatewayServer(s, m)
+		reflection.Register(s)
+		s.Serve(lis)
 	}()
 
 	<-ctx.Done()

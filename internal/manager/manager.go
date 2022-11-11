@@ -3,6 +3,7 @@ package manager
 import (
 	"bytes"
 	"context"
+	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/queuepb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -11,10 +12,10 @@ import (
 	"time"
 
 	"cdr.dev/slog"
-	"github.com/coreos/etcd/clientv3"
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/state"
+	"go.etcd.io/etcd/client/v3"
 )
 
 type Manager struct {
@@ -37,7 +38,15 @@ type Manager struct {
 	bufferPool        *sync.Pool
 	whitelistedEvents map[string]struct{}
 	Queue             queuepb.QueueClient
+
+	// Required by grpc-go
+	gatewaypb.UnsafeGatewayServer
 }
+
+//func (m *Manager) mustEmbedUnimplementedGatewayServer() {
+//	//TODO implement me
+//	panic("implement me")
+//}
 
 type Config struct {
 	Name              string

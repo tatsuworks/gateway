@@ -1,5 +1,4 @@
 package gateway
 
-type Exporter interface{
-
+type Exporter interface {
 }

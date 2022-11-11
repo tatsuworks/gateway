@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cdr.dev/slog/sloggers/sloghuman"
 	"context"
 	"flag"
 	"log"
@@ -9,7 +10,6 @@ import (
 	"os"
 
 	"cdr.dev/slog"
-	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogjson"
 	"github.com/google/gops/agent"
 	"github.com/tatsuworks/gateway/internal/state"
@@ -43,9 +43,9 @@ func main() {
 	var logger slog.Logger
 	var err error
 	if prod != "" {
-		logger = slogjson.Make(os.Stderr)
+		logger = slog.Make(slogjson.Sink(os.Stdout))
 	} else {
-		logger = sloghuman.Make(os.Stderr)
+		logger = slog.Make(sloghuman.Sink(os.Stdout))
 	}
 
 	defer logger.Sync()

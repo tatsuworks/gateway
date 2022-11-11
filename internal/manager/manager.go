@@ -3,6 +3,9 @@ package manager
 import (
 	"bytes"
 	"context"
+	"github.com/tatsuworks/gateway/queuepb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +36,7 @@ type Manager struct {
 
 	bufferPool        *sync.Pool
 	whitelistedEvents map[string]struct{}
+	Queue             queuepb.QueueClient
 }
 
 type Config struct {
@@ -45,6 +49,7 @@ type Config struct {
 	Intents           gatewayws.Intents
 	RedisAddr         string
 	EtcdAddr          string
+	QueueAddr         string
 	PodID             string
 	WhitelistedEvents map[string]struct{}
 }
@@ -76,6 +81,19 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		cfg.Logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
+	queue, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		cfg.Logger.Fatal(ctx, "failed to connect to queue", slog.Error(err))
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			cfg.Logger.Fatal(ctx, "queue connection closed", slog.Error(err))
+		}
+	}(queue)
+	// the only issue is this connects to only one client ever?
+	queuec := queuepb.NewQueueClient(queue)
+
 	return &Manager{
 		ctx:  ctx,
 		name: cfg.Name,
@@ -89,8 +107,9 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		shards: map[int]*gatewayws.Session{},
 
-		rdb:  rc,
-		etcd: etcdc,
+		rdb:   rc,
+		etcd:  etcdc,
+		Queue: queuec,
 
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -125,6 +144,7 @@ func (m *Manager) startShard(shard int) {
 		DB:                m.db,
 		WorkGroup:         m.wg,
 		Redis:             m.rdb,
+		Queue:             m.Queue,
 		Etcd:              m.etcd,
 		Token:             m.token,
 		Intents:           m.intents,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/tatsuworks/gateway/queuepb"
 	"io"
 	"strconv"
 	"sync"
@@ -76,6 +77,7 @@ type Session struct {
 	state   *handler.Client
 	stateDB state.DB
 	rc      *redis.Client
+	queuec  queuepb.QueueClient
 
 	whitelistedEvents map[string]struct{}
 }
@@ -109,6 +111,7 @@ type SessionConfig struct {
 	WorkGroup         *sync.WaitGroup
 	Redis             *redis.Client
 	Etcd              *clientv3.Client
+	Queue             queuepb.QueueClient
 	Token             string
 	Intents           Intents
 	ShardID           int
@@ -139,6 +142,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stateDB:           cfg.DB,
 		enc:               cfg.DB.Encoding(),
 		rc:                cfg.Redis,
+		queuec:            cfg.Queue,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
 	}
@@ -271,6 +275,9 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.curState = "push event to redis"
 		s.pushEventToRedis(ev, evtPayload)
 
+		s.curState = "push event to queue"
+		s.pushEventToQueue(ev, evtPayload)
+
 		s.curState = "request guild members"
 		// only request members from new guilds.
 		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
@@ -299,6 +306,23 @@ func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventP
 		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
 			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+		}
+	}
+}
+
+func (s *Session) pushEventToQueue(ev *discord.Event, evtPayload *handler.EventPayload) {
+	if s.whitelistedEvents != nil {
+		if _, ok := s.whitelistedEvents[ev.T]; !ok {
+			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
+			return
+		}
+	}
+
+	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
+		ev.T != "GUILD_MEMBER_CHUNK" {
+		_, err := s.queuec.Listener(s.ctx, &queuepb.EventRequest{Key: "events:" + ev.T, Value: ev.D})
+		if err != nil {
+			s.log.Error(s.ctx, "push event to queue", slog.Error(err))
 		}
 	}
 }

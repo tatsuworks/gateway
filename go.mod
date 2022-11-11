@@ -17,10 +17,9 @@ require (
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/gogo/protobuf v1.3.0
 	github.com/google/gops v0.3.6
-	github.com/google/uuid v1.1.1 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
@@ -43,8 +42,9 @@ require (
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
-	google.golang.org/grpc v1.25.1
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+	google.golang.org/grpc v1.50.1
+	google.golang.org/protobuf v1.28.1
 	nhooyr.io/websocket v1.8.6
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

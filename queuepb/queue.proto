@@ -1,0 +1,14 @@
+syntax = "proto3";
+package gateway;
+option go_package = "queuepb/";
+
+service Queue {
+  rpc Listener(EventRequest) returns (EmptyResponse);
+}
+
+message EventRequest {
+  string key = 1;
+  bytes value = 2;
+}
+
+message EmptyResponse {}

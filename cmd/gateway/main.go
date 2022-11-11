@@ -29,6 +29,7 @@ var (
 	name      string
 	token     string
 	redisHost string
+	queueHost string
 	etcdHost  string
 	pprof     string
 	prod      string
@@ -45,6 +46,7 @@ func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
 	flag.StringVar(&token, "token", "", "token for the bot")
 	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
+	flag.StringVar(&queueHost, "queue", "localhost:4362", "localhost:4362")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
@@ -149,6 +151,7 @@ func main() {
 		Intents:           ints,
 		RedisAddr:         redisHost,
 		EtcdAddr:          etcdHost,
+		QueueAddr:         queueHost,
 		PodID:             podId,
 		WhitelistedEvents: whitelistedEventLookup,
 	})
@@ -159,6 +162,7 @@ func main() {
 		slog.F("stop", stop),
 		slog.F("redis_host", redisHost),
 		slog.F("etcd_host", etcdHost),
+		slog.F("queue_host", queueHost),
 	)
 
 	err = m.Start(start, stop)

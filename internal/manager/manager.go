@@ -37,16 +37,11 @@ type Manager struct {
 
 	bufferPool        *sync.Pool
 	whitelistedEvents map[string]struct{}
-	Queue             queuepb.QueueClient
+	queue             queuepb.QueueClient
 
 	// Required by grpc-go
 	gatewaypb.UnsafeGatewayServer
 }
-
-//func (m *Manager) mustEmbedUnimplementedGatewayServer() {
-//	//TODO implement me
-//	panic("implement me")
-//}
 
 type Config struct {
 	Name              string
@@ -63,7 +58,7 @@ type Config struct {
 	WhitelistedEvents map[string]struct{}
 }
 
-func New(ctx context.Context, cfg *Config) *Manager {
+func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 	rc := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisAddr,
 		OnConnect: func(c *redis.Conn) error {
@@ -90,20 +85,23 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		cfg.Logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
-	queue, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	queueConn, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		cfg.Logger.Fatal(ctx, "failed to connect to queue", slog.Error(err))
 	}
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-			cfg.Logger.Fatal(ctx, "queue connection closed", slog.Error(err))
-		}
-	}(queue)
 	// the only issue is this connects to only one client ever?
-	queuec := queuepb.NewQueueClient(queue)
+	queuec := queuepb.NewQueueClient(queueConn)
 
-	return &Manager{
+	cleanConn := func() {
+		err := queueConn.Close()
+		if err != nil {
+			cfg.Logger.Error(ctx, "queue connection could not be closed", slog.Error(err))
+			return
+		}
+		cfg.Logger.Info(ctx, "queue connection closed")
+	}
+
+	manager := &Manager{
 		ctx:  ctx,
 		name: cfg.Name,
 		log:  cfg.Logger,
@@ -118,7 +116,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		rdb:   rc,
 		etcd:  etcdc,
-		Queue: queuec,
+		queue: queuec,
 
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -128,6 +126,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		whitelistedEvents: cfg.WhitelistedEvents,
 	}
+
+	return manager, cleanConn
 }
 
 func (m *Manager) Start(start, stop int) error {
@@ -153,7 +153,7 @@ func (m *Manager) startShard(shard int) {
 		DB:                m.db,
 		WorkGroup:         m.wg,
 		Redis:             m.rdb,
-		Queue:             m.Queue,
+		Queue:             m.queue,
 		Etcd:              m.etcd,
 		Token:             m.token,
 		Intents:           m.intents,
@@ -180,7 +180,7 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
-			err := s.Open(m.ctx, m.token)
+			err := s.Open(m.ctx)
 			if err != nil {
 				// if !xerrors.Is(err, context.Canceled) {
 				m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))

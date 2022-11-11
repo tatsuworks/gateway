@@ -5,7 +5,7 @@ go 1.18
 require (
 	cdr.dev/slog v1.4.1
 	cloud.google.com/go/profiler v0.3.0
-	github.com/apple/foundationdb/bindings/go v0.0.0-20221111025819-c489dbcb262a
+	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/gops v0.3.25

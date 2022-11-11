@@ -3,7 +3,7 @@ package gateway;
 option go_package = "queuepb/";
 
 service Queue {
-  rpc Listener(EventRequest) returns (EmptyResponse);
+  rpc Push(EventRequest) returns (EmptyEventResponse);
 }
 
 message EventRequest {
@@ -11,4 +11,4 @@ message EventRequest {
   bytes value = 2;
 }
 
-message EmptyResponse {}
+message EmptyEventResponse {}

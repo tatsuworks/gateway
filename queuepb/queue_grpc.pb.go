@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type QueueClient interface {
-	Listener(ctx context.Context, in *EventRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Push(ctx context.Context, in *EventRequest, opts ...grpc.CallOption) (*EmptyEventResponse, error)
 }
 
 type queueClient struct {
@@ -33,9 +33,9 @@ func NewQueueClient(cc grpc.ClientConnInterface) QueueClient {
 	return &queueClient{cc}
 }
 
-func (c *queueClient) Listener(ctx context.Context, in *EventRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
-	out := new(EmptyResponse)
-	err := c.cc.Invoke(ctx, "/gateway.Queue/Listener", in, out, opts...)
+func (c *queueClient) Push(ctx context.Context, in *EventRequest, opts ...grpc.CallOption) (*EmptyEventResponse, error) {
+	out := new(EmptyEventResponse)
+	err := c.cc.Invoke(ctx, "/gateway.Queue/Push", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *queueClient) Listener(ctx context.Context, in *EventRequest, opts ...gr
 // All implementations must embed UnimplementedQueueServer
 // for forward compatibility
 type QueueServer interface {
-	Listener(context.Context, *EventRequest) (*EmptyResponse, error)
+	Push(context.Context, *EventRequest) (*EmptyEventResponse, error)
 	mustEmbedUnimplementedQueueServer()
 }
 
@@ -54,8 +54,8 @@ type QueueServer interface {
 type UnimplementedQueueServer struct {
 }
 
-func (UnimplementedQueueServer) Listener(context.Context, *EventRequest) (*EmptyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Listener not implemented")
+func (UnimplementedQueueServer) Push(context.Context, *EventRequest) (*EmptyEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Push not implemented")
 }
 func (UnimplementedQueueServer) mustEmbedUnimplementedQueueServer() {}
 
@@ -70,20 +70,20 @@ func RegisterQueueServer(s grpc.ServiceRegistrar, srv QueueServer) {
 	s.RegisterService(&Queue_ServiceDesc, srv)
 }
 
-func _Queue_Listener_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Queue_Push_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EventRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QueueServer).Listener(ctx, in)
+		return srv.(QueueServer).Push(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/gateway.Queue/Listener",
+		FullMethod: "/gateway.Queue/Push",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueueServer).Listener(ctx, req.(*EventRequest))
+		return srv.(QueueServer).Push(ctx, req.(*EventRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -96,8 +96,8 @@ var Queue_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*QueueServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Listener",
-			Handler:    _Queue_Listener_Handler,
+			MethodName: "Push",
+			Handler:    _Queue_Push_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -167,7 +167,7 @@ func (s *Session) shouldResume() bool {
 	return s.seq != 0 && s.sessID != ""
 }
 
-func (s *Session) Open(ctx context.Context, token string) error {
+func (s *Session) Open(ctx context.Context) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -186,7 +186,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	var err error
 	err = s.initEtcd()
 	if err != nil {
-		return err
+		return xerrors.Errorf("etcd init error: %w", err)
 	}
 
 	// only acquire the identify lock if we know we won't send a resume
@@ -301,8 +301,7 @@ func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventP
 			return
 		}
 	}
-	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
-		ev.T != "GUILD_MEMBER_CHUNK" {
+	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
 		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
 		if err != nil {
 			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
@@ -318,9 +317,8 @@ func (s *Session) pushEventToQueue(ev *discord.Event, evtPayload *handler.EventP
 		}
 	}
 
-	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
-		ev.T != "GUILD_MEMBER_CHUNK" {
-		_, err := s.queuec.Listener(s.ctx, &queuepb.EventRequest{Key: "events:" + ev.T, Value: ev.D})
+	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
+		_, err := s.queuec.Push(s.ctx, &queuepb.EventRequest{Key: "gateway:events:" + ev.T, Value: ev.D})
 		if err != nil {
 			s.log.Error(s.ctx, "push event to queue", slog.Error(err))
 		}

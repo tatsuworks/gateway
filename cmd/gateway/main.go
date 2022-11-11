@@ -45,9 +45,9 @@ var (
 func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
 	flag.StringVar(&token, "token", "", "token for the bot")
-	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
-	flag.StringVar(&queueHost, "queue", "localhost:4362", "localhost:4362")
-	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
+	flag.StringVar(&redisHost, "redis", "localhost:6379", "redis host")
+	flag.StringVar(&queueHost, "queue", "localhost:4362", "queue host")
+	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "etcd host")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
 	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
@@ -141,7 +141,7 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	m := manager.New(ctx, &manager.Config{
+	m, cleanup := manager.New(ctx, &manager.Config{
 		Name:              name,
 		Logger:            logger,
 		Wg:                wg,
@@ -155,6 +155,8 @@ func main() {
 		PodID:             podId,
 		WhitelistedEvents: whitelistedEventLookup,
 	})
+	// Cleans up Queue connection
+	defer cleanup()
 
 	logger.Info(ctx, "starting manager",
 		slog.F("shards", shards),

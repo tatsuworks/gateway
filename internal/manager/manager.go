@@ -3,10 +3,6 @@ package manager
 import (
 	"bytes"
 	"context"
-	"github.com/tatsuworks/gateway/gatewaypb"
-	"github.com/tatsuworks/gateway/queuepb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +11,11 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/state"
+	"github.com/tatsuworks/gateway/protos/gatewaypb"
+	"github.com/tatsuworks/gateway/protos/queuepb"
 	"go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Manager struct {

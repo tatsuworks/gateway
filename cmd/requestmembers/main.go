@@ -7,8 +7,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/tatsuworks/gateway/gatewaypb"
+	"github.com/tatsuworks/gateway/protos/gatewaypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -27,7 +28,7 @@ func main() {
 	podNum := int64(shard / perPod)
 	fmt.Println(podNum, shard)
 
-	conn, err := grpc.Dial("0.0.0.0:80", grpc.WithInsecure())
+	conn, err := grpc.Dial("0.0.0.0:80", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal("failed to connect", err)
 	}

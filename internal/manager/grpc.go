@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"cdr.dev/slog"
-	"github.com/tatsuworks/gateway/gatewaypb"
+	"github.com/tatsuworks/gateway/protos/gatewaypb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

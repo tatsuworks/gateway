@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 
-	"github.com/tatsuworks/gateway/gatewaypb"
+	"github.com/tatsuworks/gateway/protos/gatewaypb"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	logger, _ := zap.NewDevelopment()
 
-	conn, err := grpc.Dial("127.0.0.1:8000", grpc.WithInsecure())
+	conn, err := grpc.Dial("127.0.0.1:8000", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Fatal("connect", zap.Error(err))
 	}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/tatsuworks/gateway/queuepb"
 	"io"
 	"strconv"
 	"sync"
@@ -24,6 +23,7 @@ import (
 	"github.com/tatsuworks/gateway/discord"
 	"github.com/tatsuworks/gateway/handler"
 	"github.com/tatsuworks/gateway/internal/state"
+	"github.com/tatsuworks/gateway/protos/queuepb"
 )
 
 const (

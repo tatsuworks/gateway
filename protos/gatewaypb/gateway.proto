@@ -1,0 +1,44 @@
+syntax = "proto3";
+package gateway;
+option go_package = "gatewaypb/";
+
+service Gateway {
+    rpc Version(EmptyRequest) returns (VersionResponse);
+
+    rpc RequestGuildMembers(RequestGuildMembersRequest) returns (EmptyResponse);
+    rpc RestartShard(RestartShardRequest) returns (EmptyResponse);
+    rpc Stats(EmptyRequest) returns (StatsResponse);
+}
+
+message StatsResponse {
+    repeated Stat stats = 1;
+}
+
+message Stat {
+    int32 shard = 1;
+    ShardStatus status = 2;
+    int32 event_rate = 3;
+}
+
+enum ShardStatus {
+    DISCONNECTED = 0;
+    CONNECTING = 1;
+    GUILD_STREAM = 2;
+    CONNECTED = 3;
+}
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+message VersionResponse {
+    string version = 1;
+}
+
+message RequestGuildMembersRequest {
+    int64 guild_id = 1;
+    int32 shard = 2;
+}
+
+message RestartShardRequest {
+    int32 shard = 1;
+}

@@ -15,12 +15,12 @@ import (
 	"cdr.dev/slog/sloggers/slogjson"
 	"cdr.dev/slog/sloggers/slogstackdriver"
 	"cloud.google.com/go/profiler"
-	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"github.com/tatsuworks/gateway/internal/state"
 	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
 	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
+	"github.com/tatsuworks/gateway/protos/gatewaypb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

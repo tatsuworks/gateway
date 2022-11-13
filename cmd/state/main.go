@@ -33,7 +33,10 @@ func init() {
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
 	flag.StringVar(&addr, "addr", "0.0.0.0:8080", "0.0.0.0:80")
 	flag.StringVar(&psqlAddr, "psql", "", "Postgres address")
+
 	flag.Parse()
+
+	usePsql = psqlAddr != ""
 }
 
 func main() {
@@ -51,7 +54,7 @@ func main() {
 	defer logger.Sync()
 
 	var statedb state.DB
-	if psqlAddr != "" {
+	if usePsql {
 		statedb, err = statepsql.NewDB(ctx, psqlAddr)
 		if err != nil {
 			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
@@ -73,11 +76,11 @@ func main() {
 		logger.Fatal(ctx, "failed to create gops agent", slog.Error(err))
 	}
 
-	state, err := api.NewServer(logger, statedb, Version)
+	server, err := api.NewServer(logger, statedb, Version)
 	if err != nil {
 		logger.Fatal(ctx, "failed to create state", slog.Error(err))
 	}
 
-	state.Init()
-	logger.Fatal(ctx, "failed to run server", slog.Error(state.Start(addr)))
+	server.Init()
+	logger.Fatal(ctx, "failed to run server", slog.Error(server.Start(addr)))
 }

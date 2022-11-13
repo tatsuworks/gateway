@@ -32,9 +32,9 @@ type Manager struct {
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
 
+	eventHost int
 	rdb       *redis.Client
 	queue     queuepb.QueueClient
-	eventHost string
 
 	etcd *clientv3.Client
 
@@ -53,13 +53,19 @@ type Config struct {
 	Token             string
 	Shards            int
 	Intents           gatewayws.Intents
-	RedisAddr         string
 	EtcdAddr          string
-	QueueAddr         string
 	PodID             string
 	WhitelistedEvents map[string]struct{}
-	EventHost         string
+
+	EventHost int
+	RedisAddr string
+	QueueAddr string
 }
+
+const (
+	RedisEvent = iota
+	QueueEvent
+)
 
 func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 
@@ -68,7 +74,7 @@ func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 	var queuec queuepb.QueueClient
 
 	switch cfg.EventHost {
-	case "redis":
+	case RedisEvent:
 		{
 			rc = redis.NewClient(&redis.Options{
 				Addr: cfg.RedisAddr,
@@ -88,7 +94,7 @@ func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 				cfg.Logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
 			}
 		}
-	case "queue":
+	case QueueEvent:
 		{
 			queueConn, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
@@ -108,7 +114,7 @@ func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 
 	// cleanConn disconnects from the gRPC server that Gateway was connected to.
 	cleanConn := func() {
-		if cfg.EventHost != "queue" {
+		if cfg.EventHost != QueueEvent {
 			return
 		}
 		err := queueConn.Close()

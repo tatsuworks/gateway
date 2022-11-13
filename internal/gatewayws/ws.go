@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/tatsuworks/gateway/internal/manager"
 	"io"
 	"strconv"
 	"sync"
@@ -76,11 +77,12 @@ type Session struct {
 
 	state   *handler.Client
 	stateDB state.DB
-	rc      *redis.Client
-	queuec  queuepb.QueueClient
 
 	whitelistedEvents map[string]struct{}
-	eventHost         string
+
+	eventHost int
+	rc        *redis.Client
+	queuec    queuepb.QueueClient
 }
 
 func (s *Session) Status() string {
@@ -110,16 +112,17 @@ type SessionConfig struct {
 	Logger            slog.Logger
 	DB                state.DB
 	WorkGroup         *sync.WaitGroup
-	Redis             *redis.Client
 	Etcd              *clientv3.Client
-	Queue             queuepb.QueueClient
 	Token             string
 	Intents           Intents
 	ShardID           int
 	ShardCount        int
 	BufferPool        *sync.Pool
 	WhitelistedEvents map[string]struct{}
-	EventHost         string
+
+	EventHost int
+	Redis     *redis.Client
+	Queue     queuepb.QueueClient
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -282,9 +285,9 @@ func (s *Session) Open(ctx context.Context) error {
 			} else {
 				if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
 					switch s.eventHost {
-					case "redis":
+					case manager.RedisEvent:
 						s.pushEventToRedis(ev)
-					case "queue":
+					case manager.QueueEvent:
 						s.pushEventToQueue(ev)
 					}
 				}

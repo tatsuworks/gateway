@@ -33,7 +33,7 @@ var (
 	redisHost string
 	queue     bool
 	queueHost string
-	eventHost string
+	eventHost int
 	etcdHost  string
 	pprof     string
 	prod      string
@@ -72,10 +72,10 @@ func init() {
 		log.Fatal("at least one of redisHost or queueHost expected")
 	} else {
 		if redis {
-			eventHost = "redis"
+			eventHost = manager.RedisEvent
 		}
 		if queue {
-			eventHost = "queue"
+			eventHost = manager.QueueEvent
 		}
 	}
 }

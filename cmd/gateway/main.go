@@ -68,7 +68,8 @@ func init() {
 	psql = psqlAddr != ""
 	redis = redisHost != ""
 	queue = queueHost != ""
-	if !(redis && queue) {
+
+	if !(redis || queue) {
 		log.Fatal("at least one of redisHost or queueHost expected")
 	} else {
 		if redis {
@@ -189,7 +190,7 @@ func main() {
 				return "queue " + queueHost
 			}
 			return "redis or queue not supplied"
-		}),
+		}()),
 	)
 
 	err = m.Start(start, stop)

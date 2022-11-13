@@ -3,8 +3,8 @@ package gatewayws
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"github.com/tatsuworks/gateway/internal/manager"
 	"io"
 	"strconv"
 	"sync"
@@ -282,14 +282,17 @@ func (s *Session) Open(ctx context.Context) error {
 		if s.whitelistedEvents != nil {
 			if _, ok := s.whitelistedEvents[ev.T]; !ok {
 				s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
-			} else {
-				if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
-					switch s.eventHost {
-					case manager.RedisEvent:
-						s.pushEventToRedis(ev)
-					case manager.QueueEvent:
-						s.pushEventToQueue(ev)
-					}
+			}
+		} else {
+			if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
+				switch s.eventHost {
+				// TODO: Using enums results in circular dependency issues.
+				case 0:
+					// manager.RedisEvent
+					s.pushEventToRedis(ev)
+				case 1:
+					// manager.QueueEvent
+					s.pushEventToQueue(ev)
 				}
 			}
 		}
@@ -442,7 +445,7 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 	err := s.readMessage()
 	if err != nil {
 		var werr websocket.CloseError
-		if xerrors.As(err, &werr) {
+		if errors.As(err, &werr) {
 			// This somehow happens if you resume to a
 			// valid session associated with a different
 			// token.

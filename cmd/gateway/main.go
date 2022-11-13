@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -28,8 +29,11 @@ import (
 var (
 	name      string
 	token     string
+	redis     bool
 	redisHost string
+	queue     bool
 	queueHost string
+	eventHost string
 	etcdHost  string
 	pprof     string
 	prod      string
@@ -45,8 +49,8 @@ var (
 func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
 	flag.StringVar(&token, "token", "", "token for the bot")
-	flag.StringVar(&redisHost, "redis", "localhost:6379", "redis host")
-	flag.StringVar(&queueHost, "queue", "localhost:4362", "queue host")
+	flag.StringVar(&redisHost, "redis", "", "redis host") // localhost:6379
+	flag.StringVar(&queueHost, "queue", "", "queue host") // localhost:4362
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "etcd host")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
@@ -60,7 +64,20 @@ func init() {
 	flag.IntVar(&stop, "stop", 1, "Last shard (non-inclusive)")
 
 	flag.Parse()
+
 	psql = psqlAddr != ""
+	redis = redisHost != ""
+	queue = queueHost != ""
+	if !(redis && queue) {
+		log.Fatal("at least one of redisHost or queueHost expected")
+	} else {
+		if redis {
+			eventHost = "redis"
+		}
+		if queue {
+			eventHost = "queue"
+		}
+	}
 }
 
 func main() {
@@ -149,22 +166,30 @@ func main() {
 		Token:             token,
 		Shards:            shards,
 		Intents:           ints,
-		RedisAddr:         redisHost,
 		EtcdAddr:          etcdHost,
+		RedisAddr:         redisHost,
 		QueueAddr:         queueHost,
+		EventHost:         eventHost,
 		PodID:             podId,
 		WhitelistedEvents: whitelistedEventLookup,
 	})
-	// Cleans up Queue connection
+	// cleanup disconnects the queue connection.
 	defer cleanup()
 
 	logger.Info(ctx, "starting manager",
 		slog.F("shards", shards),
 		slog.F("start", start),
 		slog.F("stop", stop),
-		slog.F("redis_host", redisHost),
 		slog.F("etcd_host", etcdHost),
-		slog.F("queue_host", queueHost),
+		slog.F("event_host", func() string {
+			if redis {
+				return "redis " + redisHost
+			}
+			if queue {
+				return "queue " + queueHost
+			}
+			return "redis or queue not supplied"
+		}),
 	)
 
 	err = m.Start(start, stop)

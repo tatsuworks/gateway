@@ -80,6 +80,7 @@ type Session struct {
 	queuec  queuepb.QueueClient
 
 	whitelistedEvents map[string]struct{}
+	eventHost         string
 }
 
 func (s *Session) Status() string {
@@ -118,6 +119,7 @@ type SessionConfig struct {
 	ShardCount        int
 	BufferPool        *sync.Pool
 	WhitelistedEvents map[string]struct{}
+	EventHost         string
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -141,10 +143,13 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		state:             handler.NewClient(cfg.Logger, cfg.DB),
 		stateDB:           cfg.DB,
 		enc:               cfg.DB.Encoding(),
-		rc:                cfg.Redis,
-		queuec:            cfg.Queue,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
+
+		// event forwarding method
+		eventHost: cfg.EventHost,
+		rc:        cfg.Redis,
+		queuec:    cfg.Queue,
 	}
 
 	sess.loadSessID()
@@ -256,27 +261,35 @@ func (s *Session) Open(ctx context.Context) error {
 		}
 
 		s.curState = "handle internal event " + ev.T
-		var handled bool
-		if handled, err = s.handleInternalEvent(ev); handled {
+		if handled, err := s.handleInternalEvent(ev); handled {
 			if err != nil {
 				break
 			}
-
 			continue
 		}
 
-		s.curState = "handle state event " + ev.T
+		s.curState = "handle state event" + ev.T
 		evtPayload, err := s.state.HandleEvent(ctx, ev)
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
-		s.curState = "push event to redis"
-		s.pushEventToRedis(ev, evtPayload)
-
-		s.curState = "push event to queue"
-		s.pushEventToQueue(ev, evtPayload)
+		s.curState = "push event"
+		if s.whitelistedEvents != nil {
+			if _, ok := s.whitelistedEvents[ev.T]; !ok {
+				s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
+			} else {
+				if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
+					switch s.eventHost {
+					case "redis":
+						s.pushEventToRedis(ev)
+					case "queue":
+						s.pushEventToQueue(ev)
+					}
+				}
+			}
+		}
 
 		s.curState = "request guild members"
 		// only request members from new guilds.
@@ -294,34 +307,17 @@ func (s *Session) Open(ctx context.Context) error {
 	return err
 }
 
-func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
-	if s.whitelistedEvents != nil {
-		if _, ok := s.whitelistedEvents[ev.T]; !ok {
-			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
-			return
-		}
-	}
-	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
-		err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-		if err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
-		}
+func (s *Session) pushEventToRedis(ev *discord.Event) {
+	err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
+	if err != nil {
+		s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 	}
 }
 
-func (s *Session) pushEventToQueue(ev *discord.Event, evtPayload *handler.EventPayload) {
-	if s.whitelistedEvents != nil {
-		if _, ok := s.whitelistedEvents[ev.T]; !ok {
-			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
-			return
-		}
-	}
-
-	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) && ev.T != "GUILD_MEMBER_CHUNK" {
-		_, err := s.queuec.Push(s.ctx, &queuepb.EventRequest{Key: "gateway:events:" + ev.T, Value: ev.D})
-		if err != nil {
-			s.log.Error(s.ctx, "push event to queue", slog.Error(err))
-		}
+func (s *Session) pushEventToQueue(ev *discord.Event) {
+	_, err := s.queuec.Push(s.ctx, &queuepb.EventRequest{Key: "gateway:events:" + ev.T, Value: ev.D})
+	if err != nil {
+		s.log.Error(s.ctx, "push event to queue", slog.Error(err))
 	}
 }
 

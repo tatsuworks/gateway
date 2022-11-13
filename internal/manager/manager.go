@@ -32,12 +32,14 @@ type Manager struct {
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
 
-	rdb  *redis.Client
+	rdb       *redis.Client
+	queue     queuepb.QueueClient
+	eventHost string
+
 	etcd *clientv3.Client
 
 	bufferPool        *sync.Pool
 	whitelistedEvents map[string]struct{}
-	queue             queuepb.QueueClient
 
 	// Required by grpc-go
 	gatewaypb.UnsafeGatewayServer
@@ -56,25 +58,44 @@ type Config struct {
 	QueueAddr         string
 	PodID             string
 	WhitelistedEvents map[string]struct{}
+	EventHost         string
 }
 
 func New(ctx context.Context, cfg *Config) (*Manager, func()) {
-	rc := redis.NewClient(&redis.Options{
-		Addr: cfg.RedisAddr,
-		OnConnect: func(c *redis.Conn) error {
-			if cfg.PodID != "" {
-				c.ClientSetName(cfg.Name + "-" + cfg.PodID)
-			} else {
-				c.ClientSetName(cfg.Name)
+
+	var rc *redis.Client
+	var queueConn *grpc.ClientConn
+	var queuec queuepb.QueueClient
+
+	switch cfg.EventHost {
+	case "redis":
+		{
+			rc = redis.NewClient(&redis.Options{
+				Addr: cfg.RedisAddr,
+				OnConnect: func(c *redis.Conn) error {
+					if cfg.PodID != "" {
+						c.ClientSetName(cfg.Name + "-" + cfg.PodID)
+					} else {
+						c.ClientSetName(cfg.Name)
+					}
+
+					return nil
+				},
+			})
+
+			_, err := rc.Ping().Result()
+			if err != nil {
+				cfg.Logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
 			}
-
-			return nil
-		},
-	})
-
-	_, err := rc.Ping().Result()
-	if err != nil {
-		cfg.Logger.Fatal(ctx, "failed to ping redis", slog.Error(err))
+		}
+	case "queue":
+		{
+			queueConn, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				cfg.Logger.Fatal(ctx, "failed to connect to queue", slog.Error(err))
+			}
+			queuec = queuepb.NewQueueClient(queueConn)
+		}
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{
@@ -85,14 +106,11 @@ func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 		cfg.Logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
-	queueConn, err := grpc.Dial(cfg.QueueAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		cfg.Logger.Fatal(ctx, "failed to connect to queue", slog.Error(err))
-	}
-	// the only issue is this connects to only one client ever?
-	queuec := queuepb.NewQueueClient(queueConn)
-
+	// cleanConn disconnects from the gRPC server that Gateway was connected to.
 	cleanConn := func() {
+		if cfg.EventHost != "queue" {
+			return
+		}
 		err := queueConn.Close()
 		if err != nil {
 			cfg.Logger.Error(ctx, "queue connection could not be closed", slog.Error(err))
@@ -114,9 +132,10 @@ func New(ctx context.Context, cfg *Config) (*Manager, func()) {
 
 		shards: map[int]*gatewayws.Session{},
 
-		rdb:   rc,
-		etcd:  etcdc,
-		queue: queuec,
+		eventHost: cfg.EventHost,
+		rdb:       rc,
+		queue:     queuec,
+		etcd:      etcdc,
 
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -154,6 +173,7 @@ func (m *Manager) startShard(shard int) {
 		WorkGroup:         m.wg,
 		Redis:             m.rdb,
 		Queue:             m.queue,
+		EventHost:         m.eventHost,
 		Etcd:              m.etcd,
 		Token:             m.token,
 		Intents:           m.intents,
@@ -192,11 +212,11 @@ func (m *Manager) startShard(shard int) {
 	}()
 }
 
-const ManagerLogInterval = 5 * time.Minute
+const LogInterval = 5 * time.Minute
 
 func (m *Manager) logHealth() {
 	var (
-		t   = time.NewTicker(ManagerLogInterval)
+		t   = time.NewTicker(LogInterval)
 		ctx = m.ctx
 	)
 	defer t.Stop()
@@ -210,7 +230,7 @@ func (m *Manager) logHealth() {
 
 		var out []string
 		for _, session := range m.shards {
-			if session != nil && session.LongLastAck(ManagerLogInterval) {
+			if session != nil && session.LongLastAck(LogInterval) {
 				out = append(out, session.Status())
 			}
 		}

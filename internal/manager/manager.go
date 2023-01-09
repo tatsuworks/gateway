@@ -70,6 +70,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 			if err != nil {
 				// It is not fatal if one multiRedis client did not connect.
 				cfg.Logger.Warn(ctx, "createRedisClient", slog.Error(err))
+				continue
 			}
 			rdbClients = append(rdbClients, mrc)
 		}

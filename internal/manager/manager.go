@@ -60,19 +60,29 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	var err error
 
 	if multiRedisEnv != "" {
-		err := json.Unmarshal([]byte(multiRedisEnv), &multiRedisAddresses)
+		err = json.Unmarshal([]byte(multiRedisEnv), &multiRedisAddresses)
 		if err != nil {
 			cfg.Logger.Fatal(ctx, "invalid multi_redis", slog.Error(err))
 		}
 		for _, addr := range multiRedisAddresses {
-			rc, err = createRedisClient(addr, cfg.Name, cfg.PodID)
-			rdbClients = append(rdbClients, rc)
+			var mrc *redis.Client
+			mrc, err = createRedisClient(addr, cfg.Name, cfg.PodID)
+			if err != nil {
+				// It is not fatal if one multiRedis client did not connect.
+				cfg.Logger.Warn(ctx, "createRedisClient", slog.Error(err))
+			}
+			rdbClients = append(rdbClients, mrc)
 		}
 	} else {
 		rc, err = createRedisClient(cfg.RedisAddr, cfg.Name, cfg.PodID)
 		if err != nil {
 			cfg.Logger.Fatal(ctx, "createRedisClient", slog.Error(err))
 		}
+	}
+
+	// No multi redis clients were connected, or all failed to connect.
+	if multiRedisEnv != "" && len(rdbClients) == 0 {
+		cfg.Logger.Fatal(ctx, "multiRedisEnv is set, but all redis clients failed to connect.")
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{

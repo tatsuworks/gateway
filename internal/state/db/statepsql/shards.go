@@ -112,3 +112,44 @@ func (db *db) SetStatus(ctx context.Context, shard int, name, status string) err
 
 	return nil
 }
+
+func (db *db) SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error {
+	const q = `
+				INSERT INTO
+					shards (id, name, seq, sess, resume_url)
+				VALUES
+					($1, $2, 0, '', $3)
+				ON CONFLICT
+					(id, name)
+				DO UPDATE
+				SET
+					resume_url = $3
+			`
+
+	_, err := db.sql.ExecContext(ctx, q, shard, name, resumeURL)
+	if err != nil {
+		return xerrors.Errorf("exec update: %w", err)
+	}
+
+	return nil
+}
+
+func (db *db) GetResumeGatewayURL(ctx context.Context, shard int, name string) (string, error) {
+	const q = `
+				SELECT
+					resume_url
+				FROM
+					shards
+				WHERE
+					id = $1 AND
+					name = $2
+				`
+
+	var resumeURL string
+	err := db.sql.GetContext(ctx, &resumeURL, q, shard, name)
+	if err != nil {
+		return "", xerrors.Errorf("exec select: %w", err)
+	}
+
+	return resumeURL, nil
+}

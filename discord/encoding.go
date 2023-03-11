@@ -4,7 +4,7 @@ type Encoding interface {
 	Name() string
 
 	DecodeHello(buf []byte) (int, string, error)
-	DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string, _ error)
+	DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string, resumeGatewayURL string, _ error)
 
 	DecodeT(buf []byte) (*Event, error)
 

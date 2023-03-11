@@ -103,10 +103,13 @@ func (s *Session) cleanupBuffer() {
 }
 
 func (s *Session) GatewayURL() string {
+	wsOpts := "?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+
 	if s.resumeURL != "" && s.sessID != "" {
-		return s.resumeURL
+		return s.resumeURL + wsOpts
 	}
-	return "wss://gateway.discord.gg/?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+
+	return "wss://gateway.discord.gg/" + wsOpts
 }
 
 type SessionConfig struct {

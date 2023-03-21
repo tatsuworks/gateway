@@ -15,6 +15,8 @@ type DB interface {
 	SetSessionID(ctx context.Context, shard int, name string, sess string) error
 	GetSessionID(ctx context.Context, shard int, name string) (string, error)
 	SetStatus(ctx context.Context, shard int, name string, status string) error
+	SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error
+	GetResumeGatewayURL(ctx context.Context, shard int, name string) (string, error)
 
 	SetGuild(ctx context.Context, id int64, raw []byte) (bool, error)
 	GetGuild(ctx context.Context, id int64) ([]byte, error)

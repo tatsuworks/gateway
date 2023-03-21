@@ -42,10 +42,11 @@ type Session struct {
 	shardID    int
 	shardCount int
 
-	authed bool
-	seq    int64
-	sessID string
-	last   int64
+	authed    bool
+	seq       int64
+	sessID    string
+	resumeURL string
+	last      int64
 
 	wsConn *websocket.Conn
 	zr     io.ReadCloser
@@ -83,10 +84,12 @@ type Session struct {
 func (s *Session) Status() string {
 	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
 }
+
 func (s *Session) LongLastAck(threshold time.Duration) bool {
 	cutoff := time.Now().Add(-threshold)
 	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
 }
+
 func (s *Session) cleanupBuffer() {
 	if s.buf != nil {
 		if s.buf.Cap() < (1 << 24) {
@@ -98,8 +101,15 @@ func (s *Session) cleanupBuffer() {
 	}
 	s.buf = nil
 }
+
 func (s *Session) GatewayURL() string {
-	return "wss://gateway.discord.gg/?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+	wsOpts := "?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+
+	if s.resumeURL != "" && s.sessID != "" {
+		return s.resumeURL + wsOpts
+	}
+
+	return "wss://gateway.discord.gg/" + wsOpts
 }
 
 type SessionConfig struct {
@@ -145,6 +155,8 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 
 	sess.loadSessID()
 	sess.loadSeq()
+	sess.loadResumeURL()
+
 	return sess, nil
 }
 
@@ -330,6 +342,8 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.persistSessID()
 		s.seq = 0
 		s.persistSeq()
+		s.resumeURL = ""
+		s.persistResumeURL()
 		s.wch = make(chan *Op, 2000)
 
 		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
@@ -350,7 +364,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	switch ev.T {
 	case "READY":
 		s.guilds = map[int64]struct{}{}
-		guilds, _, sess, err := s.enc.DecodeReady(ev.D)
+		guilds, _, sess, resumeURL, err := s.enc.DecodeReady(ev.D)
 		if err != nil {
 			return true, xerrors.Errorf("decode ready: %w", err)
 		}
@@ -360,8 +374,11 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		}
 
 		s.sessID = sess
-		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("guild_count", len(s.guilds)))
+		s.resumeURL = resumeURL
+		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("resume_gateway_url", resumeURL),
+			slog.F("guild_count", len(s.guilds)))
 		s.persistSessID()
+		s.persistResumeURL()
 		s.authed = true
 		s.ready = time.Now()
 
@@ -428,8 +445,10 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 			if werr.Code == 4006 {
 				s.seq = 0
 				s.sessID = ""
+				s.resumeURL = ""
 				s.persistSeq()
 				s.persistSessID()
+				s.persistResumeURL()
 			}
 		}
 		return nil, xerrors.Errorf("read message: %w", err)

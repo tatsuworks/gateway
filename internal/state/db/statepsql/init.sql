@@ -112,16 +112,15 @@ CREATE INDEX CONCURRENTLY
 IF NOT EXISTS emojis_guild_id ON emojis
 ("guild_id");
 
-CREATE UNLOGGED TABLE
-IF NOT EXISTS shards
+CREATE UNLOGGED TABLE IF NOT EXISTS shards
 (
 	"id" int NOT NULL,
 	"name" text NOT NULL,
 	"seq" int8 NOT NULL,
 	"sess" text NOT NULL,
 	"status" text NOT NULL DEFAULT '',
-	PRIMARY KEY
-("id", "name")
+    "resume_url" text NOT NULL DEFAULT '',
+	PRIMARY KEY ("id", "name")
 );
 
 CREATE TABLE "public"."guilds_persistent"

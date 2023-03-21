@@ -42,6 +42,22 @@ func (s *Session) loadSessID() {
 	}
 }
 
+func (s *Session) persistResumeURL() {
+	err := s.stateDB.SetResumeGatewayURL(context.Background(), s.shardID, s.name, s.resumeURL)
+	if err != nil {
+		s.log.Error(s.ctx, "save resume gateway url", slog.Error(err))
+	}
+}
+
+func (s *Session) loadResumeURL() {
+	url, err := s.stateDB.GetResumeGatewayURL(context.Background(), s.shardID, s.name)
+	if err != nil {
+		s.log.Error(s.ctx, "load resume gateway url", slog.Error(err))
+		return
+	}
+	s.resumeURL = url
+}
+
 func (s *Session) persistStatus() {
 	err := s.stateDB.SetStatus(context.Background(), s.shardID, s.name, s.curState)
 	if err != nil {

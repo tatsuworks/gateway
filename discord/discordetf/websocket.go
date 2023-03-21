@@ -61,49 +61,54 @@ func (_ decoder) DecodeHello(buf []byte) (hbInterval int, trace string, _ error)
 	return hbInterval, trace, nil
 }
 
-func (_ decoder) DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string, _ error) {
-	var (
-		d      = &etfDecoder{buf: buf}
-		v      int
-		sessID string
-	)
+func (_ decoder) DecodeReady(buf []byte) (guilds map[int64][]byte, version int, sessionID string,
+	resumeGatewayURL string, _ error) {
+	d := &etfDecoder{buf: buf}
 
 	err := d.checkByte(ettMap)
 	if err != nil {
-		return nil, 0, "", xerrors.Errorf("verify map byte: %s", err)
+		return nil, 0, "", "", xerrors.Errorf("verify map byte: %s", err)
 	}
 
 	arity := d.readMapLen()
 	for ; arity > 0; arity-- {
 		l, err := d.readAtomWithTag()
 		if err != nil {
-			return nil, 0, "", xerrors.Errorf("read map key: %s", err)
+			return nil, 0, "", "", xerrors.Errorf("read map key: %s", err)
 		}
 
 		key := string(d.buf[d.off-l : d.off])
 		switch key {
 		case "v":
-			v, err = d.readIntWithTagIntoInt()
+			version, err = d.readIntWithTagIntoInt()
 			if err != nil {
-				return nil, 0, "", xerrors.Errorf("read version: %s", err)
+				return nil, 0, "", "", xerrors.Errorf("read version: %s", err)
 			}
 
 		case "session_id":
 			a, err := d.readAtomWithTag()
 			if err != nil {
-				return nil, 0, "", xerrors.Errorf("read session_id: %s", err)
+				return nil, 0, "", "", xerrors.Errorf("read session_id: %s", err)
 			}
 
-			sessID = string(d.buf[d.off-a : d.off])
+			sessionID = string(d.buf[d.off-a : d.off])
+
+		case "resume_gateway_url":
+			a, err := d.readAtomWithTag()
+			if err != nil {
+				return nil, 0, "", "", xerrors.Errorf("read resume_gateway_url: %s", err)
+			}
+
+			resumeGatewayURL = string(d.buf[d.off-a : d.off])
 
 		default:
 			err := d.readTerm()
 			if err != nil {
-				return nil, 0, "", xerrors.Errorf("read ready field %s: %w", key, err)
+				return nil, 0, "", "", xerrors.Errorf("read ready field %s: %w", key, err)
 			}
 		}
 
 	}
 
-	return nil, v, sessID, nil
+	return nil, version, sessionID, resumeGatewayURL, nil
 }

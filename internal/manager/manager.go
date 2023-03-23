@@ -74,16 +74,16 @@ func New(ctx context.Context, cfg *Config) *Manager {
 			}
 			rdbClients = append(rdbClients, mrc)
 		}
+
+		// No multi redis clients were connected, or all failed to connect.
+		if len(rdbClients) == 0 {
+			cfg.Logger.Fatal(ctx, "multiRedisEnv is set, but all redis clients failed to connect.")
+		}
 	} else {
 		rc, err = createRedisClient(cfg.RedisAddr, cfg.Name, cfg.PodID)
 		if err != nil {
 			cfg.Logger.Fatal(ctx, "createRedisClient", slog.Error(err))
 		}
-	}
-
-	// No multi redis clients were connected, or all failed to connect.
-	if multiRedisEnv != "" && len(rdbClients) == 0 {
-		cfg.Logger.Fatal(ctx, "multiRedisEnv is set, but all redis clients failed to connect.")
 	}
 
 	etcdc, err := clientv3.New(clientv3.Config{

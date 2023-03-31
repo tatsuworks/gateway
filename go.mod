@@ -23,15 +23,14 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.11.1 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
-	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
-	github.com/julienschmidt/httprouter v1.2.0
-	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/json-iterator/go v1.1.11
+	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.4.0
 	github.com/minio/simdjson-go v0.1.4
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
-	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v1.1.0 // indirect
+	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/soheilhy/cmux v0.1.4 // indirect
 	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect

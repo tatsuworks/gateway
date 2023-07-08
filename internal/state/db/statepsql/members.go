@@ -206,6 +206,8 @@ FROM
 	members
 WHERE
 	guild_id = $1 AND (
+		data->'user'->>'global_name' ilike $2 OR
+		data->'user'->>'display_name' ilike $2 OR
 		data->'user'->>'username' ilike $2 OR
 		data->>'nick' ilike $2
 	)

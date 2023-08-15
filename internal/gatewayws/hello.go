@@ -20,7 +20,9 @@ func (s *Session) readHello() error {
 	if err != nil {
 		return xerrors.Errorf("decode hello message: %w", err)
 	}
-
+	if interval <= 0 {
+		return xerrors.Errorf("invalid interval received: %d", interval)
+	}
 	s.interval = time.Duration(interval) * time.Millisecond
 	s.trace = trace
 

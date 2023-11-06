@@ -21,7 +21,6 @@ Events are pushed to [redis](https://redis.io) using `RPUSH`. The content is the
 ## Setting up the Gateway
 
 1. Add a variable in `cmd/gateway/main.go` named `Token` that contains your token.
-1. D `cmd/gateway/main.go` named `Token` that contains your token.
 1. Enable modules `export GO111MODULE=on`
 1. Run `go build` in `cmd/gateway`
 1. To run, do `./gateway` in `cmd/gateway`

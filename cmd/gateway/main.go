@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/sloghuman"
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
@@ -44,8 +45,8 @@ func init() {
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
-	flag.StringVar(&psqlAddr, "psqlAddr", "postgresql://tatsu:ATQupgJNdc4J8Mgavcj9q9tgSOUzBnOj@night.tatsu.lol/atlas?sslmode=disable", "Address to connect to Postgres on")
-	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
+	flag.StringVar(&psqlAddr, "psqlAddr", "postgresql://tatsu:ATQupgJNdc4J8Mgavcj9q9tgSOUzBnOj@localhost/state", "Address to connect to Postgres on")
+	flag.StringVar(&addr, "addr", "localhost:4201", "Management address to listen on")
 	flag.StringVar(&intents, "intents", "default", "default, all")
 	flag.StringVar(&podId, "podId", "dev", "0, 1, 2, 3...")
 
@@ -86,7 +87,9 @@ func main() {
 	// 	// running on gcp, so use slogstackdriver instead
 	// 	logger = slogstackdriver.Make(os.Stderr)
 	// }
+	logger = sloghuman.Make(os.Stderr)
 	defer logger.Sync()
+	logger.Info(ctx,"hi0")
 
 	if psql {
 		statedb, err = statepsql.NewDB(ctx, psqlAddr)
@@ -99,6 +102,7 @@ func main() {
 			logger.Fatal(ctx, "failed to init fdb state", slog.Error(err))
 		}
 	}
+	logger.Info(ctx,"hi1")
 
 	var ints gatewayws.Intents
 	switch intents {
@@ -109,6 +113,7 @@ func main() {
 	default:
 		logger.Fatal(ctx, "unknown intents", slog.F("intent", intents))
 	}
+	logger.Info(ctx,"hi2")
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
@@ -117,11 +122,13 @@ func main() {
 		logger.Info(ctx, "closing")
 		cancel()
 	}()
+	logger.Info(ctx,"hi3")
 
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		logger.Fatal(ctx, "listen", slog.Error(err))
 	}
+	logger.Info(ctx,"hi4")
 
 	events := os.Getenv("WHITELIST_EVENTS")
 	var whitelistedEventLookup map[string]struct{}
@@ -133,6 +140,7 @@ func main() {
 			whitelistedEventLookup[evt] = empty
 		}
 	}
+	logger.Info(ctx,"hi5")
 
 	wg := &sync.WaitGroup{}
 	m := manager.New(ctx, &manager.Config{

@@ -31,8 +31,8 @@ var (
 func init() {
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
 	flag.BoolVar(&usePprof, "pprof", false, "add pprof debugging")
-	flag.StringVar(&addr, "addr", "0.0.0.0:8080", "0.0.0.0:80")
-	flag.StringVar(&psqlAddr, "psql", "", "Postgres address")
+	flag.StringVar(&addr, "addr", "0.0.0.0:8085", "0.0.0.0:80")
+	flag.StringVar(&psqlAddr, "psql", "postgresql://tatsu:ATQupgJNdc4J8Mgavcj9q9tgSOUzBnOj@localhost/state", "Postgres address")
 	flag.Parse()
 }
 

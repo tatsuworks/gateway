@@ -176,3 +176,20 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 
 	return s.writeTerm(w, m)
 }
+
+func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	user, err := userParam(p)
+	if err != nil {
+		return xerrors.Errorf("read user param: %w", err)
+	}
+	m, err := s.db.GetUser(r.Context(), user)
+	if err != nil {
+		return xerrors.Errorf("read user: %w", err)
+	}
+
+	if m == nil {
+		return ErrNotFound
+	}
+
+	return s.writeTerm(w, m)
+}

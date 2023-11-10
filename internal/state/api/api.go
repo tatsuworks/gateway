@@ -57,6 +57,7 @@ func (s *Server) Init() {
 	}))
 
 	s.router.GET(path.Join(base, "users", ":user"), wrapHandler(s.log, s.getUser))
+	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
 	// s.router.GET(path.Join(base, "channels"), wrapHandler(s.log, s.getChannels))
 	s.router.GET(path.Join(base, "channels", ":channel"), wrapHandler(s.log, s.getChannel))
 	s.router.GET(path.Join(base, "channels", ":channel", "messages", ":message"), wrapHandler(s.log, s.getChannelMessage))

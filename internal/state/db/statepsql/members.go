@@ -198,6 +198,25 @@ ORDER BY last_updated desc nulls last limit 1
 	return *(*[]byte)(unsafe.Pointer(&usr)), nil
 }
 
+func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]byte, error) {
+	q := `
+	SELECT
+		user_id,data->'user'
+	FROM
+		members
+	WHERE
+		user_id = ANY ($1)
+	ORDER BY last_updated desc nulls last limit 1
+	`
+
+	var usrs []RawJSON
+	err := db.sql.SelectContext(ctx, &usrs, q, pq.Array(userIDs))
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+	return *(*[]byte)(unsafe.Pointer(&usrs)), nil
+}
+
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
 	const q = `
 SELECT

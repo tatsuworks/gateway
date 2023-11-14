@@ -10,6 +10,7 @@ import (
 
 	"github.com/lib/pq"
 	"golang.org/x/xerrors"
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte) error {
@@ -198,10 +199,10 @@ ORDER BY last_updated desc nulls last limit 1
 	return *(*[]byte)(unsafe.Pointer(&usr)), nil
 }
 
-func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]byte, error) {
+func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]state.UserAndData, error) {
 	q := `
 	SELECT
-		user_id,data->'user'
+		user_id AS user_id,data->'user'->>'username' AS user
 	FROM
 		members
 	WHERE
@@ -209,12 +210,12 @@ func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64)
 	ORDER BY last_updated desc nulls last limit 1
 	`
 
-	var usrs []RawJSON
-	err := db.sql.SelectContext(ctx, &usrs, q, pq.Array(userIDs))
+	var usersAndData []state.UserAndData
+	err := db.sql.SelectContext(ctx, &usersAndData, q, pq.Array(userIDs))
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
-	return *(*[]byte)(unsafe.Pointer(&usrs)), nil
+	return usersAndData, nil
 }
 
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {

@@ -6,6 +6,11 @@ import (
 	"github.com/tatsuworks/gateway/discord"
 )
 
+type UserAndData struct {
+    UserID int64  `db:"user_id"`
+    User   string `db:"user"`
+}
+
 type DB interface {
 	Encoding() discord.Encoding
 
@@ -70,7 +75,7 @@ type DB interface {
 	DeleteGuildEmoji(ctx context.Context, guild, emoji int64) error
 
 	GetUser(ctx context.Context, userID int64) ([]byte, error)
-	GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]byte, error)
+	GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]UserAndData, error)
 
 	SetThreads(ctx context.Context, guild int64, threads map[int64][]byte) error
 	SetThread(ctx context.Context, guild, parent, owner, id int64, raw []byte) error

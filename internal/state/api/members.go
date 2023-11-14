@@ -7,6 +7,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
+	"fmt"
 )
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -178,20 +179,42 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 }
 
 func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	user, err := userParam(p)
-	if err != nil {
-		return xerrors.Errorf("read users param: %w", err)
+	var userIDs []string
+    if err := json.NewDecoder(r.Body).Decode(&userIDs); err != nil {
+        http.Error(w, "Invalid string array", http.StatusBadRequest)
+        return xerrors.Errorf("parse body string array: %w", err)
+    }
+
+	var convertedUserIDs []int64
+
+	for _, userId := range userIDs {
+		value, err := strconv.ParseInt(userId,10,64);
+		if err != nil {
+			return xerrors.Errorf("parse int for userids array: %w", err)
+		}
+		convertedUserIDs = append(convertedUserIDs,value)
 	}
-	m, err := s.db.GetUser(r.Context(), user)
+
+	data, err := s.db.GetUsersDiscordIdAndUsername(r.Context(), convertedUserIDs)
 	if err != nil {
 		return xerrors.Errorf("read users: %w", err)
 	}
 
-	if m == nil {
-		return ErrNotFound
-	}
+	fmt.Println(data)
 
-	return s.writeTerm(w, m)
+	result := make([][]byte, len(data))
+
+    for i, userAndData := range data {
+        // Convert each UserAndData to []byte
+        userAndDataBytes, err := json.Marshal(userAndData)
+        if err != nil {
+            return xerrors.Errorf("converting user ids and discord data to [][]byte: %w", err)
+        }
+
+        result[i] = userAndDataBytes
+    }
+
+	return s.writeTerms(w, result)
 }
 
 // Define a handler function for SetGuildMembers

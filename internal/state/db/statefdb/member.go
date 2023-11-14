@@ -73,6 +73,10 @@ func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
 	panic("unimplemented")
 }
 
+func (db *DB) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]byte, error) {
+	panic("unimplemented")
+}
+
 func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
 	panic("unimplemented")
 }

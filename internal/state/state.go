@@ -8,7 +8,7 @@ import (
 
 type UserAndData struct {
     UserID string  `db:"id"`
-    User   string `db:"user"`
+    Username   string `db:"username"`
 }
 
 type DB interface {

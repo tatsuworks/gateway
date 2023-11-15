@@ -7,8 +7,33 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
-	//"fmt"
+	"strings"
 )
+
+// Where should I put this?
+type User struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	Avatar        string `json:"avatar"`
+	Discriminator string `json:"discriminator"`
+	// Add other fields as needed
+}
+
+type GuildMember struct {
+	Avatar                      string `json:"avatar"`
+	CommunicationDisabledUntil string `json:"communication_disabled_until"`
+	Flags                       int    `json:"flags"`
+	JoinedAt                    string `json:"joined_at"`
+	Nick                        string `json:"nick"`
+	Pending                     bool   `json:"pending"`
+	PremiumSince                string `json:"premium_since"`
+	Roles                       []string `json:"roles"`
+	UnusualDMActivityUntil      string `json:"unusual_dm_activity_until"`
+	User                        User   `json:"user"`
+	Mute                        bool   `json:"mute"`
+	Deaf                        bool   `json:"deaf"`
+	// This is what is received from discord, add other fields as needed
+}
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	guild, err := guildParam(p)
@@ -179,15 +204,18 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 }
 
 func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	var userIDs []string
-    if err := json.NewDecoder(r.Body).Decode(&userIDs); err != nil {
-        http.Error(w, "Invalid string array", http.StatusBadRequest)
-        return xerrors.Errorf("parse body string array: %w", err)
-    }
+	// id1,id2,id3
+	userIDs := r.URL.Query().Get("userIDs")
+	
+	if userIDs == "" {
+		return xerrors.Errorf("empty userids array")
+	}
+
+	userIDsSlice := strings.Split(userIDs, ",")
 
 	var convertedUserIDs []int64
 
-	for _, userId := range userIDs {
+	for _, userId := range userIDsSlice {
 		value, err := strconv.ParseInt(userId,10,64);
 		if err != nil {
 			return xerrors.Errorf("parse int for userids array: %w", err)
@@ -223,31 +251,6 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 		return xerrors.Errorf("read guild param: %w", err)
 	}
 	
-	// Where should I put this?
-	type User struct {
-		ID            string `json:"id"`
-		Username      string `json:"username"`
-		Avatar        string `json:"avatar"`
-		Discriminator string `json:"discriminator"`
-		// Add other fields as needed
-	}
-	
-	type GuildMember struct {
-		Avatar                      string `json:"avatar"`
-		CommunicationDisabledUntil string `json:"communication_disabled_until"`
-		Flags                       int    `json:"flags"`
-		JoinedAt                    string `json:"joined_at"`
-		Nick                        string `json:"nick"`
-		Pending                     bool   `json:"pending"`
-		PremiumSince                string `json:"premium_since"`
-		Roles                       []string `json:"roles"`
-		UnusualDMActivityUntil      string `json:"unusual_dm_activity_until"`
-		User                        User   `json:"user"`
-		Mute                        bool   `json:"mute"`
-		Deaf                        bool   `json:"deaf"`
-		// This is what is received from discord, add other fields as needed
-	}
-	
 	// Seems dumb to read into [string]GuildMember first before converting to [int64][]byte
 	var guildMemberData = make(map[string]GuildMember)
     if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
@@ -260,9 +263,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	for key,value := range guildMemberData {
 		num, err := strconv.ParseInt(key,10,64);
 		if err != nil {
-			if err != nil {
-				return xerrors.Errorf("convert discord id from string to int64: %w", err)
-			}
+			return xerrors.Errorf("convert discord id from string to int64: %w", err)
 		}
 
 		memberJSON, err := json.Marshal(value);

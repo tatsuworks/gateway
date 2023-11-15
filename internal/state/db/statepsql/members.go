@@ -202,7 +202,7 @@ ORDER BY last_updated desc nulls last limit 1
 func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]state.UserAndData, error) {
 	q := `
 	SELECT
-		data->'user'->>'id' AS id,data->'user'->>'username' AS user
+		data->'user'->>'id' AS id,data->'user'->>'username' AS username
 	FROM
 		members
 	WHERE

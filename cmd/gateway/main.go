@@ -11,6 +11,10 @@ import (
 	"syscall"
 
 	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/sloghuman"
+	"cdr.dev/slog/sloggers/slogjson"
+	"cdr.dev/slog/sloggers/slogstackdriver"
+	"cloud.google.com/go/profiler"
 	"github.com/tatsuworks/gateway/gatewaypb"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
@@ -39,15 +43,15 @@ var (
 
 func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
-	flag.StringVar(&token, "token", "v_tmm7yq9Msd9TuCxNqMyGWla2uWnaXy", "token for the bot")
+	flag.StringVar(&token, "token", "", "token for the bot")
 	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
-	flag.StringVar(&psqlAddr, "psqlAddr", "postgresql://tatsu:ATQupgJNdc4J8Mgavcj9q9tgSOUzBnOj@night.tatsu.lol/atlas?sslmode=disable", "Address to connect to Postgres on")
+	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
 	flag.StringVar(&intents, "intents", "default", "default, all")
-	flag.StringVar(&podId, "podId", "dev", "0, 1, 2, 3...")
+	flag.StringVar(&podId, "podId", "", "0, 1, 2, 3...")
 
 	flag.IntVar(&shards, "shards", 1, "Total shards")
 	flag.IntVar(&start, "start", 0, "First shard to start (inclusive)")
@@ -68,24 +72,25 @@ func main() {
 		err     error
 	)
 
-	// cfg := profiler.Config{
-	// 	Service:        "gateway",
-	// 	ServiceVersion: "1.0.0",
-	// }
+	cfg := profiler.Config{
+		Service:        "gateway",
+		ServiceVersion: "1.0.0",
+	}
 
-	// Profiler initialization, best done as early as possible.
-	// err = profiler.Start(cfg)
-	// if err != nil {
-	// 	if prod != "" {
-	// 		logger = slogjson.Make(os.Stderr)
-	// 	} else {
-	// 		logger = sloghuman.Make(os.Stderr)
-	// 	}
-	// 	logger.Error(ctx, "profiler could not start", slog.F("err", err))
-	// } else {
-	// 	// running on gcp, so use slogstackdriver instead
-	// 	logger = slogstackdriver.Make(os.Stderr)
-	// }
+	//Profiler initialization, best done as early as possible.
+	err = profiler.Start(cfg)
+	if err != nil {
+		if prod != "" {
+			logger = slogjson.Make(os.Stderr)
+		} else {
+			logger = sloghuman.Make(os.Stderr)
+		}
+		logger.Error(ctx, "profiler could not start", slog.F("err", err))
+	} else {
+		// running on gcp, so use slogstackdriver instead
+		logger = slogstackdriver.Make(os.Stderr)
+	}
+
 	defer logger.Sync()
 
 	if psql {

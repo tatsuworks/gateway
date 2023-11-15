@@ -7,7 +7,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
-	"fmt"
+	//"fmt"
 )
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -269,7 +269,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 
 		convertedGuildMemberData[num] = memberJSON
 	}
-	
+
 	err = s.db.SetGuildMembers(r.Context(),guild,convertedGuildMemberData)
 	if err != nil {
 		if err != nil {

@@ -200,8 +200,6 @@ func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.P
 		return xerrors.Errorf("read users: %w", err)
 	}
 
-	fmt.Println(data)
-
 	result := make([][]byte, len(data))
 
     for i, userAndData := range data {
@@ -271,7 +269,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 
 		convertedGuildMemberData[num] = memberJSON
 	}
-
+	
 	err = s.db.SetGuildMembers(r.Context(),guild,convertedGuildMemberData)
 	if err != nil {
 		if err != nil {

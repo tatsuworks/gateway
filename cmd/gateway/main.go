@@ -77,7 +77,7 @@ func main() {
 		ServiceVersion: "1.0.0",
 	}
 
-	//Profiler initialization, best done as early as possible.
+	// Profiler initialization, best done as early as possible.
 	err = profiler.Start(cfg)
 	if err != nil {
 		if prod != "" {

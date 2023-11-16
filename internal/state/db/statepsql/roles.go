@@ -138,3 +138,18 @@ WHERE
 
 	return nil
 }
+
+func (db *db) DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs []int64) error {
+	const q = `
+	DELETE FROM
+		roles
+	WHERE
+		guild_id = $1 AND id = ANY ($2)
+	`
+	_, err := db.sql.ExecContext(ctx, q, guildID,pq.Array(roleIDs))
+	if err != nil {
+		return xerrors.Errorf("exec delete: %w", err)
+	}
+
+	return nil
+}

@@ -79,6 +79,88 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 	return s.writeTerms(w, ros)
 }
 
+func (s *Server) setGuildRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	var rolesData = make(map[string]interface{})
+    if err := json.NewDecoder(r.Body).Decode(&rolesData); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return xerrors.Errorf("parse body json: %w", err)
+    }
+
+	var convertedRolesData = make(map[int64][]byte)
+
+	for key,value := range rolesData {
+		num, err := strconv.ParseInt(key,10,64);
+		if err != nil {
+			return xerrors.Errorf("convert role id from string to int64: %w", err)
+		}
+
+		memberJSON, err := json.Marshal(value);
+
+		convertedRolesData[num] = memberJSON
+	}
+
+	err = s.db.SetGuildRoles(r.Context(),guild,convertedRolesData)
+	if err != nil {
+		return xerrors.Errorf("update guild roles cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild roles set successfully"))
+	return nil
+}
+
+func (s *Server) deleteGuildRolesById(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	var rolesID []string
+    if err := json.NewDecoder(r.Body).Decode(&rolesID); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return xerrors.Errorf("parse body json: %w", err)
+    }
+	
+	var rolesToDelete []int64
+	for _, roleIdString := range rolesID {
+		num, err := strconv.ParseInt(roleIdString,10,64);
+		if err != nil {
+			return xerrors.Errorf("convert role id from string to int64: %w", err)
+		}
+		rolesToDelete = append(rolesToDelete,num);
+	}
+
+	err = s.db.DeleteGuildRolesById(r.Context(),guild,rolesToDelete)
+	if err != nil {
+		return xerrors.Errorf("update guild roles cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild roles deleted successfully"))
+	return nil
+}
+
+func (s *Server) deleteGuildRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	err = s.db.DeleteGuildRoles(r.Context(),guild)
+	if err != nil {
+		return xerrors.Errorf("update guild roles cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild roles deleted successfully"))
+	return nil
+}
+
 func roleParam(p httprouter.Params) (int64, error) {
 	r := p.ByName("role")
 	ri, err := strconv.ParseInt(r, 10, 64)

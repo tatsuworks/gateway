@@ -96,3 +96,7 @@ func (db *DB) SetPresences(ctx context.Context, guildID int64, presences map[int
 func (db *DB) GetGuildMembersWithRole(ctx context.Context, guild, role int64) ([][]byte, error) {
 	panic("unimplemented")
 }
+
+func (db *DB) DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs []int64) error {
+	panic("unimplemented")
+}

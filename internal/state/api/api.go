@@ -77,6 +77,10 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "threads"), wrapHandler(s.log, s.getGuildThreads))
 	s.router.GET(path.Join(base, "channels", ":channel", "threads"), wrapHandler(s.log, s.getChannelThreads))
 	s.router.GET(path.Join(base, "threads", ":thread"), wrapHandler(s.log, s.getThread))
+
+	s.router.POST(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.setGuildRoles))
+	s.router.POST(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
+	s.router.POST(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
 }
 
 func (s *Server) Start(addr string) error {

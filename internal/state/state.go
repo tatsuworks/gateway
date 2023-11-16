@@ -35,6 +35,7 @@ type DB interface {
 	SetChannels(ctx context.Context, guild int64, channels map[int64][]byte) error
 	DeleteChannels(ctx context.Context, guild int64) error
 	SetVoiceState(ctx context.Context, guild, user int64, raw []byte) error
+	DeleteChannelsById(ctx context.Context, guild int64, channelIDs []int64) error
 
 	SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error
 	DeleteGuildMembers(ctx context.Context, guild int64) error

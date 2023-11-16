@@ -8,6 +8,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
+	"encoding/json"
 )
 
 func (s *Server) getChannel(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -57,6 +58,88 @@ func (s *Server) getGuildChannels(w http.ResponseWriter, r *http.Request, p http
 	}
 
 	return s.writeTerms(w, cs)
+}
+
+func (s *Server) setGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	var channelsData = make(map[string]interface{})
+    if err := json.NewDecoder(r.Body).Decode(&channelsData); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return xerrors.Errorf("parse body json: %w", err)
+    }
+
+	var convertedChannelsData = make(map[int64][]byte)
+
+	for key,value := range channelsData {
+		num, err := strconv.ParseInt(key,10,64);
+		if err != nil {
+			return xerrors.Errorf("convert channel id from string to int64: %w", err)
+		}
+
+		memberJSON, err := json.Marshal(value);
+
+		convertedChannelsData[num] = memberJSON
+	}
+
+	err = s.db.SetChannels(r.Context(),guild,convertedChannelsData)
+	if err != nil {
+		return xerrors.Errorf("update guild channels cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild channels set successfully"))
+	return nil
+}
+
+func (s *Server) deleteGuildChannelsById(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	var channelsID []string
+    if err := json.NewDecoder(r.Body).Decode(&channelsID); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return xerrors.Errorf("parse body json: %w", err)
+    }
+	
+	var channelsToDelete []int64
+	for _, channelIdString := range channelsID {
+		num, err := strconv.ParseInt(channelIdString,10,64);
+		if err != nil {
+			return xerrors.Errorf("convert channel id from string to int64: %w", err)
+		}
+		channelsToDelete = append(channelsToDelete,num);
+	}
+
+	err = s.db.DeleteChannelsById(r.Context(),guild,channelsToDelete)
+	if err != nil {
+		return xerrors.Errorf("update guild channels cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild channels deleted successfully"))
+	return nil
+}
+
+func (s *Server) deleteGuildChannels(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	err = s.db.DeleteChannels(r.Context(),guild)
+	if err != nil {
+		return xerrors.Errorf("update guild channels cache: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild channels deleted successfully"))
+	return nil
 }
 
 // Erlang external term tags.

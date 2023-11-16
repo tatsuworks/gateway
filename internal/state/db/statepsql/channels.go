@@ -162,12 +162,27 @@ WHERE
 
 func (db *db) DeleteChannels(ctx context.Context, guild int64) error {
 	const q = `
-DELETE FROM
-	channels
-WHERE
-	guild_id = $1
-`
+	DELETE FROM
+		channels
+	WHERE
+		guild_id = $1
+	`
 	_, err := db.sql.ExecContext(ctx, q, guild)
+	if err != nil {
+		return xerrors.Errorf("exec delete: %w", err)
+	}
+
+	return nil
+}
+
+func (db *db) DeleteChannelsById(ctx context.Context, guild int64, channelIDs []int64) error {
+	const q = `
+	DELETE FROM
+		channels
+	WHERE
+		guild_id = $1 AND id = ANY ($2)
+	`
+	_, err := db.sql.ExecContext(ctx, q, guild, pq.Array(channelIDs))
 	if err != nil {
 		return xerrors.Errorf("exec delete: %w", err)
 	}

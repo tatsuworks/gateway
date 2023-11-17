@@ -83,6 +83,7 @@ func (s *Server) Init() {
 	s.router.POST(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
 	s.router.POST(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
 
+	s.router.POST(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.setGuildMembers))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.setGuildChannels))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))

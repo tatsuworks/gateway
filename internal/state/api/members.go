@@ -9,6 +9,30 @@ import (
 	"golang.org/x/xerrors"
 )
 
+type User struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	Avatar        string `json:"avatar"`
+	Discriminator string `json:"discriminator"`
+	// Add other fields as needed
+}
+
+type GuildMember struct {
+	Avatar                      string `json:"avatar"`
+	CommunicationDisabledUntil string `json:"communication_disabled_until"`
+	Flags                       int    `json:"flags"`
+	JoinedAt                    string `json:"joined_at"`
+	Nick                        string `json:"nick"`
+	Pending                     bool   `json:"pending"`
+	PremiumSince                string `json:"premium_since"`
+	Roles                       []string `json:"roles"`
+	UnusualDMActivityUntil      string `json:"unusual_dm_activity_until"`
+	User                        User   `json:"user"`
+	Mute                        bool   `json:"mute"`
+	Deaf                        bool   `json:"deaf"`
+	// This is what is received from discord, add other fields as needed
+}
+
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	guild, err := guildParam(p)
 	if err != nil {
@@ -175,4 +199,43 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	}
 
 	return s.writeTerm(w, m)
+}
+
+func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+    // Parse guild ID from the URL parameter
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	// Seems dumb to read into [string]GuildMember first before converting to [int64][]byte
+	var guildMemberData = make(map[string]GuildMember)
+    if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return xerrors.Errorf("parse body json: %w", err)
+    }
+
+	var convertedGuildMemberData = make(map[int64][]byte)
+
+	for key,value := range guildMemberData {
+		num, err := strconv.ParseInt(key,10,64);
+		if err != nil {
+			return xerrors.Errorf("convert discord id from string to int64: %w", err)
+		}
+
+		memberJSON, err := json.Marshal(value);
+
+		convertedGuildMemberData[num] = memberJSON
+	}
+	
+	err = s.db.SetGuildMembers(r.Context(),guild,convertedGuildMemberData)
+	if err != nil {
+		if err != nil {
+			return xerrors.Errorf("update guild members cache: %w", err)
+		}
+	}
+
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("Guild members set successfully"))
+	return nil
 }

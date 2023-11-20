@@ -90,6 +90,7 @@ func main() {
 		// running on gcp, so use slogstackdriver instead
 		logger = slogstackdriver.Make(os.Stderr)
 	}
+
 	defer logger.Sync()
 
 	if psql {

@@ -87,6 +87,8 @@ func (s *Server) Init() {
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.setGuildChannels))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
+
+	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
 }
 
 func (s *Server) Start(addr string) error {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/lib/pq"
 	"golang.org/x/xerrors"
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte) error {
@@ -196,6 +197,24 @@ ORDER BY last_updated desc nulls last limit 1
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}
 	return *(*[]byte)(unsafe.Pointer(&usr)), nil
+}
+
+func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]state.UserAndData, error) {
+	q := `
+	SELECT
+		data->'user'->>'id' AS id,data->'user'->>'username' AS username
+	FROM
+		members
+	WHERE
+		user_id = ANY ($1)
+	`
+
+	var usersAndData []state.UserAndData
+	err := db.sql.SelectContext(ctx, &usersAndData, q, pq.Array(userIDs))
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+	return usersAndData, nil
 }
 
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {

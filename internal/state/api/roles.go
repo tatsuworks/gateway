@@ -100,6 +100,9 @@ func (s *Server) setGuildRoles(w http.ResponseWriter, r *http.Request, p httprou
 		}
 
 		memberJSON, err := json.Marshal(value);
+		if err != nil {
+			return xerrors.Errorf("convert role data to json format: %w", err)
+		}
 
 		convertedRolesData[num] = memberJSON
 	}

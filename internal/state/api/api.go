@@ -80,13 +80,13 @@ func (s *Server) Init() {
 	
 	// Added for beta server discord management feature on liveops dashboard
 	s.router.POST(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.setGuildRoles))
-	s.router.POST(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
-	s.router.POST(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
 
 	s.router.POST(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.setGuildMembers))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.setGuildChannels))
-	s.router.POST(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
-	s.router.POST(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
 
 	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
 }

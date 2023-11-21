@@ -10,31 +10,6 @@ import (
 	"strings"
 )
 
-// Where should I put this?
-type User struct {
-	ID            string `json:"id"`
-	Username      string `json:"username"`
-	Avatar        string `json:"avatar"`
-	Discriminator string `json:"discriminator"`
-	// Add other fields as needed
-}
-
-type GuildMember struct {
-	Avatar                      string `json:"avatar"`
-	CommunicationDisabledUntil string `json:"communication_disabled_until"`
-	Flags                       int    `json:"flags"`
-	JoinedAt                    string `json:"joined_at"`
-	Nick                        string `json:"nick"`
-	Pending                     bool   `json:"pending"`
-	PremiumSince                string `json:"premium_since"`
-	Roles                       []string `json:"roles"`
-	UnusualDMActivityUntil      string `json:"unusual_dm_activity_until"`
-	User                        User   `json:"user"`
-	Mute                        bool   `json:"mute"`
-	Deaf                        bool   `json:"deaf"`
-	// This is what is received from discord, add other fields as needed
-}
-
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	guild, err := guildParam(p)
 	if err != nil {
@@ -251,8 +226,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 		return xerrors.Errorf("read guild param: %w", err)
 	}
 	
-	// Seems dumb to read into [string]GuildMember first before converting to [int64][]byte
-	var guildMemberData = make(map[string]GuildMember)
+	var guildMemberData = make(map[string][]byte)
     if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
         http.Error(w, "Invalid JSON", http.StatusBadRequest)
         return xerrors.Errorf("parse body json: %w", err)
@@ -267,6 +241,9 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 		}
 
 		memberJSON, err := json.Marshal(value);
+		if err != nil {
+			return xerrors.Errorf("convert guild member data to json format: %w", err)
+		}
 
 		convertedGuildMemberData[num] = memberJSON
 	}

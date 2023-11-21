@@ -226,7 +226,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 		return xerrors.Errorf("read guild param: %w", err)
 	}
 	
-	var guildMemberData = make(map[string][]byte)
+	var guildMemberData = make(map[string]interface{})
     if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
         http.Error(w, "Invalid JSON", http.StatusBadRequest)
         return xerrors.Errorf("parse body json: %w", err)

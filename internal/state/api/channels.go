@@ -81,6 +81,9 @@ func (s *Server) setGuildChannels(w http.ResponseWriter, r *http.Request, p http
 		}
 
 		memberJSON, err := json.Marshal(value);
+		if err != nil {
+			return xerrors.Errorf("convert channels data from interface to json: %w", err)
+		}
 
 		convertedChannelsData[num] = memberJSON
 	}

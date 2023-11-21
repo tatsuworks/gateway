@@ -89,6 +89,7 @@ func (s *Server) Init() {
 	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
 
 	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
+	s.router.GET(path.Join(base,"guilds",":guild","roles",":role","users",":user"),wrapHandler(s.log,s.getUserInGuildHasRole))
 }
 
 func (s *Server) Start(addr string) error {

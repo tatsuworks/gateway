@@ -312,3 +312,26 @@ func (db *db) SetPresences(ctx context.Context, guildID int64, presences map[int
 
 	return nil
 }
+
+func (db *db) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID int64, userID int64) (bool, error) {
+	const q = `
+	SELECT EXISTS(
+		SELECT
+			1
+		FROM
+			members
+		WHERE
+			guild_id = $1 AND user_id = $3 AND (
+				data->'roles' @> jsonb_build_array($2::text)
+			)
+	)
+	`
+
+	var exists bool
+	err := db.sql.GetContext(ctx, &exists, q, guildID, roleID,userID)
+	if err != nil {
+		return false, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return exists, nil
+}

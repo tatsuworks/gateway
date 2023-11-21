@@ -250,12 +250,48 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	
 	err = s.db.SetGuildMembers(r.Context(),guild,convertedGuildMemberData)
 	if err != nil {
-		if err != nil {
-			return xerrors.Errorf("update guild members cache: %w", err)
-		}
+		return xerrors.Errorf("update guild members cache: %w", err)
 	}
 
     w.WriteHeader(http.StatusOK)
     w.Write([]byte("Guild members set successfully"))
 	return nil
+}
+
+func (s *Server) getUserInGuildHasRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	guild, err := guildParam(p)
+	if err != nil {
+		return xerrors.Errorf("read guild param: %w", err)
+	}
+
+	role, err := roleParam(p)
+	if err != nil {
+		return xerrors.Errorf("read role param: %w", err)
+	}
+
+	user, err := userParam(p)
+	if err != nil {
+		return xerrors.Errorf("read user param: %w", err)
+	}
+
+	exists, err := s.db.GetUserInGuildHasRole(r.Context(),guild,role,user)
+	if err != nil {
+		return xerrors.Errorf("check guild member role existence: %w", err)
+	}
+
+	response := struct {
+		Exists bool `json:"exists"`
+	}{
+		Exists: exists,
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		return xerrors.Errorf("convert bool result struct to json: %w", err)
+	}
+	
+	w.Header().Set("Content-Type","application/json")
+    w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+	return nil;
 }

@@ -6,6 +6,11 @@ import (
 	"github.com/tatsuworks/gateway/discord"
 )
 
+type UserAndData struct {
+    UserID string  `db:"id"`
+    Username   string `db:"username"`
+}
+
 type DB interface {
 	Encoding() discord.Encoding
 
@@ -35,6 +40,7 @@ type DB interface {
 	SetChannels(ctx context.Context, guild int64, channels map[int64][]byte) error
 	DeleteChannels(ctx context.Context, guild int64) error
 	SetVoiceState(ctx context.Context, guild, user int64, raw []byte) error
+	DeleteChannelsById(ctx context.Context, guild int64, channelIDs []int64) error
 
 	SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error
 	DeleteGuildMembers(ctx context.Context, guild int64) error
@@ -62,6 +68,8 @@ type DB interface {
 	GetGuildRoles(ctx context.Context, guild int64) ([][]byte, error)
 	DeleteGuildRoles(ctx context.Context, guild int64) error
 	DeleteGuildRole(ctx context.Context, guild, role int64) error
+	DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs []int64) error
+	GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID int64, userID int64) (bool, error)
 
 	SetGuildEmojis(ctx context.Context, guild int64, raws map[int64][]byte) error
 	SetGuildEmoji(ctx context.Context, guild, emoji int64, raw []byte) error
@@ -70,6 +78,7 @@ type DB interface {
 	DeleteGuildEmoji(ctx context.Context, guild, emoji int64) error
 
 	GetUser(ctx context.Context, userID int64) ([]byte, error)
+	GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]UserAndData, error)
 
 	SetThreads(ctx context.Context, guild int64, threads map[int64][]byte) error
 	SetThread(ctx context.Context, guild, parent, owner, id int64, raw []byte) error

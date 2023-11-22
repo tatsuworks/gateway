@@ -2,8 +2,9 @@ package statefdb
 
 import (
 	"context"
-
+	
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 func (db *DB) SetGuildMembers(_ context.Context, guild int64, raws map[int64][]byte) error {
@@ -73,6 +74,10 @@ func (db *DB) GetUser(ctx context.Context, userID int64) ([]byte, error) {
 	panic("unimplemented")
 }
 
+func (db *DB) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]state.UserAndData, error) {
+	panic("unimplemented")
+}
+
 func (db *DB) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
 	panic("unimplemented")
 }
@@ -94,5 +99,13 @@ func (db *DB) SetPresences(ctx context.Context, guildID int64, presences map[int
 }
 
 func (db *DB) GetGuildMembersWithRole(ctx context.Context, guild, role int64) ([][]byte, error) {
+	panic("unimplemented")
+}
+
+func (db *DB) DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs []int64) error {
+	panic("unimplemented")
+}
+
+func (db *DB) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID int64, userID int64) (bool, error) {
 	panic("unimplemented")
 }

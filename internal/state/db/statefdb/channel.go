@@ -141,3 +141,7 @@ func (db *DB) SetVoiceState(_ context.Context, guild, user int64, raw []byte) er
 		return nil
 	})
 }
+
+func (db *DB) DeleteChannelsById(ctx context.Context, guildID int64, channelIDs []int64) (error) {
+	panic("unimplemented")
+}

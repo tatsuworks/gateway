@@ -106,6 +106,6 @@ func (db *DB) DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs [
 	panic("unimplemented")
 }
 
-func (db *DB) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID int64, userID int64) (bool, error) {
+func (db *DB) GetUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, roleIDs []int64, userID int64) (bool, error) {
 	panic("unimplemented")
 }

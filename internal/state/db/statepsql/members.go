@@ -335,3 +335,29 @@ func (db *db) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID i
 
 	return exists, nil
 }
+
+func (db *db) GetUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, roleIDs []int64, userID int64) (bool, error) {
+	const q = `
+	SELECT EXISTS(
+		SELECT
+			1
+		FROM
+			members
+		WHERE
+			guild_id = ANY ($1) AND user_id = $3 AND 
+			EXISTS (
+				SELECT 1
+				FROM jsonb_array_elements_text(data->'roles') AS role
+				WHERE role::text = ANY ($2::text[])
+			)
+	)
+	`
+
+	var exists bool
+	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs),userID)
+	if err != nil {
+		return false, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return exists, nil
+}

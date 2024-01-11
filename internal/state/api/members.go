@@ -258,25 +258,38 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	return nil
 }
 
-func (s *Server) getUserInGuildHasRole(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	guild, err := guildParam(p)
-	if err != nil {
-		return xerrors.Errorf("read guild param: %w", err)
+func (s *Server) existUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	userID := r.URL.Query().Get("user_id")
+	roleIDs := r.URL.Query().Get("role_ids")
+	guildIDs := r.URL.Query().Get("server_ids")
+
+	if userID == "" || roleIDs == "" || guildIDs == "" {
+		return xerrors.Errorf("missing user id, role ids or guild ids")
 	}
 
-	role, err := roleParam(p)
+	roleIDsSliced := strings.Split(roleIDs, ",")
+	guildIDsSliced := strings.Split(guildIDs, ",")
+
+	var convertedUserID int64
+	var convertedGuildIDs []int64
+
+	value, err := strconv.ParseInt(userID,10,64);
 	if err != nil {
-		return xerrors.Errorf("read role param: %w", err)
+		return xerrors.Errorf("parse int for userID: %w", err)
+	}
+	convertedUserID = value
+
+	for _, guildId := range guildIDsSliced {
+		value, err = strconv.ParseInt(guildId,10,64);
+		if err != nil {
+			return xerrors.Errorf("parse int for guildIDsSliced array: %w", err)
+		}
+		convertedGuildIDs = append(convertedGuildIDs,value)
 	}
 
-	user, err := userParam(p)
+	exists, err := s.db.ExistUserInGuildsHasRoles(r.Context(),convertedGuildIDs,roleIDsSliced,convertedUserID)
 	if err != nil {
-		return xerrors.Errorf("read user param: %w", err)
-	}
-
-	exists, err := s.db.GetUserInGuildHasRole(r.Context(),guild,role,user)
-	if err != nil {
-		return xerrors.Errorf("check guild member role existence: %w", err)
+		return xerrors.Errorf("check user guilds and roles existence: %w", err)
 	}
 
 	response := struct {
@@ -289,7 +302,7 @@ func (s *Server) getUserInGuildHasRole(w http.ResponseWriter, r *http.Request, p
 	if err != nil {
 		return xerrors.Errorf("convert bool result struct to json: %w", err)
 	}
-	
+
 	w.Header().Set("Content-Type","application/json")
     w.WriteHeader(http.StatusOK)
 	w.Write(jsonResponse)

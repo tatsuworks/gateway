@@ -336,7 +336,7 @@ func (db *db) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID i
 	return exists, nil
 }
 
-func (db *db) GetUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, roleIDs []int64, userID int64) (bool, error) {
+func (db *db) ExistUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, roleIDs []string, userID int64) (bool, error) {
 	const q = `
 	SELECT EXISTS(
 		SELECT
@@ -348,7 +348,7 @@ func (db *db) GetUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, rol
 			EXISTS (
 				SELECT 1
 				FROM jsonb_array_elements_text(data->'roles') AS role
-				WHERE role::text = ANY ($2::text[])
+				WHERE role = ANY ($2)
 			)
 	)
 	`

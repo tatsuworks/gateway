@@ -258,7 +258,7 @@ func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httpr
 	return nil
 }
 
-func (s *Server) getUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+func (s *Server) existUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
 	userID := r.URL.Query().Get("user_id")
 	roleIDs := r.URL.Query().Get("role_ids")
 	guildIDs := r.URL.Query().Get("server_ids")
@@ -271,7 +271,6 @@ func (s *Server) getUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request,
 	guildIDsSliced := strings.Split(guildIDs, ",")
 
 	var convertedUserID int64
-	var convertedRoleIDs []int64
 	var convertedGuildIDs []int64
 
 	value, err := strconv.ParseInt(userID,10,64);
@@ -279,14 +278,6 @@ func (s *Server) getUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request,
 		return xerrors.Errorf("parse int for userID: %w", err)
 	}
 	convertedUserID = value
-
-	for _, roleId := range roleIDsSliced {
-		value, err = strconv.ParseInt(roleId,10,64);
-		if err != nil {
-			return xerrors.Errorf("parse int for roleIdsSliced array: %w", err)
-		}
-		convertedRoleIDs = append(convertedRoleIDs,value)
-	}
 
 	for _, guildId := range guildIDsSliced {
 		value, err = strconv.ParseInt(guildId,10,64);
@@ -296,7 +287,7 @@ func (s *Server) getUserInGuildsHasRoles(w http.ResponseWriter, r *http.Request,
 		convertedGuildIDs = append(convertedGuildIDs,value)
 	}
 
-	exists, err := s.db.GetUserInGuildsHasRoles(r.Context(),convertedGuildIDs,convertedRoleIDs,convertedUserID)
+	exists, err := s.db.ExistUserInGuildsHasRoles(r.Context(),convertedGuildIDs,roleIDsSliced,convertedUserID)
 	if err != nil {
 		return xerrors.Errorf("check user guilds and roles existence: %w", err)
 	}

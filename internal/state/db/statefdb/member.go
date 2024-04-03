@@ -2,7 +2,7 @@ package statefdb
 
 import (
 	"context"
-	
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/tatsuworks/gateway/internal/state"
 )
@@ -107,5 +107,9 @@ func (db *DB) DeleteGuildRolesById(ctx context.Context, guildID int64, roleIDs [
 }
 
 func (db *DB) ExistUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, roleIDs []string, userID int64) (bool, error) {
+	panic("unimplemented")
+}
+
+func (db *DB) ExistUserInGuilds(ctx context.Context, guildIDs []int64, userID int64) (bool, error) {
 	panic("unimplemented")
 }

@@ -9,8 +9,8 @@ import (
 	"unsafe"
 
 	"github.com/lib/pq"
-	"golang.org/x/xerrors"
 	"github.com/tatsuworks/gateway/internal/state"
+	"golang.org/x/xerrors"
 )
 
 func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte) error {
@@ -355,6 +355,27 @@ func (db *db) ExistUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, r
 
 	var exists bool
 	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs),userID)
+	if err != nil {
+		return false, xerrors.Errorf("exec select: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (db *db) ExistUserInGuilds(ctx context.Context, guildIDs []int64, userID int64) (bool, error) {
+	const q = `
+		SELECT EXISTS(
+			SELECT
+				1
+			FROM
+				members
+			WHERE
+				guild_id = ANY ($1) AND user_id = $2
+		)
+	`
+
+	var exists bool
+	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), userID)
 	if err != nil {
 		return false, xerrors.Errorf("exec select: %w", err)
 	}

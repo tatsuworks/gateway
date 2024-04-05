@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"strings"
+
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
-	"strings"
 )
 
 func (s *Server) getGuildMember(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -288,6 +289,55 @@ func (s *Server) existUserInGuildsHasRoles(w http.ResponseWriter, r *http.Reques
 	}
 
 	exists, err := s.db.ExistUserInGuildsHasRoles(r.Context(),convertedGuildIDs,roleIDsSliced,convertedUserID)
+	if err != nil {
+		return xerrors.Errorf("check user guilds and roles existence: %w", err)
+	}
+
+	response := struct {
+		Exists bool `json:"exists"`
+	}{
+		Exists: exists,
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		return xerrors.Errorf("convert bool result struct to json: %w", err)
+	}
+
+	w.Header().Set("Content-Type","application/json")
+    w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+	return nil;
+}
+
+func (s *Server) existUserInGuilds(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	userID := r.URL.Query().Get("user_id")
+	guildIDs := r.URL.Query().Get("server_ids")
+
+	if userID == "" || guildIDs == "" {
+		return xerrors.Errorf("missing user id, role ids or guild ids")
+	}
+
+	guildIDsSliced := strings.Split(guildIDs, ",")
+
+	var convertedUserID int64
+	var convertedGuildIDs []int64
+
+	value, err := strconv.ParseInt(userID,10,64);
+	if err != nil {
+		return xerrors.Errorf("parse int for userID: %w", err)
+	}
+	convertedUserID = value
+
+	for _, guildId := range guildIDsSliced {
+		value, err = strconv.ParseInt(guildId,10,64);
+		if err != nil {
+			return xerrors.Errorf("parse int for guildIDsSliced array: %w", err)
+		}
+		convertedGuildIDs = append(convertedGuildIDs,value)
+	}
+
+	exists, err := s.db.ExistUserInGuilds(r.Context(),convertedGuildIDs,convertedUserID)
 	if err != nil {
 		return xerrors.Errorf("check user guilds and roles existence: %w", err)
 	}

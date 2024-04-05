@@ -90,6 +90,7 @@ func (s *Server) Init() {
 
 	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
 	s.router.GET(path.Join(base, "user_in_guilds_has_roles"), wrapHandler(s.log,s.existUserInGuildsHasRoles))
+	s.router.GET(path.Join(base, "user_in_guilds"), wrapHandler(s.log,s.existUserInGuilds))
 }
 
 func (s *Server) Start(addr string) error {

@@ -64,3 +64,17 @@ var DefaultIntents = Intents{
 	IntentDirectMessageReactions,
 	IntentMessageContent,
 }
+
+var FastIntents = Intents{
+	IntentGuildBans,
+	IntentGuildEmojis,
+	IntentGuildIntegrations,
+	IntentGuildWebhooks,
+	IntentGuildInvites,
+	IntentGuildVoiceStates,
+	IntentGuildMessages,
+	IntentGuildMessageReactions,
+	IntentDirectMessages,
+	IntentDirectMessageReactions,
+	IntentMessageContent,
+}

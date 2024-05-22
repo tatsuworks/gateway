@@ -108,7 +108,11 @@ func main() {
 	var ints gatewayws.Intents
 	switch intents {
 	case "default":
-		ints = gatewayws.DefaultIntents
+		if os.Getenv("SKIP_MEMBER_REQUEST") == "true" {
+			ints = gatewayws.FastIntents
+		} else {
+			ints = gatewayws.DefaultIntents
+		}
 	case "all":
 		ints = gatewayws.AllIntents
 	default:

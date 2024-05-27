@@ -107,6 +107,8 @@ func main() {
 
 	var ints gatewayws.Intents
 	switch intents {
+	case "fast":
+		ints = gatewayws.FastIntents
 	case "default":
 		ints = gatewayws.DefaultIntents
 	case "all":

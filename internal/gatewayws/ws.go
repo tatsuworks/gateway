@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -291,9 +290,6 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		// only request members from new guilds.
 		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
 		shouldDoGuildMemberRequest := s.lastIdentify.IsZero() || s.lastIdentify.Add(5*time.Minute).Before(time.Now())
-		if os.Getenv("SKIP_MEMBER_REQUEST") == "true" {
-			shouldDoGuildMemberRequest = false
-		}
 		if evtPayload != nil && evtPayload.GuildID != 0 && shouldDoGuildMemberRequest {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)

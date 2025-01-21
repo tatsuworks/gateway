@@ -77,20 +77,21 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "threads"), wrapHandler(s.log, s.getGuildThreads))
 	s.router.GET(path.Join(base, "channels", ":channel", "threads"), wrapHandler(s.log, s.getChannelThreads))
 	s.router.GET(path.Join(base, "threads", ":thread"), wrapHandler(s.log, s.getThread))
-	
+
 	// Added for beta server discord management feature on liveops dashboard
 	s.router.POST(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.setGuildRoles))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles", "delete"), wrapHandler(s.log, s.deleteGuildRolesById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles", "wipe"), wrapHandler(s.log, s.deleteGuildRoles))
 
 	s.router.POST(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.setGuildMembers))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.setGuildChannels))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels", "delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels", "wipe"), wrapHandler(s.log, s.deleteGuildChannels))
 
 	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
-	s.router.GET(path.Join(base, "user_in_guilds_has_roles"), wrapHandler(s.log,s.existUserInGuildsHasRoles))
-	s.router.GET(path.Join(base, "user_in_guilds"), wrapHandler(s.log,s.existUserInGuilds))
+	s.router.POST(path.Join(base, "users"), wrapHandler(s.log, s.getUsersFromBody))
+	s.router.GET(path.Join(base, "user_in_guilds_has_roles"), wrapHandler(s.log, s.existUserInGuildsHasRoles))
+	s.router.GET(path.Join(base, "user_in_guilds"), wrapHandler(s.log, s.existUserInGuilds))
 }
 
 func (s *Server) Start(addr string) error {

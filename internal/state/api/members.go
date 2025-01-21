@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"strings"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/xerrors"
 )
@@ -179,83 +181,105 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	return s.writeTerm(w, m)
 }
 
-func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	// id1,id2,id3
-	userIDs := r.URL.Query().Get("userIDs")
-	
-	if userIDs == "" {
-		return xerrors.Errorf("empty userids array")
-	}
-
-	userIDsSlice := strings.Split(userIDs, ",")
-
+func (s *Server) getUsersFromDB(ctx context.Context, userIDs []string) ([][]byte, error) {
 	var convertedUserIDs []int64
 
-	for _, userId := range userIDsSlice {
-		value, err := strconv.ParseInt(userId,10,64);
+	for _, userId := range userIDs {
+		value, err := strconv.ParseInt(userId, 10, 64)
 		if err != nil {
-			return xerrors.Errorf("parse int for userids array: %w", err)
+			return nil, xerrors.Errorf("parse int for userids array: %w", err)
 		}
-		convertedUserIDs = append(convertedUserIDs,value)
+		convertedUserIDs = append(convertedUserIDs, value)
 	}
 
-	data, err := s.db.GetUsersDiscordIdAndUsername(r.Context(), convertedUserIDs)
+	data, err := s.db.GetUsersDiscordIdAndUsername(ctx, convertedUserIDs)
 	if err != nil {
-		return xerrors.Errorf("read users: %w", err)
+		return nil, xerrors.Errorf("read users: %w", err)
 	}
 
 	result := make([][]byte, len(data))
 
-    for i, userAndData := range data {
-        // Convert each UserAndData to []byte
-        userAndDataBytes, err := json.Marshal(userAndData)
-        if err != nil {
-            return xerrors.Errorf("converting user ids and discord data to [][]byte: %w", err)
-        }
+	for i, userAndData := range data {
+		// Convert each UserAndData to []byte
+		userAndDataBytes, err := json.Marshal(userAndData)
+		if err != nil {
+			return nil, xerrors.Errorf("converting user ids and discord data to [][]byte: %w", err)
+		}
 
-        result[i] = userAndDataBytes
-    }
+		result[i] = userAndDataBytes
+	}
 
-	return s.writeTerms(w, result)
+	return result, nil
+}
+
+type UsersRequest struct {
+	UserIDs []string `json:"userIDs"`
+}
+
+func (s *Server) getUsersFromBody(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	var body UsersRequest
+	err := jsoniter.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		return xerrors.Errorf("parse body: %w", err)
+	}
+
+	results, err := s.getUsersFromDB(r.Context(), body.UserIDs)
+	if err != nil {
+		return err
+	}
+	return s.writeTerms(w, results)
+}
+func (s *Server) getUsers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
+	// id1,id2,id3
+	userIDs := r.URL.Query().Get("userIDs")
+	if userIDs == "" {
+		return xerrors.Errorf("empty userids array")
+	}
+	userIDsSlice := strings.Split(userIDs, ",")
+	results, err := s.getUsersFromDB(r.Context(), userIDsSlice)
+	if err != nil {
+		return err
+	}
+	return s.writeTerms(w, results)
 }
 
 // Define a handler function for SetGuildMembers
 func (s *Server) setGuildMembers(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-    // Parse guild ID from the URL parameter
+	// Parse guild ID from the URL parameter
 	guild, err := guildParam(p)
 	if err != nil {
 		return xerrors.Errorf("read guild param: %w", err)
 	}
-	
+
 	var guildMemberData = make(map[string]interface{})
-    if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return xerrors.Errorf("parse body json: %w", err)
-    }
+	if err := json.NewDecoder(r.Body).Decode(&guildMemberData); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return xerrors.Errorf("parse body json: %w", err)
+	}
 
 	var convertedGuildMemberData = make(map[int64][]byte)
 
-	for key,value := range guildMemberData {
-		num, err := strconv.ParseInt(key,10,64);
+	for key, value := range guildMemberData {
+		num, err := strconv.ParseInt(key, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("convert discord id from string to int64: %w", err)
 		}
 
-		memberJSON, err := json.Marshal(value);
+		memberJSON, err := json.Marshal(value)
 		if err != nil {
 			return xerrors.Errorf("convert guild member data to json format: %w", err)
 		}
 
 		convertedGuildMemberData[num] = memberJSON
 	}
-	
-	err = s.db.SetGuildMembers(r.Context(),guild,convertedGuildMemberData)
+
+	err = s.db.SetGuildMembers(r.Context(), guild, convertedGuildMemberData)
 	if err != nil {
 		return xerrors.Errorf("update guild members cache: %w", err)
 	}
 
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte("Guild members set successfully"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Guild members set successfully"))
 	return nil
 }
 
@@ -274,21 +298,21 @@ func (s *Server) existUserInGuildsHasRoles(w http.ResponseWriter, r *http.Reques
 	var convertedUserID int64
 	var convertedGuildIDs []int64
 
-	value, err := strconv.ParseInt(userID,10,64);
+	value, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		return xerrors.Errorf("parse int for userID: %w", err)
 	}
 	convertedUserID = value
 
 	for _, guildId := range guildIDsSliced {
-		value, err = strconv.ParseInt(guildId,10,64);
+		value, err = strconv.ParseInt(guildId, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("parse int for guildIDsSliced array: %w", err)
 		}
-		convertedGuildIDs = append(convertedGuildIDs,value)
+		convertedGuildIDs = append(convertedGuildIDs, value)
 	}
 
-	exists, err := s.db.ExistUserInGuildsHasRoles(r.Context(),convertedGuildIDs,roleIDsSliced,convertedUserID)
+	exists, err := s.db.ExistUserInGuildsHasRoles(r.Context(), convertedGuildIDs, roleIDsSliced, convertedUserID)
 	if err != nil {
 		return xerrors.Errorf("check user guilds and roles existence: %w", err)
 	}
@@ -304,10 +328,10 @@ func (s *Server) existUserInGuildsHasRoles(w http.ResponseWriter, r *http.Reques
 		return xerrors.Errorf("convert bool result struct to json: %w", err)
 	}
 
-	w.Header().Set("Content-Type","application/json")
-    w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	w.Write(jsonResponse)
-	return nil;
+	return nil
 }
 
 func (s *Server) existUserInGuilds(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
@@ -323,21 +347,21 @@ func (s *Server) existUserInGuilds(w http.ResponseWriter, r *http.Request, p htt
 	var convertedUserID int64
 	var convertedGuildIDs []int64
 
-	value, err := strconv.ParseInt(userID,10,64);
+	value, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		return xerrors.Errorf("parse int for userID: %w", err)
 	}
 	convertedUserID = value
 
 	for _, guildId := range guildIDsSliced {
-		value, err = strconv.ParseInt(guildId,10,64);
+		value, err = strconv.ParseInt(guildId, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("parse int for guildIDsSliced array: %w", err)
 		}
-		convertedGuildIDs = append(convertedGuildIDs,value)
+		convertedGuildIDs = append(convertedGuildIDs, value)
 	}
 
-	exists, err := s.db.ExistUserInGuilds(r.Context(),convertedGuildIDs,convertedUserID)
+	exists, err := s.db.ExistUserInGuilds(r.Context(), convertedGuildIDs, convertedUserID)
 	if err != nil {
 		return xerrors.Errorf("check user guilds and roles existence: %w", err)
 	}
@@ -353,8 +377,8 @@ func (s *Server) existUserInGuilds(w http.ResponseWriter, r *http.Request, p htt
 		return xerrors.Errorf("convert bool result struct to json: %w", err)
 	}
 
-	w.Header().Set("Content-Type","application/json")
-    w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	w.Write(jsonResponse)
-	return nil;
+	return nil
 }

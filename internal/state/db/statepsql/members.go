@@ -201,12 +201,15 @@ ORDER BY last_updated desc nulls last limit 1
 
 func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64) ([]state.UserAndData, error) {
 	q := `
-	SELECT
-		data->'user'->>'id' AS id,data->'user'->>'username' AS username
-	FROM
-		members
-	WHERE
-		user_id = ANY ($1)
+	SELECT DISTINCT ON (user_id)
+    data -> 'user' ->> 'id' AS id,
+    data -> 'user' ->> 'username' AS username
+FROM
+    members
+WHERE
+    user_id = ANY($1)
+ORDER BY
+    user_id, id DESC
 	`
 
 	var usersAndData []state.UserAndData
@@ -328,7 +331,7 @@ func (db *db) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID i
 	`
 
 	var exists bool
-	err := db.sql.GetContext(ctx, &exists, q, guildID, roleID,userID)
+	err := db.sql.GetContext(ctx, &exists, q, guildID, roleID, userID)
 	if err != nil {
 		return false, xerrors.Errorf("exec select: %w", err)
 	}
@@ -354,7 +357,7 @@ func (db *db) ExistUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, r
 	`
 
 	var exists bool
-	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs),userID)
+	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs), userID)
 	if err != nil {
 		return false, xerrors.Errorf("exec select: %w", err)
 	}

@@ -53,11 +53,6 @@ type Config struct {
 	WhitelistedEvents map[string]struct{}
 }
 
-type RedisOutputConfig struct {
-	Address           string
-	WhitelistedEvents map[string]struct{}
-}
-
 func New(ctx context.Context, cfg *Config) *Manager {
 	multiRedisEnv := os.Getenv("MULTI_REDIS")
 	var rc *redis.Client

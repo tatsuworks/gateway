@@ -79,7 +79,7 @@ type Session struct {
 	rc      *redis.Client
 	multirc []*redis.Client
 
-	whitelistedEvents map[string]struct{}
+	whitelistedEvents map[string]map[string]struct{}
 }
 
 func (s *Session) Status() string {
@@ -126,7 +126,7 @@ type SessionConfig struct {
 	ShardID           int
 	ShardCount        int
 	BufferPool        *sync.Pool
-	WhitelistedEvents map[string]struct{}
+	WhitelistedEvents map[string]map[string]struct{}
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -303,27 +303,28 @@ func (s *Session) Open(ctx context.Context, token string) error {
 }
 
 func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
-	if s.whitelistedEvents != nil {
-		if _, ok := s.whitelistedEvents[ev.T]; !ok {
-			s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
-			return
+	if (ev.T == "GUILD_CREATE" && !evtPayload.IsNewGuild) || ev.T == "GUILD_MEMBER_CHUNK" {
+		return
+	}
+	push := func(addr string, rc *redis.Client) {
+		if s.whitelistedEvents != nil {
+			if _, ok := s.whitelistedEvents[addr][ev.T]; !ok {
+				s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
+				return
+			}
+		}
+
+		if err := rc.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 		}
 	}
-	if (ev.T != "GUILD_CREATE" || evtPayload.IsNewGuild) &&
-		ev.T != "GUILD_MEMBER_CHUNK" {
-		if s.multirc != nil {
-			for _, rc := range s.multirc {
-				err := rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-				if err != nil {
-					s.log.Error(s.ctx, "push event to redis", slog.Error(err))
-				}
-			}
-		} else {
-			err := s.rc.RPush("gateway:events:"+ev.T, ev.D).Err()
-			if err != nil {
-				s.log.Error(s.ctx, "push event to redis", slog.Error(err))
-			}
+
+	if s.multirc != nil {
+		for _, rc := range s.multirc {
+			push(rc.Options().Addr, rc)
 		}
+	} else {
+		push(s.rc.Options().Addr, s.rc)
 	}
 }
 

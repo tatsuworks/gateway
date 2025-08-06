@@ -288,8 +288,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 		s.curState = "request guild members"
 		// only request members from new guilds.
-		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
-		shouldDoGuildMemberRequest := s.lastIdentify.IsZero() || s.lastIdentify.Add(5*time.Minute).Before(time.Now())
+		shouldDoGuildMemberRequest := ev.T == "GUILD_CREATE" && evtPayload.IsNewGuild
+}
 		if evtPayload != nil && evtPayload.GuildID != 0 && shouldDoGuildMemberRequest {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)

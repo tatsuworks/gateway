@@ -287,8 +287,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.pushEventToRedis(ev, evtPayload)
 
 		s.curState = "request guild members"
-		// only request members from new guilds.
-		shouldDoGuildMemberRequest := ev.T == "GUILD_CREATE" && evtPayload.IsNewGuild
+
+		shouldDoGuildMemberRequest := ev.T == "GUILD_CREATE"
 		if evtPayload != nil && evtPayload.GuildID != 0 && shouldDoGuildMemberRequest {
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)

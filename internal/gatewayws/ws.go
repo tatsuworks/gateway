@@ -80,6 +80,8 @@ type Session struct {
 	multirc []*redis.Client
 
 	whitelistedEvents map[string]map[string]struct{}
+
+	hasGuildMembersIntent bool
 }
 
 func (s *Session) Status() string {
@@ -154,6 +156,14 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		multirc:           cfg.MultiRedis,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
+	}
+
+	// Set hasGuildMembersIntent
+	for _, intent := range sess.intents {
+		if intent == IntentGuildMembers {
+			sess.hasGuildMembersIntent = true
+			break
+		}
 	}
 
 	sess.loadSessID()
@@ -286,14 +296,13 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.curState = "push event to redis"
 		s.pushEventToRedis(ev, evtPayload)
 
-		s.curState = "request guild members"
-		// only request members from new guilds.
-		// if _, ok := s.guilds[requestMembers]; requestMembers != 0 && !ok {
-		shouldDoGuildMemberRequest := s.lastIdentify.IsZero() || s.lastIdentify.Add(5*time.Minute).Before(time.Now())
-		if evtPayload != nil && evtPayload.GuildID != 0 && shouldDoGuildMemberRequest {
+		// request for guild member info only on GUILD_CREATE events and if the intent is set
+		if ev.T == "GUILD_CREATE" && s.hasGuildMembersIntent && evtPayload != nil && evtPayload.GuildID != 0 {
+			s.curState = "request guild members"
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)
 		}
+
 	}
 
 	s.curState = "close"

@@ -28,7 +28,7 @@ import (
 const (
 	IdentifyMutexRootName = "/gateway/identify/"
 	IdentifyWaitTime      = 10 * time.Second
-	IdentifyStabilizeTime = 60 * time.Second
+	IdentifyStabilizeTime = 120 * time.Second
 )
 
 type Session struct {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -30,6 +31,8 @@ const (
 	IdentifyWaitTime      = 10 * time.Second
 	IdentifyStabilizeTime = 120 * time.Second
 )
+
+var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
 
 type Session struct {
 	ctx    context.Context
@@ -299,7 +302,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.pushEventToRedis(ev, evtPayload)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
-		if ev.T == "GUILD_CREATE" && s.hasGuildMembersIntent && evtPayload != nil && evtPayload.GuildID != 0 {
+		if !skipMemberRequest && ev.T == "GUILD_CREATE" && s.hasGuildMembersIntent && evtPayload != nil && evtPayload.GuildID != 0 {
 			s.curState = "request guild members"
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)

@@ -27,6 +27,8 @@ import (
 
 const (
 	IdentifyMutexRootName = "/gateway/identify/"
+	IdentifyWaitTime      = 10 * time.Second
+	IdentifyStabilizeTime = 120 * time.Second
 )
 
 type Session struct {
@@ -405,7 +407,11 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.ready = time.Now()
 
 		go func() {
-			time.Sleep(7 * time.Second)
+			totalWaitTime := IdentifyWaitTime
+			if s.hasGuildMembersIntent { // allow for more time to process database when getting guild members population
+				totalWaitTime += IdentifyStabilizeTime
+			}
+			time.Sleep(totalWaitTime)
 			err = s.releaseIdentifyLock()
 			if err != nil {
 				s.log.Error(s.ctx, "release identify lock after ready", slog.Error(err))

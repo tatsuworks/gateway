@@ -29,7 +29,8 @@ import (
 const (
 	IdentifyMutexRootName = "/gateway/identify/"
 	IdentifyWaitTime      = 10 * time.Second
-	IdentifyStabilizeTime = 120 * time.Second
+	IdentifyStabilizeTime = 60 * time.Second
+	TimeoutAllowance      = 10 * time.Second
 )
 
 var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
@@ -178,8 +179,18 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 	return sess, nil
 }
 
+func (s *Session) calcIdentifyWait() time.Duration {
+	totalWaitTime := IdentifyWaitTime
+	if !skipMemberRequest { // allow for more time to process database when getting guild members population
+		totalWaitTime += IdentifyStabilizeTime
+	}
+	return totalWaitTime
+}
+
 func (s *Session) initEtcd() error {
-	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(20))
+	timeoutDuration := s.calcIdentifyWait() + TimeoutAllowance
+
+	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
 	if err != nil {
 		return xerrors.Errorf("get etcd session: %w", err)
 	}
@@ -410,10 +421,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.ready = time.Now()
 
 		go func() {
-			totalWaitTime := IdentifyWaitTime
-			if s.hasGuildMembersIntent { // allow for more time to process database when getting guild members population
-				totalWaitTime += IdentifyStabilizeTime
-			}
+			totalWaitTime := s.calcIdentifyWait()
 			time.Sleep(totalWaitTime)
 			err = s.releaseIdentifyLock()
 			if err != nil {

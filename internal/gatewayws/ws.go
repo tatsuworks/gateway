@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -28,8 +29,11 @@ import (
 const (
 	IdentifyMutexRootName = "/gateway/identify/"
 	IdentifyWaitTime      = 10 * time.Second
-	IdentifyStabilizeTime = 120 * time.Second
+	IdentifyStabilizeTime = 60 * time.Second
+	TimeoutAllowance      = 10 * time.Second
 )
+
+var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
 
 type Session struct {
 	ctx    context.Context
@@ -175,8 +179,21 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 	return sess, nil
 }
 
+func (s *Session) shouldProcessMembers() bool {
+	return !skipMemberRequest && s.hasGuildMembersIntent
+}
+func (s *Session) calcIdentifyWait() time.Duration {
+	totalWaitTime := IdentifyWaitTime
+	if s.shouldProcessMembers() { // allow for more time to process database when getting guild members population
+		totalWaitTime += IdentifyStabilizeTime
+	}
+	return totalWaitTime
+}
+
 func (s *Session) initEtcd() error {
-	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(20))
+	timeoutDuration := s.calcIdentifyWait() + TimeoutAllowance
+
+	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
 	if err != nil {
 		return xerrors.Errorf("get etcd session: %w", err)
 	}
@@ -299,7 +316,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.pushEventToRedis(ev, evtPayload)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
-		if ev.T == "GUILD_CREATE" && s.hasGuildMembersIntent && evtPayload != nil && evtPayload.GuildID != 0 {
+		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
 			s.curState = "request guild members"
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)
@@ -407,10 +424,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.ready = time.Now()
 
 		go func() {
-			totalWaitTime := IdentifyWaitTime
-			if s.hasGuildMembersIntent { // allow for more time to process database when getting guild members population
-				totalWaitTime += IdentifyStabilizeTime
-			}
+			totalWaitTime := s.calcIdentifyWait()
 			time.Sleep(totalWaitTime)
 			err = s.releaseIdentifyLock()
 			if err != nil {

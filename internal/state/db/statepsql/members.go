@@ -14,6 +14,11 @@ import (
 )
 
 func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte) error {
+	tx, err := db.sql.BeginTx(ctx, nil)
+	if err != nil {
+		return xerrors.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
 	const q = `
 INSERT INTO
 	members (user_id, guild_id, data)
@@ -25,11 +30,28 @@ SET
 	data = $3
 `
 
-	_, err := db.sql.ExecContext(ctx, q, userID, guildID, raw)
+	_, err = tx.ExecContext(ctx, q, userID, guildID, raw)
 	if err != nil {
 		return xerrors.Errorf("exec insert: %w", err)
 	}
 
+	const updateGuild = `
+UPDATE guilds
+SET data = jsonb_set(
+    data,
+    '{member_count}',
+    ((data->>'member_count')::int + 1)::text::jsonb,
+    false
+)
+WHERE id = $1
+`
+	if _, err = tx.ExecContext(ctx, updateGuild, guildID); err != nil {
+		return xerrors.Errorf("update guild: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return xerrors.Errorf("commit: %w", err)
+	}
 	return nil
 }
 
@@ -76,6 +98,12 @@ WHERE
 }
 
 func (db *db) DeleteGuildMember(ctx context.Context, guildID, userID int64) error {
+	tx, err := db.sql.BeginTx(ctx, nil)
+	if err != nil {
+		return xerrors.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	const q = `
 DELETE FROM
 	members
@@ -84,9 +112,27 @@ WHERE
 	user_id = $2
 `
 
-	_, err := db.sql.ExecContext(ctx, q, guildID, userID)
+	_, err = tx.ExecContext(ctx, q, guildID, userID)
 	if err != nil {
 		return xerrors.Errorf("exec delete: %w", err)
+	}
+
+	const updateGuild = `
+UPDATE guilds
+SET data = jsonb_set(
+    data,
+    '{member_count}',
+    ((data->>'member_count')::int - 1)::text::jsonb,
+    false
+)
+WHERE id = $1
+`
+	if _, err = tx.ExecContext(ctx, updateGuild, guildID); err != nil {
+		return xerrors.Errorf("update guild: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return xerrors.Errorf("commit: %w", err)
 	}
 
 	return nil
@@ -328,7 +374,7 @@ func (db *db) GetUserInGuildHasRole(ctx context.Context, guildID int64, roleID i
 	`
 
 	var exists bool
-	err := db.sql.GetContext(ctx, &exists, q, guildID, roleID,userID)
+	err := db.sql.GetContext(ctx, &exists, q, guildID, roleID, userID)
 	if err != nil {
 		return false, xerrors.Errorf("exec select: %w", err)
 	}
@@ -354,7 +400,7 @@ func (db *db) ExistUserInGuildsHasRoles(ctx context.Context, guildIDs []int64, r
 	`
 
 	var exists bool
-	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs),userID)
+	err := db.sql.GetContext(ctx, &exists, q, pq.Array(guildIDs), pq.Array(roleIDs), userID)
 	if err != nil {
 		return false, xerrors.Errorf("exec select: %w", err)
 	}

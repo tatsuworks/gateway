@@ -11,12 +11,12 @@ if [[ $VERSION == *-dirty ]]; then
 fi
 
 # gateway_uri="gcr.io/tatsu-production/gateway:$VERSION"
-gateway_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/gateway:$VERSION"
+gateway_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/gateway:$VERSION-release"
 docker build -t "$gateway_uri" -f Dockerfile.gateway .
 docker push "$gateway_uri"
 
 # state_uri="gcr.io/tatsu-production/state:$VERSION"
-state_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/state:$VERSION"
+state_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/state:$VERSION-release"
 
 docker build -t "$state_uri" -f Dockerfile.state .
 docker push "$state_uri"

@@ -179,9 +179,12 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 	return sess, nil
 }
 
+func (s *Session) shouldProcessMembers() bool {
+	return !skipMemberRequest && s.hasGuildMembersIntent
+}
 func (s *Session) calcIdentifyWait() time.Duration {
 	totalWaitTime := IdentifyWaitTime
-	if !skipMemberRequest { // allow for more time to process database when getting guild members population
+	if s.shouldProcessMembers() { // allow for more time to process database when getting guild members population
 		totalWaitTime += IdentifyStabilizeTime
 	}
 	return totalWaitTime
@@ -313,7 +316,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.pushEventToRedis(ev, evtPayload)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
-		if !skipMemberRequest && ev.T == "GUILD_CREATE" && s.hasGuildMembersIntent && evtPayload != nil && evtPayload.GuildID != 0 {
+		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
 			s.curState = "request guild members"
 			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
 			s.requestGuildMembers(evtPayload.GuildID)

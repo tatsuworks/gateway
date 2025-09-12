@@ -13,7 +13,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte) error {
+func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte, isNew bool) error {
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
 		return xerrors.Errorf("begin tx: %w", err)
@@ -34,8 +34,8 @@ SET
 	if err != nil {
 		return xerrors.Errorf("exec insert: %w", err)
 	}
-
-	const updateGuild = `
+	if isNew {
+		const updateGuild = `
 UPDATE guilds
 SET data = jsonb_set(
     data,
@@ -45,8 +45,9 @@ SET data = jsonb_set(
 )
 WHERE id = $1
 `
-	if _, err = tx.ExecContext(ctx, updateGuild, guildID); err != nil {
-		return xerrors.Errorf("update guild: %w", err)
+		if _, err = tx.ExecContext(ctx, updateGuild, guildID); err != nil {
+			return xerrors.Errorf("update guild: %w", err)
+		}
 	}
 
 	if err = tx.Commit(); err != nil {

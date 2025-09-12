@@ -21,13 +21,13 @@ func (c *Client) MemberChunk(ctx context.Context, d []byte) error {
 	return nil
 }
 
-func (c *Client) MemberAdd(ctx context.Context, d []byte) error {
+func (c *Client) MemberAdd(ctx context.Context, d []byte, isNew bool) error {
 	mc, err := c.enc.DecodeMember(d)
 	if err != nil {
 		return err
 	}
 
-	err = c.db.SetGuildMember(ctx, mc.GuildID, mc.ID, mc.Raw)
+	err = c.db.SetGuildMember(ctx, mc.GuildID, mc.ID, mc.Raw, isNew)
 	if err != nil {
 		return xerrors.Errorf("set guild member: %w", err)
 	}

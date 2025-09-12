@@ -7,8 +7,8 @@ import (
 )
 
 type UserAndData struct {
-    UserID string  `db:"id"`
-    Username   string `db:"username"`
+	UserID   string `db:"id"`
+	Username string `db:"username"`
 }
 
 type DB interface {
@@ -44,7 +44,7 @@ type DB interface {
 
 	SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error
 	DeleteGuildMembers(ctx context.Context, guild int64) error
-	SetGuildMember(ctx context.Context, guild, user int64, raw []byte) error
+	SetGuildMember(ctx context.Context, guild, user int64, raw []byte, isNew bool) error
 	GetGuildMember(ctx context.Context, guild, user int64) ([]byte, error)
 	GetGuildMemberCount(ctx context.Context, guild int64) (int, error)
 	GetGuildMembers(ctx context.Context, guild int64) ([][]byte, error)

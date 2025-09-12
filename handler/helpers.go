@@ -39,9 +39,9 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "GUILD_MEMBERS_CHUNK":
 		return nil, c.MemberChunk(ctx, e.D)
 	case "GUILD_MEMBER_ADD":
-		return nil, c.MemberAdd(ctx, e.D)
+		return nil, c.MemberAdd(ctx, e.D, true)
 	case "GUILD_MEMBER_UPDATE":
-		return nil, c.MemberAdd(ctx, e.D)
+		return nil, c.MemberAdd(ctx, e.D, false)
 	case "GUILD_MEMBER_REMOVE":
 		return nil, c.MemberRemove(ctx, e.D)
 	case "GUILD_EMOJIS_UPDATE":

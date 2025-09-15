@@ -7,22 +7,24 @@ import (
 )
 
 func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) (isNewGuild bool, _ error) {
-	const persistentCheck = `SELECT count(*) FROM guilds_persistent where id = $1`
-	var c int
-	err := db.sql.GetContext(ctx, &c, persistentCheck, id)
-	isNewGuild = c == 0
 	const q = `
-	INSERT INTO
-		guilds (id, data)
-	VALUES
-		($1, $2)
-	ON CONFLICT (id)
-	DO UPDATE
-	SET
-		data = $2
-	`
+WITH existing AS (
+	SELECT 1 AS found
+	FROM guilds
+	WHERE id = $1
+),
+upserted AS (
+	INSERT INTO guilds (id, data)
+	VALUES ($1, $2)
+	ON CONFLICT (id) DO UPDATE
+	SET data = EXCLUDED.data
+	RETURNING id
+)
+SELECT (NOT EXISTS (SELECT 1 FROM existing)) AS is_new
+FROM upserted;
+`
 
-	_, err = db.sql.ExecContext(ctx, q, id, raw)
+	err := db.sql.GetContext(ctx, &isNewGuild, q, id, raw)
 	if err != nil {
 		return false, xerrors.Errorf("exec insert: %w", err)
 	}

@@ -26,7 +26,7 @@ require (
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/lib/pq v1.4.0
+	github.com/lib/pq v1.10.9
 	github.com/minio/simdjson-go v0.1.4
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect

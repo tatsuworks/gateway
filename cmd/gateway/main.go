@@ -94,7 +94,7 @@ func main() {
 	defer logger.Sync()
 
 	if psql {
-		statedb, err = statepsql.NewDB(ctx, psqlAddr)
+		statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
 		if err != nil {
 			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
 		}

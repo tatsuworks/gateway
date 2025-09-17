@@ -4,56 +4,129 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
+	"cdr.dev/slog"
 	"github.com/lib/pq"
 	"github.com/tatsuworks/gateway/internal/state"
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte, isNew bool) error {
+type MemberEvent struct {
+	GuildID int64
+	UserID  int64
+	Raw     []byte
+	IsNew   bool
+}
+
+func (db *db) StartMemberWorker(ctx context.Context, maxBatchSize int, flushInterval time.Duration) chan<- MemberEvent {
+	ch := make(chan MemberEvent, 1000)
+
+	go func() {
+		ticker := time.NewTicker(flushInterval)
+		defer ticker.Stop()
+
+		var batch []MemberEvent
+
+		flush := func() {
+			if len(batch) == 0 {
+				return
+			}
+			if err := db.processBatch(ctx, batch); err != nil {
+				db.logger.Error(ctx, "processing member batch", slog.F("err", err))
+			}
+			batch = batch[:0]
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				flush()
+				return
+			case ev := <-ch:
+				batch = append(batch, ev)
+				if len(batch) >= maxBatchSize {
+					flush()
+				}
+			case <-ticker.C:
+				flush()
+			}
+		}
+	}()
+
+	return ch
+}
+
+func (db *db) processBatch(ctx context.Context, events []MemberEvent) error {
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
-		return xerrors.Errorf("begin tx: %w", err)
+		return err
 	}
 	defer tx.Rollback()
-	const q = `
-INSERT INTO
-	members (user_id, guild_id, data)
-VALUES
-	($1, $2, $3)
+
+	insertQ := `
+INSERT INTO members (user_id, guild_id, data)
+VALUES %s
 ON CONFLICT (user_id, guild_id)
-DO UPDATE
-SET
-	data = $3
+DO UPDATE SET data = EXCLUDED.data
 `
 
-	_, err = tx.ExecContext(ctx, q, userID, guildID, raw)
-	if err != nil {
-		return xerrors.Errorf("exec insert: %w", err)
+	// Build VALUES list
+	vals := []interface{}{}
+	placeholders := []string{}
+	for i, ev := range events {
+		n := i*3 + 1
+		placeholders = append(placeholders, fmt.Sprintf("($%d,$%d,$%d)", n, n+1, n+2))
+		vals = append(vals, ev.UserID, ev.GuildID, ev.Raw)
 	}
-	if isNew {
+	stmt := fmt.Sprintf(insertQ, strings.Join(placeholders, ","))
+	if _, err := tx.ExecContext(ctx, stmt, vals...); err != nil {
+		return err
+	}
+
+	// Update guild member_count only for "new" ones
+	guildCounts := map[int64]int{}
+	for _, ev := range events {
+		if ev.IsNew {
+			guildCounts[ev.GuildID]++
+		}
+	}
+
+	for guildID, count := range guildCounts {
 		const updateGuild = `
 UPDATE guilds
 SET data = jsonb_set(
     data,
     '{member_count}',
-    ((data->>'member_count')::int + 1)::text::jsonb,
+    ((data->>'member_count')::int + $2)::text::jsonb,
     false
 )
 WHERE id = $1
 `
-		if _, err = tx.ExecContext(ctx, updateGuild, guildID); err != nil {
-			return xerrors.Errorf("update guild: %w", err)
+		if _, err := tx.ExecContext(ctx, updateGuild, guildID, count); err != nil {
+			return err
 		}
 	}
 
-	if err = tx.Commit(); err != nil {
-		return xerrors.Errorf("commit: %w", err)
+	return tx.Commit()
+}
+
+func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte, isNew bool) error {
+	select {
+	case db.memberEventCh <- MemberEvent{
+		GuildID: guildID,
+		UserID:  userID,
+		Raw:     raw,
+		IsNew:   isNew,
+	}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return nil
 }
 
 func (db *db) GetGuildMember(ctx context.Context, guildID, userID int64) ([]byte, error) {

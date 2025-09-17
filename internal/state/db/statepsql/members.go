@@ -16,6 +16,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
+type memberKey struct {
+	UserID  int64
+	GuildID int64
+}
 type MemberEvent struct {
 	GuildID int64
 	UserID  int64
@@ -30,16 +34,20 @@ func (db *db) StartMemberWorker(ctx context.Context, maxBatchSize int, flushInte
 		ticker := time.NewTicker(flushInterval)
 		defer ticker.Stop()
 
-		var batch []MemberEvent
+		batch := make(map[memberKey]MemberEvent)
 
 		flush := func() {
 			if len(batch) == 0 {
 				return
 			}
-			if err := db.processBatch(ctx, batch); err != nil {
+			events := make([]MemberEvent, 0, len(batch))
+			for _, ev := range batch {
+				events = append(events, ev)
+			}
+			if err := db.processBatch(ctx, events); err != nil {
 				db.logger.Error(ctx, "processing member batch", slog.F("err", err))
 			}
-			batch = batch[:0]
+			batch = make(map[memberKey]MemberEvent)
 		}
 
 		for {
@@ -48,7 +56,7 @@ func (db *db) StartMemberWorker(ctx context.Context, maxBatchSize int, flushInte
 				flush()
 				return
 			case ev := <-ch:
-				batch = append(batch, ev)
+				batch[memberKey{ev.UserID, ev.GuildID}] = ev
 				if len(batch) >= maxBatchSize {
 					flush()
 				}

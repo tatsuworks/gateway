@@ -313,7 +313,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		}
 
 		s.curState = "push event to redis"
-		s.pushEventToRedis(ev, evtPayload)
+		s.pushEventToRedis(ev)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
@@ -330,8 +330,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	return err
 }
 
-func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
-	if (ev.T == "GUILD_CREATE" && !evtPayload.IsNewGuild) || ev.T == "GUILD_MEMBER_CHUNK" {
+func (s *Session) pushEventToRedis(ev *discord.Event) {
+	if ev.T == "GUILD_MEMBER_CHUNK" {
 		return
 	}
 	push := func(addr string, rc *redis.Client) {

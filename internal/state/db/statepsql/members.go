@@ -7,69 +7,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 	"unsafe"
 
-	"cdr.dev/slog"
 	"github.com/lib/pq"
 	"github.com/tatsuworks/gateway/internal/state"
 	"golang.org/x/xerrors"
 )
 
-type memberKey struct {
-	UserID  int64
-	GuildID int64
-}
-type MemberEvent struct {
-	GuildID int64
-	UserID  int64
-	Raw     []byte
-	IsNew   bool
-}
-
-func (db *db) StartMemberWorker(ctx context.Context, maxBatchSize int, flushInterval time.Duration) chan<- MemberEvent {
-	ch := make(chan MemberEvent, 1000)
-
-	go func() {
-		ticker := time.NewTicker(flushInterval)
-		defer ticker.Stop()
-
-		batch := make(map[memberKey]MemberEvent)
-
-		flush := func() {
-			if len(batch) == 0 {
-				return
-			}
-			events := make([]MemberEvent, 0, len(batch))
-			for _, ev := range batch {
-				events = append(events, ev)
-			}
-			if err := db.processBatch(ctx, events); err != nil {
-				db.logger.Error(ctx, "processing member batch", slog.F("err", err))
-			}
-			batch = make(map[memberKey]MemberEvent)
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				flush()
-				return
-			case ev := <-ch:
-				batch[memberKey{ev.UserID, ev.GuildID}] = ev
-				if len(batch) >= maxBatchSize {
-					flush()
-				}
-			case <-ticker.C:
-				flush()
-			}
-		}
-	}()
-
-	return ch
-}
-
-func (db *db) processBatch(ctx context.Context, events []MemberEvent) error {
+func (db *db) processMemberBatch(ctx context.Context, events []MemberEvent) error {
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
 		return err

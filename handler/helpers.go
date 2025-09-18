@@ -20,10 +20,9 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		return c.GuildCreate(ctx, e.D)
+		return nil, c.GuildCreate(ctx, e.D)
 	case "GUILD_UPDATE":
-		_, err := c.GuildCreate(ctx, e.D)
-		return nil, err
+		return nil, c.GuildCreate(ctx, e.D)
 	case "GUILD_DELETE":
 		return nil, c.GuildDelete(ctx, e.D)
 	case "GUILD_BAN_ADD":

@@ -21,6 +21,7 @@ var _ state.DB = &db{}
 type db struct {
 	sql           *sqlx.DB
 	memberEventCh chan<- MemberEvent
+	guildEventCh  chan<- GuildEvent
 	logger        slog.Logger
 }
 
@@ -38,9 +39,8 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
-	// Now start the worker and assign the channel
-	dbInstance.memberEventCh = dbInstance.StartMemberWorker(ctx, 100, 100*time.Millisecond)
-
+	dbInstance.memberEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
+	dbInstance.guildEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processGuildBatch, logger)
 	return dbInstance, nil
 }
 

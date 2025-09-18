@@ -23,7 +23,7 @@ type DB interface {
 	SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error
 	GetResumeGatewayURL(ctx context.Context, shard int, name string) (string, error)
 
-	SetGuild(ctx context.Context, id int64, raw []byte) (bool, error)
+	SetGuild(ctx context.Context, id int64, raw []byte) error
 	GetGuild(ctx context.Context, id int64) ([]byte, error)
 	GetGuildCount(ctx context.Context) (int, error)
 	DeleteGuild(ctx context.Context, id int64) error

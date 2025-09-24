@@ -89,14 +89,16 @@ func (db *db) processGuildBatch(ctx context.Context, events []GuildEvent) error 
 
 	const insertQ = `
 INSERT INTO guilds (id, data)
-SELECT * FROM UNNEST($1::bigint[], $2::bytea[])
+SELECT * FROM UNNEST($1::bigint[], $2::jsonb[])
 ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
 `
+
 	ids := make([]int64, len(events))
-	datas := make([][]byte, len(events))
+	datas := make([]string, len(events))
+
 	for i, ev := range events {
 		ids[i] = ev.GuildID
-		datas[i] = ev.Raw
+		datas[i] = string(ev.Raw)
 	}
 	if _, err := tx.ExecContext(ctx, insertQ, pq.Array(ids), pq.Array(datas)); err != nil {
 		return err

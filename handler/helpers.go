@@ -8,8 +8,7 @@ import (
 )
 
 type EventPayload struct {
-	GuildID    int64
-	IsNewGuild bool
+	GuildID int64
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
@@ -20,9 +19,11 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		return nil, c.GuildCreate(ctx, e.D)
+		guildId, err := c.GuildCreate(ctx, e.D)
+		return &EventPayload{GuildID: guildId}, err
 	case "GUILD_UPDATE":
-		return nil, c.GuildCreate(ctx, e.D)
+		guildId, err := c.GuildCreate(ctx, e.D)
+		return &EventPayload{GuildID: guildId}, err
 	case "GUILD_DELETE":
 		return nil, c.GuildDelete(ctx, e.D)
 	case "GUILD_BAN_ADD":

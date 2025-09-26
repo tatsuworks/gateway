@@ -9,7 +9,6 @@ require (
 	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/etcd-io/etcd v3.3.15+incompatible
-	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/gogo/protobuf v1.3.0
 	github.com/google/gops v0.3.6
 	github.com/jmoiron/sqlx v1.2.0
@@ -18,6 +17,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/minio/simdjson-go v0.1.4
 	github.com/pkg/errors v0.8.1
+	github.com/redis/go-redis/v9 v9.14.0
 	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
 	github.com/valyala/fasthttp v1.34.0
 	go.uber.org/zap v1.12.0
@@ -32,12 +32,14 @@ require (
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/alecthomas/chroma v0.7.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
@@ -58,8 +60,6 @@ require (
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/onsi/ginkgo v1.8.0 // indirect
-	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/soheilhy/cmux v0.1.4 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect

@@ -5,7 +5,7 @@ import (
 	"unsafe"
 
 	"cdr.dev/slog"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {

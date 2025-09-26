@@ -11,7 +11,7 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/state"
 )

@@ -15,7 +15,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"

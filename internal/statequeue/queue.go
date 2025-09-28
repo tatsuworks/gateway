@@ -5,7 +5,7 @@ import (
 	"unsafe"
 
 	"cdr.dev/slog"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
@@ -17,7 +17,7 @@ type Server struct {
 
 func (s *Server) runShard(ctx context.Context) {
 	for {
-		parts, err := s.queue.BLPop(0, "gateway:cache").Result()
+		parts, err := s.queue.BLPop(ctx, 0, "gateway:cache").Result()
 		if err != nil {
 			s.log.Error(ctx, "failed to pop event", slog.Error(err))
 		}

@@ -2,7 +2,6 @@ package statepsql
 
 import (
 	"context"
-	"reflect"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -118,9 +117,7 @@ DO UPDATE SET
 }
 
 func bytesToString(b []byte) string {
-	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	sh := reflect.StringHeader{Data: bh.Data, Len: bh.Len}
-	str := *(*string)(unsafe.Pointer(&sh))
+	str := string(b)
 	return strings.ToValidUTF8(str, "")
 }
 

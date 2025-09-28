@@ -4,16 +4,18 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"os"
 	"strconv"
 	"testing"
 
+	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogtest/assert"
 )
 
 var channelJSON = []byte(`{"id": "$id", "name": "general", "nsfw": true, "type": 0, "topic": "24/7 chat about how to gank Mike #2", "guild_id": "$guildid", "position": 6, "parent_id": "399942396007890945", "last_message_id": "155117677105512449", "rate_limit_per_user": 2, "permission_overwrites": []}`)
 
 func TestChannels(t *testing.T) {
-	db, err := NewDB(context.Background(), "postgresql://tatsu@localhost/state?sslmode=disable")
+	db, err := NewDB(context.Background(), "postgresql://tatsu@localhost/state?sslmode=disable", sloghuman.Make(os.Stderr))
 	assert.Success(t, "failed to open postgres", err)
 
 	var (

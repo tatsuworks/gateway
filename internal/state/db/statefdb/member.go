@@ -20,7 +20,7 @@ func (db *DB) DeleteGuildMembers(_ context.Context, guild int64) error {
 	})
 }
 
-func (db *DB) SetGuildMember(_ context.Context, guild, user int64, raw []byte) error {
+func (db *DB) SetGuildMember(_ context.Context, guild, user int64, raw []byte, isNew bool) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Set(db.fmtGuildMemberKey(guild, user), raw)
 		return nil

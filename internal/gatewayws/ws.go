@@ -15,7 +15,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
@@ -313,7 +313,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		}
 
 		s.curState = "push event to redis"
-		s.pushEventToRedis(ev, evtPayload)
+		s.pushEventToRedis(ev)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
@@ -330,8 +330,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	return err
 }
 
-func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventPayload) {
-	if (ev.T == "GUILD_CREATE" && !evtPayload.IsNewGuild) || ev.T == "GUILD_MEMBER_CHUNK" {
+func (s *Session) pushEventToRedis(ev *discord.Event) {
+	if ev.T == "GUILD_MEMBER_CHUNK" {
 		return
 	}
 	push := func(addr string, rc *redis.Client) {
@@ -342,7 +342,7 @@ func (s *Session) pushEventToRedis(ev *discord.Event, evtPayload *handler.EventP
 			}
 		}
 
-		if err := rc.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
+		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
 			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 		}
 	}

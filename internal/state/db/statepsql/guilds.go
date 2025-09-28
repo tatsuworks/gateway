@@ -3,31 +3,17 @@ package statepsql
 import (
 	"context"
 
+	"github.com/lib/pq"
 	"golang.org/x/xerrors"
 )
 
-func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) (isNewGuild bool, _ error) {
-	const persistentCheck = `SELECT count(*) FROM guilds_persistent where id = $1`
-	var c int
-	err := db.sql.GetContext(ctx, &c, persistentCheck, id)
-	isNewGuild = c == 0
-	const q = `
-	INSERT INTO
-		guilds (id, data)
-	VALUES
-		($1, $2)
-	ON CONFLICT (id)
-	DO UPDATE
-	SET
-		data = $2
-	`
-
-	_, err = db.sql.ExecContext(ctx, q, id, raw)
-	if err != nil {
-		return false, xerrors.Errorf("exec insert: %w", err)
+func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) error {
+	select {
+	case db.guildEventCh <- GuildEvent{GuildID: id, Raw: raw}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-
-	return isNewGuild, nil
 }
 
 func (db *db) GetGuild(ctx context.Context, id int64) ([]byte, error) {
@@ -92,4 +78,30 @@ func (db *db) GetGuildBan(ctx context.Context, guild, user int64) ([]byte, error
 
 func (db *db) DeleteGuildBan(ctx context.Context, guild, user int64) error {
 	return nil
+}
+
+func (db *db) processGuildBatch(ctx context.Context, events []GuildEvent) error {
+	tx, err := db.sql.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	const insertQ = `
+INSERT INTO guilds (id, data)
+SELECT * FROM UNNEST($1::bigint[], $2::jsonb[])
+ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
+`
+
+	ids := make([]int64, len(events))
+	datas := make([]string, len(events))
+
+	for i, ev := range events {
+		ids[i] = ev.GuildID
+		datas[i] = string(ev.Raw)
+	}
+	if _, err := tx.ExecContext(ctx, insertQ, pq.Array(ids), pq.Array(datas)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

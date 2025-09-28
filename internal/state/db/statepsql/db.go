@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql/driver"
 
+	"cdr.dev/slog"
+
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/tatsuworks/gateway/discord"
@@ -15,10 +19,13 @@ import (
 var _ state.DB = &db{}
 
 type db struct {
-	sql *sqlx.DB
+	sql           *sqlx.DB
+	memberEventCh chan<- MemberEvent
+	guildEventCh  chan<- GuildEvent
+	logger        slog.Logger
 }
 
-func NewDB(ctx context.Context, addr string) (state.DB, error) {
+func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, error) {
 	sqlx, err := sqlx.Open("postgres", addr)
 	if err != nil {
 		return nil, xerrors.Errorf("open sqlx: %w", err)
@@ -31,8 +38,10 @@ func NewDB(ctx context.Context, addr string) (state.DB, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
-
-	return &db{sqlx}, nil
+	dbInstance := &db{sql: sqlx, logger: logger}
+	dbInstance.memberEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
+	dbInstance.guildEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processGuildBatch, logger)
+	return dbInstance, nil
 }
 
 func (db *db) Encoding() discord.Encoding {

@@ -11,7 +11,7 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/state"
 )
@@ -71,7 +71,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		for address, events := range multiRedisConfig {
 			var mrc *redis.Client
-			mrc, err = createRedisClient(address, cfg.Name, cfg.PodID)
+			mrc, err = createRedisClient(ctx, address, cfg.Name, cfg.PodID)
 			if err != nil {
 				// It is not fatal if one multiRedis client did not connect.
 				cfg.Logger.Warn(ctx, "createRedisClient",
@@ -103,7 +103,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 			cfg.Logger.Fatal(ctx, "multiRedisEnv is set, but all redis clients failed to connect.")
 		}
 	} else {
-		rc, err = createRedisClient(cfg.RedisAddr, cfg.Name, cfg.PodID)
+		rc, err = createRedisClient(ctx, cfg.RedisAddr, cfg.Name, cfg.PodID)
 		if err != nil {
 			cfg.Logger.Fatal(ctx, "createRedisClient", slog.Error(err))
 		}
@@ -240,21 +240,18 @@ func (m *Manager) logHealth() {
 	}
 }
 
-func createRedisClient(addr, name, podID string) (*redis.Client, error) {
-	rc := redis.NewClient(&redis.Options{
-		Addr: addr,
-		OnConnect: func(c *redis.Conn) error {
-			if podID != "" {
-				c.ClientSetName(name + "-" + podID)
-			} else {
-				c.ClientSetName(name)
-			}
+func createRedisClient(ctx context.Context, addr, name, podID string) (*redis.Client, error) {
+	clientName := name
+	if podID != "" {
+		clientName = name + "-" + podID
+	}
 
-			return nil
-		},
+	rc := redis.NewClient(&redis.Options{
+		Addr:       addr,
+		ClientName: clientName,
 	})
 
-	_, err := rc.Ping().Result()
+	_, err := rc.Ping(ctx).Result()
 	if err != nil {
 		return nil, err
 	}

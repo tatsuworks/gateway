@@ -52,7 +52,7 @@ func main() {
 
 	var statedb state.DB
 	if psqlAddr != "" {
-		statedb, err = statepsql.NewDB(ctx, psqlAddr)
+		statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
 		if err != nil {
 			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
 		}

@@ -8,8 +8,7 @@ import (
 )
 
 type EventPayload struct {
-	GuildID    int64
-	IsNewGuild bool
+	GuildID int64
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
@@ -20,10 +19,11 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		return c.GuildCreate(ctx, e.D)
+		guildId, err := c.GuildCreate(ctx, e.D)
+		return &EventPayload{GuildID: guildId}, err
 	case "GUILD_UPDATE":
-		_, err := c.GuildCreate(ctx, e.D)
-		return nil, err
+		guildId, err := c.GuildCreate(ctx, e.D)
+		return &EventPayload{GuildID: guildId}, err
 	case "GUILD_DELETE":
 		return nil, c.GuildDelete(ctx, e.D)
 	case "GUILD_BAN_ADD":
@@ -39,9 +39,9 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "GUILD_MEMBERS_CHUNK":
 		return nil, c.MemberChunk(ctx, e.D)
 	case "GUILD_MEMBER_ADD":
-		return nil, c.MemberAdd(ctx, e.D)
+		return nil, c.MemberAdd(ctx, e.D, true)
 	case "GUILD_MEMBER_UPDATE":
-		return nil, c.MemberAdd(ctx, e.D)
+		return nil, c.MemberAdd(ctx, e.D, false)
 	case "GUILD_MEMBER_REMOVE":
 		return nil, c.MemberRemove(ctx, e.D)
 	case "GUILD_EMOJIS_UPDATE":

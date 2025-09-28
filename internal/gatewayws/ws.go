@@ -342,7 +342,7 @@ func (s *Session) pushEventToRedis(ev *discord.Event) {
 			}
 		}
 
-		if err := rc.RPush("gateway:events:"+ev.T, ev.D).Err(); err != nil {
+		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
 			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
 		}
 	}

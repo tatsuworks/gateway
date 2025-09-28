@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -12,11 +12,12 @@ import (
 var redisURL = os.Getenv("REDIS")
 
 func main() {
+	ctx := context.Background()
 	rc := redis.NewClient(&redis.Options{
 		Addr: redisURL,
 	})
 
-	err := rc.Ping().Err()
+	err := rc.Ping(ctx).Err()
 	if err != nil {
 		panic(err)
 	}
@@ -34,27 +35,18 @@ func main() {
 	// 	}
 	// }
 
-	keys, err := rc.Keys("gateway:sess::*").Result()
+	keys, err := rc.Keys(ctx, "gateway:sess::*").Result()
 	if err != nil {
 		panic(err)
 	}
 
 	for _, e := range keys {
-		val, err := rc.Get(e).Result()
+		val, err := rc.Get(ctx, e).Result()
 		if err != nil {
 			panic(err)
 		}
 
 		sp := strings.Split(e, "::")
-		rc.Set(fmt.Sprintf("%s:gateway-state:%s", sp[0], sp[1]), val, 0).Err()
+		rc.Set(ctx, fmt.Sprintf("%s:gateway-state:%s", sp[0], sp[1]), val, 0).Err()
 	}
-}
-
-func parse(s string) int64 {
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		panic(err)
-	}
-
-	return i
 }

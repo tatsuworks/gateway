@@ -70,7 +70,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		var mrc *redis.Client
 		mrc, err = createRedisClient(ctx, address, cfg.Name, cfg.PodID)
 		if err != nil {
-			if os.Getenv("PROD") == "true" {
+			if os.Getenv("PROD") != "" {
 				cfg.Logger.Fatal(ctx, "createRedisClient",
 					slog.F("address", address),
 					slog.Error(err))

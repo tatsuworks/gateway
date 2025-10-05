@@ -7,7 +7,6 @@ STOP=$(((POD_ID+1) * SHARDS_PER_POD))
 exec /gateway \
 	--token="$TOKEN" \
 	--name="$NAME" \
-	--prod="$PROD" \
 	--etcd="$ETCD" \
 	--pprof="$PPROF" \
 	--addr="$ADDR" \

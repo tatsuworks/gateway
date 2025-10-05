@@ -29,7 +29,6 @@ var (
 	token    string
 	etcdHost string
 	pprof    string
-	prod     string
 	psql     bool
 	psqlAddr string
 	addr     string
@@ -44,7 +43,6 @@ func init() {
 	flag.StringVar(&token, "token", "", "token for the bot")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
-	flag.StringVar(&prod, "prod", "", "Enable production logging")
 	flag.StringVar(&psqlAddr, "psqlAddr", "", "Address to connect to Postgres on")
 	flag.StringVar(&addr, "addr", "localhost:80", "Management address to listen on")
 	flag.StringVar(&intents, "intents", "default", "default, all")
@@ -77,7 +75,7 @@ func main() {
 	// Profiler initialization, best done as early as possible.
 	err = profiler.Start(cfg)
 	if err != nil {
-		if prod != "" {
+		if os.Getenv("PROD") != "" {
 			logger = slogjson.Make(os.Stderr)
 		} else {
 			logger = sloghuman.Make(os.Stderr)

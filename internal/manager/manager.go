@@ -101,9 +101,6 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	// This collects the addresses of all CONNECTED redis clients.
 	addresses := make([]string, 0, len(rdbClients))
 	for _, c := range rdbClients {
-		if c == nil || c.Options() == nil {
-			continue
-		}
 		addresses = append(addresses, c.Options().Addr)
 	}
 	cfg.Logger.Info(ctx, "initialized redis clients", slog.F("count", len(rdbClients)), slog.F("addrs", strings.Join(addresses, ",")))

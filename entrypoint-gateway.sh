@@ -8,7 +8,6 @@ exec /gateway \
 	--token="$TOKEN" \
 	--name="$NAME" \
 	--prod="$PROD" \
-	--redis="$REDIS" \
 	--etcd="$ETCD" \
 	--pprof="$PPROF" \
 	--addr="$ADDR" \

@@ -338,16 +338,16 @@ func (s *Session) pushEventToRedis(ev *discord.Event) {
 	}
 	push := func(addr string, rc *redis.Client) {
 		if whitelist, exists := s.whitelistedEvents[addr]; exists {
-			s.log.Debug(s.ctx, "checking whitelist", slog.F("event type", ev.T), slog.F("redis addr", addr))
+			s.log.Debug(s.ctx, "checking whitelist", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 			if _, ok := whitelist[ev.T]; !ok {
-				s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T), slog.F("redis addr", addr))
+				s.log.Debug(s.ctx, "not whitelisted", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 				return
 			}
 		}
 
-		s.log.Debug(s.ctx, "pushing event to redis", slog.F("event type", ev.T), slog.F("redis addr", addr))
+		s.log.Debug(s.ctx, "pushing event to redis", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err), slog.F("event type", ev.T), slog.F("redis addr", addr))
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err), slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 		}
 	}
 

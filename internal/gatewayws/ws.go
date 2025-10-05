@@ -283,7 +283,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	defer s.persistSeq()
 
 	for {
-		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck.Format(time.RFC3339)), slog.F("last_hb", s.lastHB.Format(time.RFC3339)), slog.F("seq", atomic.LoadInt64(&s.seq)))
+		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck), slog.F("last_hb", s.lastHB), slog.F("seq", atomic.LoadInt64(&s.seq)))
 
 		ev, err := s.readAndDecodeEvent()
 		if err != nil {
@@ -293,29 +293,28 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
 		}
-
-		s.log.Debug(s.ctx, "event info", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
+		s.log.Debug(s.ctx, "decoded event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 
 		s.curState = "handle internal event " + ev.T
+		s.log.Debug(s.ctx, "handling internal event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		var handled bool
 		if handled, err = s.handleInternalEvent(ev); handled {
 			if err != nil {
 				break
 			}
-
 			continue
 		}
 
 		s.curState = "handle state event " + ev.T
+		s.log.Debug(s.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		evtPayload, err := s.state.HandleEvent(ctx, ev)
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
-		s.log.Debug(s.ctx, "handled event", slog.F("type", ev.T))
-
 		s.curState = "push event to redis"
+		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
@@ -346,11 +345,10 @@ func (s *Session) pushEventToRedis(ev *discord.Event) {
 			}
 		}
 
+		s.log.Debug(s.ctx, "pushing event to redis", slog.F("event type", ev.T), slog.F("redis addr", addr))
 		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err), slog.F("event type", ev.T), slog.F("redis addr", addr))
 		}
-
-		s.log.Debug(s.ctx, "pushed event to redis", slog.F("event type", ev.T), slog.F("redis addr", addr))
 	}
 
 	for _, rc := range s.rc {

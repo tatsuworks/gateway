@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -26,17 +25,16 @@ import (
 )
 
 var (
-	name      string
-	token     string
-	redisHost string
-	etcdHost  string
-	pprof     string
-	prod      string
-	psql      bool
-	psqlAddr  string
-	addr      string
-	intents   string
-	podId     string
+	name     string
+	token    string
+	etcdHost string
+	pprof    string
+	prod     string
+	psql     bool
+	psqlAddr string
+	addr     string
+	intents  string
+	podId    string
 
 	shards, start, stop int
 )
@@ -44,7 +42,6 @@ var (
 func init() {
 	flag.StringVar(&name, "name", "gateway", "name of gateway")
 	flag.StringVar(&token, "token", "", "token for the bot")
-	flag.StringVar(&redisHost, "redis", "localhost:6379", "localhost:6379")
 	flag.StringVar(&etcdHost, "etcd", "http://localhost:2379,http://localhost:4001", "")
 	flag.StringVar(&pprof, "pprof", "localhost:6060", "Address for pprof to listen on")
 	flag.StringVar(&prod, "prod", "", "Enable production logging")
@@ -130,37 +127,23 @@ func main() {
 		logger.Fatal(ctx, "listen", slog.Error(err))
 	}
 
-	events := os.Getenv("WHITELIST_EVENTS")
-	var whitelistedEventLookup map[string]struct{}
-	if events != "" {
-		whitelistedEvents := strings.Split(events, ",")
-		whitelistedEventLookup = make(map[string]struct{}, len(whitelistedEvents))
-		var empty struct{}
-		for _, evt := range whitelistedEvents {
-			whitelistedEventLookup[evt] = empty
-		}
-	}
-
 	wg := &sync.WaitGroup{}
 	m := manager.New(ctx, &manager.Config{
-		Name:              name,
-		Logger:            logger,
-		Wg:                wg,
-		DB:                statedb,
-		Token:             token,
-		Shards:            shards,
-		Intents:           ints,
-		RedisAddr:         redisHost,
-		EtcdAddr:          etcdHost,
-		PodID:             podId,
-		WhitelistedEvents: whitelistedEventLookup,
+		Name:     name,
+		Logger:   logger,
+		Wg:       wg,
+		DB:       statedb,
+		Token:    token,
+		Shards:   shards,
+		Intents:  ints,
+		EtcdAddr: etcdHost,
+		PodID:    podId,
 	})
 
 	logger.Info(ctx, "starting manager",
 		slog.F("shards", shards),
 		slog.F("start", start),
 		slog.F("stop", stop),
-		slog.F("redis_host", redisHost),
 		slog.F("etcd_host", etcdHost),
 	)
 

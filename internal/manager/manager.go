@@ -30,9 +30,8 @@ type Manager struct {
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
 
-	rdb        *redis.Client
-	rdbClients []*redis.Client
-	etcd       *clientv3.Client
+	rdb  []*redis.Client
+	etcd *clientv3.Client
 
 	bufferPool *sync.Pool
 
@@ -40,75 +39,74 @@ type Manager struct {
 }
 
 type Config struct {
-	Name              string
-	Logger            slog.Logger
-	DB                state.DB
-	Wg                *sync.WaitGroup
-	Token             string
-	Shards            int
-	Intents           gatewayws.Intents
-	RedisAddr         string
-	EtcdAddr          string
-	PodID             string
-	WhitelistedEvents map[string]struct{}
+	Name     string
+	Logger   slog.Logger
+	DB       state.DB
+	Wg       *sync.WaitGroup
+	Token    string
+	Shards   int
+	Intents  gatewayws.Intents
+	EtcdAddr string
+	PodID    string
 }
 
 func New(ctx context.Context, cfg *Config) *Manager {
 	multiRedisEnv := os.Getenv("MULTI_REDIS")
-	var rc *redis.Client
+	if multiRedisEnv == "" {
+		cfg.Logger.Fatal(ctx, "MULTI_REDIS environment variable is required")
+	}
+
 	var rdbClients []*redis.Client
-	// maps redis address to map of whitelisted events
 	var redisWhitelistedEvents = make(map[string]map[string]struct{})
 	var err error
 
-	if multiRedisEnv != "" {
-		// Parse as map[address][]events
-		var multiRedisConfig map[string][]string
-		err = json.Unmarshal([]byte(multiRedisEnv), &multiRedisConfig)
-		if err != nil {
-			cfg.Logger.Fatal(ctx, "invalid MULTI_REDIS format", slog.Error(err))
-		}
+	var multiRedisConfig map[string][]string
+	err = json.Unmarshal([]byte(multiRedisEnv), &multiRedisConfig)
+	if err != nil {
+		cfg.Logger.Fatal(ctx, "invalid MULTI_REDIS format", slog.Error(err))
+	}
 
-		for address, events := range multiRedisConfig {
-			var mrc *redis.Client
-			mrc, err = createRedisClient(ctx, address, cfg.Name, cfg.PodID)
-			if err != nil {
-				// It is not fatal if one multiRedis client did not connect.
-				cfg.Logger.Warn(ctx, "createRedisClient",
+	for address, events := range multiRedisConfig {
+		var mrc *redis.Client
+		mrc, err = createRedisClient(ctx, address, cfg.Name, cfg.PodID)
+		if err != nil {
+			if os.Getenv("PROD") == "true" {
+				cfg.Logger.Fatal(ctx, "createRedisClient",
 					slog.F("address", address),
 					slog.Error(err))
-				continue
 			}
-			rdbClients = append(rdbClients, mrc)
 
-			// Convert string slice to map[string]struct{}
+			// Not all multiRedis clients need to connect in development.
+			cfg.Logger.Warn(ctx, "createRedisClient",
+				slog.F("address", address),
+				slog.Error(err))
+			continue
+		}
+		rdbClients = append(rdbClients, mrc)
+
+		if len(events) > 0 {
 			whitelistForClient := make(map[string]struct{})
-
-			// If specific events are configured for this Redis instance
-			if len(events) > 0 {
-				for _, event := range events {
-					whitelistForClient[event] = struct{}{}
-				}
-			} else {
-				// If no specific events configured, use all global whitelisted events
-				whitelistForClient = cfg.WhitelistedEvents
+			for _, event := range events {
+				whitelistForClient[event] = struct{}{}
 			}
-
-			// Store the whitelist keyed by Redis address
 			redisWhitelistedEvents[mrc.Options().Addr] = whitelistForClient
 		}
-
-		// No multi redis clients were connected, or all failed to connect.
-		if len(rdbClients) == 0 {
-			cfg.Logger.Fatal(ctx, "multiRedisEnv is set, but all redis clients failed to connect.")
-		}
-	} else {
-		rc, err = createRedisClient(ctx, cfg.RedisAddr, cfg.Name, cfg.PodID)
-		if err != nil {
-			cfg.Logger.Fatal(ctx, "createRedisClient", slog.Error(err))
-		}
-		redisWhitelistedEvents[rc.Options().Addr] = cfg.WhitelistedEvents
 	}
+
+	// No multi redis clients were connected, or all failed to connect.
+	if len(rdbClients) == 0 {
+		cfg.Logger.Fatal(ctx, "all redis clients failed to connect")
+	}
+
+	// This collects the addresses of all CONNECTED redis clients.
+	addresses := make([]string, 0, len(rdbClients))
+	for _, c := range rdbClients {
+		if c == nil || c.Options() == nil {
+			continue
+		}
+		addresses = append(addresses, c.Options().Addr)
+	}
+	cfg.Logger.Info(ctx, "initialized redis clients", slog.F("count", len(rdbClients)), slog.F("addrs", strings.Join(addresses, ",")))
 
 	etcdc, err := clientv3.New(clientv3.Config{
 		Endpoints:   strings.Split(cfg.EtcdAddr, ","),
@@ -131,9 +129,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 
 		shards: map[int]*gatewayws.Session{},
 
-		rdb:        rc,
-		rdbClients: rdbClients,
-		etcd:       etcdc,
+		rdb:  rdbClients,
+		etcd: etcdc,
 
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -168,14 +165,13 @@ func (m *Manager) startShard(shard int) {
 		DB:                m.db,
 		WorkGroup:         m.wg,
 		Redis:             m.rdb,
-		MultiRedis:        m.rdbClients,
 		Etcd:              m.etcd,
 		Token:             m.token,
 		Intents:           m.intents,
 		ShardID:           shard,
 		ShardCount:        m.shardCount,
 		BufferPool:        m.bufferPool,
-		WhitelistedEvents: m.whitelistedEvents, // Pass the per-redis whitelisted events
+		WhitelistedEvents: m.whitelistedEvents,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

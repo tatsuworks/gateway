@@ -82,8 +82,7 @@ type Session struct {
 
 	state   *handler.Client
 	stateDB state.DB
-	rc      *redis.Client
-	multirc []*redis.Client
+	rc      []*redis.Client
 
 	whitelistedEvents map[string]map[string]struct{}
 
@@ -126,8 +125,7 @@ type SessionConfig struct {
 	Logger            slog.Logger
 	DB                state.DB
 	WorkGroup         *sync.WaitGroup
-	Redis             *redis.Client
-	MultiRedis        []*redis.Client
+	Redis             []*redis.Client
 	Etcd              *clientv3.Client
 	Token             string
 	Intents           Intents
@@ -159,7 +157,6 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stateDB:           cfg.DB,
 		enc:               cfg.DB.Encoding(),
 		rc:                cfg.Redis,
-		multirc:           cfg.MultiRedis,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
 	}
@@ -286,6 +283,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	defer s.persistSeq()
 
 	for {
+		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck), slog.F("last_hb", s.lastHB), slog.F("seq", atomic.LoadInt64(&s.seq)))
+
 		ev, err := s.readAndDecodeEvent()
 		if err != nil {
 			s.log.Error(ctx, "read and decode event", slog.Error(err))
@@ -294,18 +293,20 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		if ev.S != 0 {
 			atomic.StoreInt64(&s.seq, ev.S)
 		}
+		s.log.Debug(s.ctx, "decoded event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 
 		s.curState = "handle internal event " + ev.T
+		s.log.Debug(s.ctx, "handling internal event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		var handled bool
 		if handled, err = s.handleInternalEvent(ev); handled {
 			if err != nil {
 				break
 			}
-
 			continue
 		}
 
 		s.curState = "handle state event " + ev.T
+		s.log.Debug(s.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		evtPayload, err := s.state.HandleEvent(ctx, ev)
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
@@ -313,6 +314,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		}
 
 		s.curState = "push event to redis"
+		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
@@ -335,24 +337,22 @@ func (s *Session) pushEventToRedis(ev *discord.Event) {
 		return
 	}
 	push := func(addr string, rc *redis.Client) {
-		if s.whitelistedEvents != nil {
-			if _, ok := s.whitelistedEvents[addr][ev.T]; !ok {
-				s.log.Debug(s.ctx, "not whitelisted", slog.F("event type", ev.T))
+		if whitelist, exists := s.whitelistedEvents[addr]; exists {
+			s.log.Debug(s.ctx, "checking whitelist", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+			if _, ok := whitelist[ev.T]; !ok {
+				s.log.Debug(s.ctx, "not whitelisted", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 				return
 			}
 		}
 
+		s.log.Debug(s.ctx, "pushing event to redis", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err))
+			s.log.Error(s.ctx, "push event to redis", slog.Error(err), slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 		}
 	}
 
-	if s.multirc != nil {
-		for _, rc := range s.multirc {
-			push(rc.Options().Addr, rc)
-		}
-	} else {
-		push(s.rc.Options().Addr, s.rc)
+	for _, rc := range s.rc {
+		push(rc.Options().Addr, rc)
 	}
 }
 

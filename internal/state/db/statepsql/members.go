@@ -298,16 +298,17 @@ SELECT
 FROM
 	members
 WHERE
-	guild_id = $1 AND (
-		data->'user'->>'global_name' ilike $2 OR
-		data->'user'->>'display_name' ilike $2 OR
-		data->'user'->>'username' ilike $2 OR
-		data->>'nick' ilike $2
-	)
+	guild_id = $1
+	AND lower(
+		coalesce(data->'user'->>'global_name', '') || ' ' ||
+		coalesce(data->'user'->>'display_name', '') || ' ' ||
+		coalesce(data->'user'->>'username', '') || ' ' ||
+		coalesce(data->>'nick', '')
+	) LIKE lower('%' || $2 || '%')
 `
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+query+"%")
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, query)
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

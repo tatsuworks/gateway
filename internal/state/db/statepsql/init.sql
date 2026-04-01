@@ -72,6 +72,17 @@ IF NOT EXISTS members_guild_id ON members
 CREATE INDEX CONCURRENTLY
 IF NOT EXISTS members_user_id ON members
 ("user_id");
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX CONCURRENTLY
+IF NOT EXISTS members_search_trgm ON members
+USING GIN (
+	lower(
+		coalesce(data->'user'->>'global_name', '') || ' ' ||
+		coalesce(data->'user'->>'display_name', '') || ' ' ||
+		coalesce(data->'user'->>'username', '') || ' ' ||
+		coalesce(data->>'nick', '')
+	) gin_trgm_ops
+);
 
 CREATE UNLOGGED TABLE
 IF NOT EXISTS messages

@@ -254,14 +254,15 @@ WHERE
 }
 
 func (db *db) GetUser(ctx context.Context, userID int64) ([]byte, error) {
+	// ORDER BY guild_id DESC exploits the composite PK index (guild_id, user_id):
+	// guild_id is a Discord snowflake, so higher == more recently joined guild,
+	// which carries the freshest user object. No extra index needed.
 	q := `
-SELECT
-	data->'user'
-FROM
-	members
-WHERE
-	user_id = $1
-ORDER BY last_updated desc nulls last limit 1
+SELECT data->'user'
+FROM members
+WHERE user_id = $1
+ORDER BY guild_id DESC
+LIMIT 1
 `
 
 	var usr RawJSON

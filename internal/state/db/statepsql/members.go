@@ -307,11 +307,11 @@ WHERE
 		coalesce(data->'user'->>'display_name', '') || ' ' ||
 		coalesce(data->'user'->>'username', '') || ' ' ||
 		coalesce(data->>'nick', '')
-	) LIKE lower('%' || $2 || '%')
+	) LIKE $2
 `
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, query)
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+strings.ToLower(query)+"%")
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

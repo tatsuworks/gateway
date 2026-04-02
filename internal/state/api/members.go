@@ -106,13 +106,26 @@ func (s *Server) searchGuildMembers(w http.ResponseWriter, r *http.Request, p ht
 	if err != nil {
 		return xerrors.Errorf("read guild param: %w", err)
 	}
+
+	const defaultLimit, maxLimit = 100, 1000
+	limit := defaultLimit
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil || limit < 1 {
+			return xerrors.Errorf("invalid limit: must be a positive integer")
+		}
+		if limit > maxLimit {
+			limit = maxLimit
+		}
+	}
+
 	var (
 		ctx   = r.Context()
 		query = r.URL.Query().Get("query")
 	)
 	var ms [][]byte
 	if query != "" && len(query) > 2 {
-		ms, err = s.db.SearchGuildMembers(ctx, g, query)
+		ms, err = s.db.SearchGuildMembers(ctx, g, query, limit)
 		if err != nil {
 			return xerrors.Errorf("search members: %w", err)
 		}

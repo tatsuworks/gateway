@@ -292,6 +292,9 @@ func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64)
 }
 
 func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
+	// Fields are concatenated for GIN trigram matching via members_search_trgm index.
+	// Trade-off: may produce cross-field false positives (e.g. "foo b" matching
+	// global_name="foo" + username="bar"), which is acceptable for best-effort search.
 	const q = `
 SELECT
 	data

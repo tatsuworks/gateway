@@ -67,9 +67,6 @@ EXECUTE PROCEDURE update_last_updated_column
 
 -- SELECT create_distributed_table('members', 'guild_id');
 CREATE INDEX CONCURRENTLY
-IF NOT EXISTS members_guild_id ON members
-("guild_id");
-CREATE INDEX CONCURRENTLY
 IF NOT EXISTS members_user_id ON members
 ("user_id");
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

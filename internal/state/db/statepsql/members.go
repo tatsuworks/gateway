@@ -291,23 +291,28 @@ func (db *db) GetUsersDiscordIdAndUsername(ctx context.Context, userIDs []int64)
 	return usersAndData, nil
 }
 
-func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string) ([][]byte, error) {
+func (db *db) SearchGuildMembers(ctx context.Context, guildID int64, query string, limit int) ([][]byte, error) {
+	// Fields are concatenated for GIN trigram matching via members_search_trgm index.
+	// Trade-off: may produce cross-field false positives (e.g. "foo b" matching
+	// global_name="foo" + username="bar"), which is acceptable for best-effort search.
 	const q = `
 SELECT
 	data
 FROM
 	members
 WHERE
-	guild_id = $1 AND (
-		data->'user'->>'global_name' ilike $2 OR
-		data->'user'->>'display_name' ilike $2 OR
-		data->'user'->>'username' ilike $2 OR
-		data->>'nick' ilike $2
-	)
+	guild_id = $1
+	AND lower(
+		coalesce(data->'user'->>'global_name', '') || ' ' ||
+		coalesce(data->'user'->>'display_name', '') || ' ' ||
+		coalesce(data->'user'->>'username', '') || ' ' ||
+		coalesce(data->>'nick', '')
+	) LIKE $2
+LIMIT $3
 `
 
 	var ms []RawJSON
-	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+query+"%")
+	err := db.sql.SelectContext(ctx, &ms, q, guildID, "%"+strings.ToLower(query)+"%", limit)
 	if err != nil {
 		return nil, xerrors.Errorf("exec select: %w", err)
 	}

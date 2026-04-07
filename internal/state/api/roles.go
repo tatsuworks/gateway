@@ -59,6 +59,9 @@ func (s *Server) getGuildRoleSlice(w http.ResponseWriter, r *http.Request, p htt
 	)
 
 	for _, e := range rs {
+		if e == "" {
+			continue
+		}
 		rr, err := strconv.ParseInt(e, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("parse role id: %w", err)

@@ -12,6 +12,13 @@ func (s *Session) persistReadyGuilds() {
 
 }
 
+func (s *Session) persistShardInfo() {
+	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, s.seq, s.sessID, s.resumeURL)
+	if err != nil {
+		s.log.Error(s.ctx, "save shard info", slog.Error(err))
+	}
+}
+
 func (s *Session) persistSeq() {
 	err := s.stateDB.SetSequence(context.Background(), s.shardID, s.name, s.seq)
 	if err != nil {
@@ -27,25 +34,11 @@ func (s *Session) loadSeq() {
 	}
 }
 
-func (s *Session) persistSessID() {
-	err := s.stateDB.SetSessionID(context.Background(), s.shardID, s.name, s.sessID)
-	if err != nil {
-		s.log.Error(s.ctx, "save seq", slog.Error(err))
-	}
-}
-
 func (s *Session) loadSessID() {
 	var err error
 	s.sessID, err = s.stateDB.GetSessionID(context.Background(), s.shardID, s.name)
 	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(s.ctx, "load session id", slog.Error(err))
-	}
-}
-
-func (s *Session) persistResumeURL() {
-	err := s.stateDB.SetResumeGatewayURL(context.Background(), s.shardID, s.name, s.resumeURL)
-	if err != nil {
-		s.log.Error(s.ctx, "save resume gateway url", slog.Error(err))
 	}
 }
 

@@ -20,6 +20,27 @@ func (db *db) GetShardInfo(ctx context.Context, shard int, name string) (sess st
 	return
 }
 
+func (db *db) SetShardInfo(ctx context.Context, shard int, name string, seq int64, sess string, resumeURL string) error {
+	const q = `
+INSERT INTO
+	shards (id, name, seq, sess, resume_url)
+VALUES
+	($1, $2, $3, $4, $5)
+ON CONFLICT
+	(id, name)
+DO UPDATE
+SET
+	seq = $3, sess = $4, resume_url = $5
+`
+
+	_, err := db.sql.ExecContext(ctx, q, shard, name, seq, sess, resumeURL)
+	if err != nil {
+		return xerrors.Errorf("exec update: %w", err)
+	}
+
+	return nil
+}
+
 func (db *db) SetSequence(ctx context.Context, shard int, name string, seq int64) error {
 	const q = `
 INSERT INTO

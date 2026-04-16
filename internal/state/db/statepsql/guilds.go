@@ -8,12 +8,7 @@ import (
 )
 
 func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) error {
-	select {
-	case db.guildEventCh <- GuildEvent{GuildID: id, Raw: raw}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return db.guildBatcher.Send(ctx, GuildEvent{GuildID: id, Raw: raw})
 }
 
 func (db *db) GetGuild(ctx context.Context, id int64) ([]byte, error) {

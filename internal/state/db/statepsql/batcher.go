@@ -7,10 +7,6 @@ import (
 	"cdr.dev/slog"
 )
 
-type memberKey struct {
-	UserID  int64
-	GuildID int64
-}
 type MemberEvent struct {
 	GuildID int64
 	UserID  int64
@@ -27,102 +23,120 @@ type GuildEvent struct {
 	Raw     []byte
 }
 
-// BatchWorker starts a goroutine that deduplicates and batches events before
-// writing them to the database. Events are keyed by (UserID, GuildID) for
-// members/presences or by GuildID for guilds — newer events for the same key
-// overwrite older ones, reducing redundant writes.
+// ShardedBatcher fans events across N independent batch workers, routed by
+// hash(keyOf(ev)) % N. Because the same key always lands on the same worker
+// and each worker runs at most one flush at a time, two concurrent DB
+// transactions can never contend on the same row — this avoids the
+// transactionid waits we saw when the previous single-worker batcher allowed
+// multiple overlapping upserts on the same (user_id, guild_id) key.
+type ShardedBatcher[T any] struct {
+	chans []chan T
+	keyOf func(T) uint64
+}
+
+func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
+	ch := s.chans[s.keyOf(ev)%uint64(len(s.chans))]
+	select {
+	case ch <- ev:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// NewShardedBatcher spawns `shards` batch workers, each with its own channel
+// and in-flight flush slot. Events are deduplicated within a batch by
+// keyOf(ev) — newer events for the same key overwrite older ones.
 //
-// Flushes happen when the batch reaches maxBatchSize or every flushInterval,
-// whichever comes first. Flushes run in a separate goroutine so the batcher
-// keeps draining the channel while the DB write is in flight, allowing
-// multiple batches to be written concurrently across the connection pool.
-func BatchWorker[T any](
+// Flushes happen when a worker's batch reaches maxBatchSize or every
+// flushInterval. While a flush is in flight, the worker keeps draining its
+// channel into the next batch; a second flush blocks until the first
+// completes, providing per-shard backpressure.
+func NewShardedBatcher[T any](
 	ctx context.Context,
+	shards int,
 	maxBatchSize int,
-	maxConcurrentFlushes int,
 	flushInterval time.Duration,
+	keyOf func(T) uint64,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
-) chan<- T {
-	ch := make(chan T, 4000)
+) *ShardedBatcher[T] {
+	if shards < 1 {
+		shards = 1
+	}
+	chans := make([]chan T, shards)
+	for i := range chans {
+		chans[i] = make(chan T, 4000)
+		go runBatcher(ctx, chans[i], maxBatchSize, flushInterval, keyOf, process, logger)
+	}
+	return &ShardedBatcher[T]{chans: chans, keyOf: keyOf}
+}
 
-	go func() {
-		ticker := time.NewTicker(flushInterval)
-		defer ticker.Stop()
+func runBatcher[T any](
+	ctx context.Context,
+	ch <-chan T,
+	maxBatchSize int,
+	flushInterval time.Duration,
+	keyOf func(T) uint64,
+	process func(context.Context, []T) error,
+	logger slog.Logger,
+) {
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
 
-		// Semaphore to cap concurrent in-flight flushes. If all slots are
-		// taken, flush blocks until one completes — this provides natural
-		// backpressure when the DB can't keep up, while still allowing
-		// parallel writes up to the connection pool size.
-		sem := make(chan struct{}, maxConcurrentFlushes)
+	inFlight := make(chan struct{}, 1)
+	batch := make(map[uint64]T)
 
-		batch := make(map[any]T)
-
-		// flush snapshots the current batch and processes it in a background
-		// goroutine. Acquires a semaphore slot first — blocks if all slots
-		// are in use, preventing unbounded memory growth.
-		flush := func() {
-			if len(batch) == 0 {
-				return
-			}
-			events := make([]T, 0, len(batch))
-			for _, ev := range batch {
-				events = append(events, ev)
-			}
-			batch = make(map[any]T)
-			sem <- struct{}{} // backpressure if too many flushes in-flight
-			go func() {
-				defer func() { <-sem }()
-				if err := process(ctx, events); err != nil {
-					logger.Error(ctx, "processing batch", slog.F("err", err))
-				}
-			}()
+	flush := func() {
+		if len(batch) == 0 {
+			return
 		}
-
-		// addToBatch deduplicates by composite key — only the latest event
-		// for a given key is kept in the batch.
-		addToBatch := func(ev T) {
-			var key any
-			switch v := any(ev).(type) {
-			case MemberEvent:
-				key = memberKey{v.UserID, v.GuildID}
-			case PresenceEvent:
-				key = memberKey{v.UserID, v.GuildID}
-			case GuildEvent:
-				key = v.GuildID
-			default:
-				key = v
-			}
-			batch[key] = ev
+		events := make([]T, 0, len(batch))
+		for _, ev := range batch {
+			events = append(events, ev)
 		}
+		batch = make(map[uint64]T)
+		inFlight <- struct{}{}
+		go func() {
+			defer func() { <-inFlight }()
+			if err := process(ctx, events); err != nil {
+				logger.Error(ctx, "processing batch", slog.F("err", err))
+			}
+		}()
+	}
 
-		for {
-			select {
-			case <-ctx.Done():
-				flush()
-				return
-			case ev := <-ch:
-				addToBatch(ev)
-				// Non-blocking drain: pull all buffered events from the
-				// channel before deciding to flush. This catches up quickly
-				// after a flush blocks, and maximises deduplication.
-				for len(batch) < maxBatchSize {
-					select {
-					case ev := <-ch:
-						addToBatch(ev)
-					default:
-						goto drained
-					}
+	for {
+		select {
+		case <-ctx.Done():
+			flush()
+			return
+		case ev := <-ch:
+			batch[keyOf(ev)] = ev
+			for len(batch) < maxBatchSize {
+				select {
+				case ev := <-ch:
+					batch[keyOf(ev)] = ev
+				default:
+					goto drained
 				}
-			drained:
-				if len(batch) >= maxBatchSize {
-					flush()
-				}
-			case <-ticker.C:
+			}
+		drained:
+			if len(batch) >= maxBatchSize {
 				flush()
 			}
+		case <-ticker.C:
+			flush()
 		}
-	}()
+	}
+}
 
-	return ch
+// mixUserGuild hashes a (userID, guildID) pair for shard routing.
+// The golden-ratio multiplier spreads Discord snowflake entropy across all
+// bits so modulo-N sharding distributes evenly.
+func mixUserGuild(userID, guildID int64) uint64 {
+	return uint64(userID)*0x9E3779B97F4A7C15 ^ uint64(guildID)
+}
+
+func mixGuildID(guildID int64) uint64 {
+	return uint64(guildID) * 0x9E3779B97F4A7C15
 }

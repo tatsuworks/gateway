@@ -68,17 +68,12 @@ WHERE id = $1
 }
 
 func (db *db) SetGuildMember(ctx context.Context, guildID, userID int64, raw []byte, isNew bool) error {
-	select {
-	case db.memberEventCh <- MemberEvent{
+	return db.memberBatcher.Send(ctx, MemberEvent{
 		GuildID: guildID,
 		UserID:  userID,
 		Raw:     raw,
 		IsNew:   isNew,
-	}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	})
 }
 
 func (db *db) GetGuildMember(ctx context.Context, guildID, userID int64) ([]byte, error) {
@@ -166,15 +161,13 @@ WHERE id = $1
 
 func (db *db) SetGuildMembers(ctx context.Context, guildID int64, members map[int64][]byte) error {
 	for userID, raw := range members {
-		select {
-		case db.memberEventCh <- MemberEvent{
+		if err := db.memberBatcher.Send(ctx, MemberEvent{
 			GuildID: guildID,
 			UserID:  userID,
 			Raw:     raw,
 			IsNew:   false,
-		}:
-		case <-ctx.Done():
-			return ctx.Err()
+		}); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -325,16 +318,11 @@ DO UPDATE SET data = EXCLUDED.data
 }
 
 func (db *db) SetPresence(ctx context.Context, guildID, userID int64, raw []byte) error {
-	select {
-	case db.presenceEventCh <- PresenceEvent{
+	return db.presenceBatcher.Send(ctx, PresenceEvent{
 		GuildID: guildID,
 		UserID:  userID,
 		Raw:     raw,
-	}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	})
 }
 
 func (db *db) GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error) {
@@ -357,14 +345,12 @@ WHERE
 
 func (db *db) SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error {
 	for userID, raw := range presences {
-		select {
-		case db.presenceEventCh <- PresenceEvent{
+		if err := db.presenceBatcher.Send(ctx, PresenceEvent{
 			GuildID: guildID,
 			UserID:  userID,
 			Raw:     raw,
-		}:
-		case <-ctx.Done():
-			return ctx.Err()
+		}); err != nil {
+			return err
 		}
 	}
 	return nil

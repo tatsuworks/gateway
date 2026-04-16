@@ -21,11 +21,11 @@ import (
 var _ state.DB = &db{}
 
 type db struct {
-	sql           *sqlx.DB
-	memberEventCh   chan<- MemberEvent
-	presenceEventCh chan<- PresenceEvent
-	guildEventCh    chan<- GuildEvent
-	logger        slog.Logger
+	sql             *sqlx.DB
+	memberBatcher   *ShardedBatcher[MemberEvent]
+	presenceBatcher *ShardedBatcher[PresenceEvent]
+	guildBatcher    *ShardedBatcher[GuildEvent]
+	logger          slog.Logger
 }
 
 func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, error) {
@@ -46,9 +46,15 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
-	dbInstance.memberEventCh = BatchWorker(ctx, 1000, maxConns, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
-	dbInstance.presenceEventCh = BatchWorker(ctx, 1000, maxConns, 100*time.Millisecond, dbInstance.processPresenceBatch, logger)
-	dbInstance.guildEventCh = BatchWorker(ctx, 500, maxConns, 100*time.Millisecond, dbInstance.processGuildBatch, logger)
+	dbInstance.memberBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
+		func(ev MemberEvent) uint64 { return mixUserGuild(ev.UserID, ev.GuildID) },
+		dbInstance.processMemberBatch, logger)
+	dbInstance.presenceBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
+		func(ev PresenceEvent) uint64 { return mixUserGuild(ev.UserID, ev.GuildID) },
+		dbInstance.processPresenceBatch, logger)
+	dbInstance.guildBatcher = NewShardedBatcher(ctx, maxConns, 500, 100*time.Millisecond,
+		func(ev GuildEvent) uint64 { return mixGuildID(ev.GuildID) },
+		dbInstance.processGuildBatch, logger)
 	return dbInstance, nil
 }
 

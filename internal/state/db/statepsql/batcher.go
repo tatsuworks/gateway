@@ -57,24 +57,38 @@ func BatchWorker[T any](
 			batch = make(map[any]T)
 		}
 
+		addToBatch := func(ev T) {
+			var key any
+			switch v := any(ev).(type) {
+			case MemberEvent:
+				key = memberKey{v.UserID, v.GuildID}
+			case PresenceEvent:
+				key = memberKey{v.UserID, v.GuildID}
+			case GuildEvent:
+				key = v.GuildID
+			default:
+				key = v
+			}
+			batch[key] = ev
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
 				flush()
 				return
 			case ev := <-ch:
-				var key any
-				switch v := any(ev).(type) {
-				case MemberEvent:
-					key = memberKey{v.UserID, v.GuildID}
-				case PresenceEvent:
-					key = memberKey{v.UserID, v.GuildID}
-				case GuildEvent:
-					key = v.GuildID
-				default:
-					key = v
+				addToBatch(ev)
+				// Drain all buffered events before flushing.
+				for len(batch) < maxBatchSize {
+					select {
+					case ev := <-ch:
+						addToBatch(ev)
+					default:
+						goto drained
+					}
 				}
-				batch[key] = ev
+			drained:
 				if len(batch) >= maxBatchSize {
 					flush()
 				}

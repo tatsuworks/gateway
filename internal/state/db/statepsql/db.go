@@ -47,13 +47,16 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
 	dbInstance.memberBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
-		func(ev MemberEvent) uint64 { return mixUserGuild(ev.UserID, ev.GuildID) },
+		func(ev MemberEvent) uint64 { return uint64(ev.GuildID) },
+		func(ev MemberEvent) any { return memberKey{ev.UserID, ev.GuildID} },
 		dbInstance.processMemberBatch, logger)
 	dbInstance.presenceBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
-		func(ev PresenceEvent) uint64 { return mixUserGuild(ev.UserID, ev.GuildID) },
+		func(ev PresenceEvent) uint64 { return uint64(ev.GuildID) },
+		func(ev PresenceEvent) any { return memberKey{ev.UserID, ev.GuildID} },
 		dbInstance.processPresenceBatch, logger)
 	dbInstance.guildBatcher = NewShardedBatcher(ctx, maxConns, 500, 100*time.Millisecond,
-		func(ev GuildEvent) uint64 { return mixGuildID(ev.GuildID) },
+		func(ev GuildEvent) uint64 { return uint64(ev.GuildID) },
+		func(ev GuildEvent) any { return ev.GuildID },
 		dbInstance.processGuildBatch, logger)
 	return dbInstance, nil
 }

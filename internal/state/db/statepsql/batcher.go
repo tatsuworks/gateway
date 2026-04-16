@@ -39,6 +39,7 @@ type GuildEvent struct {
 func BatchWorker[T any](
 	ctx context.Context,
 	maxBatchSize int,
+	maxConcurrentFlushes int,
 	flushInterval time.Duration,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
@@ -49,11 +50,17 @@ func BatchWorker[T any](
 		ticker := time.NewTicker(flushInterval)
 		defer ticker.Stop()
 
+		// Semaphore to cap concurrent in-flight flushes. If all slots are
+		// taken, flush blocks until one completes — this provides natural
+		// backpressure when the DB can't keep up, while still allowing
+		// parallel writes up to the connection pool size.
+		sem := make(chan struct{}, maxConcurrentFlushes)
+
 		batch := make(map[any]T)
 
 		// flush snapshots the current batch and processes it in a background
-		// goroutine so the main loop can continue draining without waiting
-		// for the DB write to complete.
+		// goroutine. Acquires a semaphore slot first — blocks if all slots
+		// are in use, preventing unbounded memory growth.
 		flush := func() {
 			if len(batch) == 0 {
 				return
@@ -63,7 +70,9 @@ func BatchWorker[T any](
 				events = append(events, ev)
 			}
 			batch = make(map[any]T)
+			sem <- struct{}{} // backpressure if too many flushes in-flight
 			go func() {
+				defer func() { <-sem }()
 				if err := process(ctx, events); err != nil {
 					logger.Error(ctx, "processing batch", slog.F("err", err))
 				}

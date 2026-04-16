@@ -7,37 +7,50 @@ import (
 	"cdr.dev/slog"
 )
 
+// BatchEvent is implemented by event types to provide routing and dedup keys.
+// RouteKey groups events onto the same worker (guildID); DedupKey collapses
+// duplicate events within a batch (e.g. same member updated twice).
+type BatchEvent interface {
+	RouteKey() uint64
+	DedupKey() any
+}
+
 type MemberEvent struct {
 	GuildID int64
 	UserID  int64
 	Raw     []byte
 	IsNew   bool
 }
+
+func (e MemberEvent) RouteKey() uint64 { return uint64(e.GuildID) }
+func (e MemberEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
+
 type PresenceEvent struct {
 	GuildID int64
 	UserID  int64
 	Raw     []byte
 }
+
+func (e PresenceEvent) RouteKey() uint64 { return uint64(e.GuildID) }
+func (e PresenceEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
+
 type GuildEvent struct {
 	GuildID int64
 	Raw     []byte
 }
 
+func (e GuildEvent) RouteKey() uint64 { return uint64(e.GuildID) }
+func (e GuildEvent) DedupKey() any    { return e.GuildID }
+
 // ShardedBatcher fans events across N independent batch workers, routed by
-// routeKey(ev) % N. Because Discord maps each guild to exactly one shard,
-// routing by guildID guarantees that events for the same rows always land on
-// the same worker — two concurrent flushes can never contend on the same row.
-//
-// Deduplication within a batch uses a separate dedupKey so that, e.g.,
-// different members in the same guild are kept as distinct entries while
-// duplicate updates to the same member collapse.
-type ShardedBatcher[T any] struct {
-	chans    []chan T
-	routeKey func(T) uint64
+// RouteKey() % N. Events for the same guild cluster on one worker for better
+// batch locality; dedup within a batch uses DedupKey().
+type ShardedBatcher[T BatchEvent] struct {
+	chans []chan T
 }
 
 func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
-	ch := s.chans[s.routeKey(ev)%uint64(len(s.chans))]
+	ch := s.chans[ev.RouteKey()%uint64(len(s.chans))]
 	select {
 	case ch <- ev:
 		return nil
@@ -46,21 +59,11 @@ func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
 	}
 }
 
-// NewShardedBatcher spawns `shards` batch workers, each with its own channel
-// and in-flight flush slot. routeKey determines which worker an event goes to;
-// dedupKey determines which events overwrite each other within a batch.
-//
-// Flushes happen when a worker's batch reaches maxBatchSize or every
-// flushInterval. While a flush is in flight, the worker keeps draining its
-// channel into the next batch; a second flush blocks until the first
-// completes, providing per-worker backpressure.
-func NewShardedBatcher[T any](
+func NewShardedBatcher[T BatchEvent](
 	ctx context.Context,
 	shards int,
 	maxBatchSize int,
 	flushInterval time.Duration,
-	routeKey func(T) uint64,
-	dedupKey func(T) any,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
 ) *ShardedBatcher[T] {
@@ -70,17 +73,16 @@ func NewShardedBatcher[T any](
 	chans := make([]chan T, shards)
 	for i := range chans {
 		chans[i] = make(chan T, 4000)
-		go runBatcher(ctx, chans[i], maxBatchSize, flushInterval, dedupKey, process, logger)
+		go runBatcher(ctx, chans[i], maxBatchSize, flushInterval, process, logger)
 	}
-	return &ShardedBatcher[T]{chans: chans, routeKey: routeKey}
+	return &ShardedBatcher[T]{chans: chans}
 }
 
-func runBatcher[T any](
+func runBatcher[T BatchEvent](
 	ctx context.Context,
 	ch <-chan T,
 	maxBatchSize int,
 	flushInterval time.Duration,
-	dedupKey func(T) any,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
 ) {
@@ -114,11 +116,11 @@ func runBatcher[T any](
 			flush()
 			return
 		case ev := <-ch:
-			batch[dedupKey(ev)] = ev
+			batch[ev.DedupKey()] = ev
 			for len(batch) < maxBatchSize {
 				select {
 				case ev := <-ch:
-					batch[dedupKey(ev)] = ev
+					batch[ev.DedupKey()] = ev
 				default:
 					goto drained
 				}
@@ -131,9 +133,4 @@ func runBatcher[T any](
 			flush()
 		}
 	}
-}
-
-type memberKey struct {
-	UserID  int64
-	GuildID int64
 }

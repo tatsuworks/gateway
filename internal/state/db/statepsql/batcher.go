@@ -17,6 +17,11 @@ type MemberEvent struct {
 	Raw     []byte
 	IsNew   bool
 }
+type PresenceEvent struct {
+	GuildID int64
+	UserID  int64
+	Raw     []byte
+}
 type GuildEvent struct {
 	GuildID int64
 	Raw     []byte
@@ -30,7 +35,7 @@ func BatchWorker[T any](
 	process func(context.Context, []T) error,
 	logger slog.Logger, // Use your logger interface/type
 ) chan<- T {
-	ch := make(chan T, 1000)
+	ch := make(chan T, 4000)
 
 	go func() {
 		ticker := time.NewTicker(flushInterval)
@@ -61,6 +66,8 @@ func BatchWorker[T any](
 				var key any
 				switch v := any(ev).(type) {
 				case MemberEvent:
+					key = memberKey{v.UserID, v.GuildID}
+				case PresenceEvent:
 					key = memberKey{v.UserID, v.GuildID}
 				case GuildEvent:
 					key = v.GuildID

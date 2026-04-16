@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"unsafe"
 
@@ -166,36 +165,18 @@ WHERE id = $1
 }
 
 func (db *db) SetGuildMembers(ctx context.Context, guildID int64, members map[int64][]byte) error {
-	var q strings.Builder
-
-	q.WriteString(`
-INSERT INTO
-	members (user_id, guild_id, data)
-VALUES
-`)
-
-	first := true
-	for i, e := range members {
-		if !first {
-			q.WriteString(", ")
+	for userID, raw := range members {
+		select {
+		case db.memberEventCh <- MemberEvent{
+			GuildID: guildID,
+			UserID:  userID,
+			Raw:     raw,
+			IsNew:   false,
+		}:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-		first = false
-
-		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
 	}
-
-	q.WriteString(`
-ON CONFLICT
-	(user_id, guild_id)
-DO UPDATE SET
-	data = excluded.data
-`)
-
-	_, err := db.sql.ExecContext(ctx, q.String())
-	if err != nil {
-		return xerrors.Errorf("copy: %w", err)
-	}
-
 	return nil
 }
 
@@ -320,24 +301,40 @@ LIMIT $3
 	return *(*[][]byte)(unsafe.Pointer(&ms)), nil
 }
 
-func (db *db) SetPresence(ctx context.Context, guildID, userID int64, raw []byte) error {
-	const q = `
-INSERT INTO
-	presence (user_id, guild_id, data)
-VALUES
-	($1, $2, $3)
+func (db *db) processPresenceBatch(ctx context.Context, events []PresenceEvent) error {
+	insertQ := `
+INSERT INTO presence (user_id, guild_id, data)
+VALUES %s
 ON CONFLICT (user_id, guild_id)
-DO UPDATE
-SET
-	data = $3
+DO UPDATE SET data = EXCLUDED.data
 `
 
-	_, err := db.sql.ExecContext(ctx, q, userID, guildID, raw)
-	if err != nil {
-		return xerrors.Errorf("exec insert: %w", err)
+	vals := make([]interface{}, 0, len(events)*3)
+	placeholders := make([]string, 0, len(events))
+	for i, ev := range events {
+		n := i*3 + 1
+		placeholders = append(placeholders, fmt.Sprintf("($%d,$%d,$%d)", n, n+1, n+2))
+		vals = append(vals, ev.UserID, ev.GuildID, ev.Raw)
+	}
+	stmt := fmt.Sprintf(insertQ, strings.Join(placeholders, ","))
+	if _, err := db.sql.ExecContext(ctx, stmt, vals...); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func (db *db) SetPresence(ctx context.Context, guildID, userID int64, raw []byte) error {
+	select {
+	case db.presenceEventCh <- PresenceEvent{
+		GuildID: guildID,
+		UserID:  userID,
+		Raw:     raw,
+	}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (db *db) GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error) {
@@ -359,36 +356,17 @@ WHERE
 }
 
 func (db *db) SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error {
-	var q strings.Builder
-
-	q.WriteString(`
-			INSERT INTO
-				presence (user_id, guild_id, data)
-			VALUES 
-			`)
-
-	first := true
-	for i, e := range presences {
-		if !first {
-			q.WriteString(", ")
+	for userID, raw := range presences {
+		select {
+		case db.presenceEventCh <- PresenceEvent{
+			GuildID: guildID,
+			UserID:  userID,
+			Raw:     raw,
+		}:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-		first = false
-
-		q.WriteString("(" + strconv.FormatInt(i, 10) + ", " + strconv.FormatInt(guildID, 10) + ", " + pq.QuoteLiteral(bytesToString(e)) + "::jsonb)")
 	}
-
-	q.WriteString(`
-			ON CONFLICT
-				(user_id, guild_id)
-			DO UPDATE SET
-				data = excluded.data
-			`)
-
-	_, err := db.sql.ExecContext(ctx, q.String())
-	if err != nil {
-		return xerrors.Errorf("copy: %w", err)
-	}
-
 	return nil
 }
 

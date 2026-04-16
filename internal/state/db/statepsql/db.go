@@ -20,8 +20,9 @@ var _ state.DB = &db{}
 
 type db struct {
 	sql           *sqlx.DB
-	memberEventCh chan<- MemberEvent
-	guildEventCh  chan<- GuildEvent
+	memberEventCh   chan<- MemberEvent
+	presenceEventCh chan<- PresenceEvent
+	guildEventCh    chan<- GuildEvent
 	logger        slog.Logger
 }
 
@@ -39,7 +40,8 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
-	dbInstance.memberEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
+	dbInstance.memberEventCh = BatchWorker(ctx, 1000, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
+	dbInstance.presenceEventCh = BatchWorker(ctx, 1000, 100*time.Millisecond, dbInstance.processPresenceBatch, logger)
 	dbInstance.guildEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processGuildBatch, logger)
 	return dbInstance, nil
 }

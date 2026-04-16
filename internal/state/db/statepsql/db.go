@@ -3,6 +3,8 @@ package statepsql
 import (
 	"context"
 	"database/sql/driver"
+	"os"
+	"strconv"
 
 	"cdr.dev/slog"
 
@@ -32,8 +34,12 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("open sqlx: %w", err)
 	}
 
-	sqlx.SetMaxOpenConns(4)
-	sqlx.SetMaxIdleConns(4)
+	maxConns := 4
+	if v, err := strconv.Atoi(os.Getenv("PSQL_MAX_CONNS")); err == nil && v > 0 {
+		maxConns = v
+	}
+	sqlx.SetMaxOpenConns(maxConns)
+	sqlx.SetMaxIdleConns(maxConns)
 
 	err = sqlx.Ping()
 	if err != nil {

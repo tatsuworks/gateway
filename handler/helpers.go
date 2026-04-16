@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"unicode/utf8"
 
 	"github.com/tatsuworks/gateway/discord"
 )
@@ -12,8 +13,9 @@ type EventPayload struct {
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
-	// clear nulls
-	e.D = bytes.ToValidUTF8(e.D, nil)
+	if !utf8.Valid(e.D) {
+		e.D = bytes.ToValidUTF8(e.D, nil)
+	}
 
 	switch e.T {
 	case "PRESENCE_UPDATE":

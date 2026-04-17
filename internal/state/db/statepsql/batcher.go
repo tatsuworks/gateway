@@ -12,7 +12,7 @@ import (
 // duplicate events within a batch (e.g. same member updated twice).
 type BatchEvent interface {
 	RouteKey() uint64
-	DedupKey() any
+	DedupKey() uint64
 }
 
 type MemberEvent struct {
@@ -23,7 +23,7 @@ type MemberEvent struct {
 }
 
 func (e MemberEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e MemberEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
+func (e MemberEvent) DedupKey() uint64 { return uint64(e.UserID)<<32 | uint64(e.GuildID)&0xFFFFFFFF }
 
 type PresenceEvent struct {
 	GuildID int64
@@ -32,7 +32,7 @@ type PresenceEvent struct {
 }
 
 func (e PresenceEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e PresenceEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
+func (e PresenceEvent) DedupKey() uint64 { return uint64(e.UserID)<<32 | uint64(e.GuildID)&0xFFFFFFFF }
 
 type GuildEvent struct {
 	GuildID int64
@@ -40,7 +40,7 @@ type GuildEvent struct {
 }
 
 func (e GuildEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e GuildEvent) DedupKey() any    { return e.GuildID }
+func (e GuildEvent) DedupKey() uint64 { return uint64(e.GuildID) }
 
 // ShardedBatcher fans events across N independent batch workers, routed by
 // RouteKey() % N. Events for the same guild cluster on one worker for better
@@ -90,7 +90,7 @@ func runBatcher[T BatchEvent](
 	defer ticker.Stop()
 
 	inFlight := make(chan struct{}, 1)
-	batch := make(map[any]T)
+	batch := make(map[uint64]T)
 
 	flush := func() {
 		if len(batch) == 0 {
@@ -100,7 +100,7 @@ func runBatcher[T BatchEvent](
 		for _, ev := range batch {
 			events = append(events, ev)
 		}
-		batch = make(map[any]T)
+		batch = make(map[uint64]T)
 		inFlight <- struct{}{}
 		go func() {
 			defer func() { <-inFlight }()

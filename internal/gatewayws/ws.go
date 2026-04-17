@@ -280,7 +280,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
-	defer s.persistSeq()
+	defer s.persistShardInfo()
 
 	for {
 		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck), slog.F("last_hb", s.lastHB), slog.F("seq", atomic.LoadInt64(&s.seq)))

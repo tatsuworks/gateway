@@ -8,21 +8,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (s *Session) persistReadyGuilds() {
-
-}
-
 func (s *Session) persistShardInfo() {
 	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, s.seq, s.sessID, s.resumeURL)
 	if err != nil {
 		s.log.Error(s.ctx, "save shard info", slog.Error(err))
-	}
-}
-
-func (s *Session) persistSeq() {
-	err := s.stateDB.SetSequence(context.Background(), s.shardID, s.name, s.seq)
-	if err != nil {
-		s.log.Error(s.ctx, "save seq", slog.Error(err))
 	}
 }
 

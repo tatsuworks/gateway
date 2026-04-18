@@ -16,20 +16,19 @@ import (
 func (db *db) processMemberBatch(ctx context.Context, events []MemberEvent) error {
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return xerrors.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
-	insertQ := `
+	const insertQ = `
 INSERT INTO members (user_id, guild_id, data)
 VALUES %s
 ON CONFLICT (user_id, guild_id)
 DO UPDATE SET data = EXCLUDED.data
 `
 
-	// Build VALUES list
-	vals := []interface{}{}
-	placeholders := []string{}
+	vals := make([]interface{}, 0, len(events)*3)
+	placeholders := make([]string, 0, len(events))
 	for i, ev := range events {
 		n := i*3 + 1
 		placeholders = append(placeholders, fmt.Sprintf("($%d,$%d,$%d)", n, n+1, n+2))
@@ -37,19 +36,17 @@ DO UPDATE SET data = EXCLUDED.data
 	}
 	stmt := fmt.Sprintf(insertQ, strings.Join(placeholders, ","))
 	if _, err := tx.ExecContext(ctx, stmt, vals...); err != nil {
-		return err
+		return xerrors.Errorf("exec insert members: %w", err)
 	}
 
-	// Update guild member_count only for "new" ones
-	guildCounts := map[int64]int{}
+	guildCounts := make(map[int64]int, len(events))
 	for _, ev := range events {
 		if ev.IsNew {
 			guildCounts[ev.GuildID]++
 		}
 	}
 
-	for guildID, count := range guildCounts {
-		const updateGuild = `
+	const updateGuild = `
 UPDATE guilds
 SET data = jsonb_set(
     data,
@@ -59,8 +56,9 @@ SET data = jsonb_set(
 )
 WHERE id = $1
 `
+	for guildID, count := range guildCounts {
 		if _, err := tx.ExecContext(ctx, updateGuild, guildID, count); err != nil {
-			return err
+			return xerrors.Errorf("exec update member_count: %w", err)
 		}
 	}
 
@@ -295,7 +293,7 @@ LIMIT $3
 }
 
 func (db *db) processPresenceBatch(ctx context.Context, events []PresenceEvent) error {
-	insertQ := `
+	const insertQ = `
 INSERT INTO presence (user_id, guild_id, data)
 VALUES %s
 ON CONFLICT (user_id, guild_id)
@@ -311,7 +309,7 @@ DO UPDATE SET data = EXCLUDED.data
 	}
 	stmt := fmt.Sprintf(insertQ, strings.Join(placeholders, ","))
 	if _, err := db.sql.ExecContext(ctx, stmt, vals...); err != nil {
-		return err
+		return xerrors.Errorf("exec insert presence: %w", err)
 	}
 
 	return nil

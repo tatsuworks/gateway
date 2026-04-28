@@ -124,7 +124,12 @@ func runBatcher[T BatchEvent](
 			return
 		case ev := <-ch:
 			batch[ev.DedupKey()] = ev
-			for len(batch) < maxBatchSize {
+			// Bound the drain by iteration count, not just unique keys.
+			// Under sustained hot-key traffic that dedupes to fewer than
+			// maxBatchSize keys, an unbounded inner loop would never fall
+			// back to the outer select, starving the ticker and ctx.Done()
+			// cases.
+			for i := 1; i < maxBatchSize && len(batch) < maxBatchSize; i++ {
 				select {
 				case ev := <-ch:
 					batch[ev.DedupKey()] = ev

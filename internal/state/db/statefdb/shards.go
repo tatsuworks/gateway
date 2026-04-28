@@ -5,6 +5,9 @@ import "context"
 func (db *DB) GetShardInfo(ctx context.Context, shard int, name string) (sess string, seq int64, err error) {
 	panic("unimplemented")
 }
+func (db *DB) SetShardInfo(ctx context.Context, shard int, name string, seq int64, sess string, resumeURL string) error {
+	panic("unimplemented")
+}
 func (db *DB) SetSequence(ctx context.Context, shard int, name string, seq int64) error {
 	panic("unimplemented")
 }

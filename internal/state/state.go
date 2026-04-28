@@ -15,6 +15,7 @@ type DB interface {
 	Encoding() discord.Encoding
 
 	GetShardInfo(ctx context.Context, shard int, name string) (sess string, seq int64, err error)
+	SetShardInfo(ctx context.Context, shard int, name string, seq int64, sess string, resumeURL string) error
 	SetSequence(ctx context.Context, shard int, name string, seq int64) error
 	GetSequence(ctx context.Context, shard int, name string) (int64, error)
 	SetSessionID(ctx context.Context, shard int, name string, sess string) error

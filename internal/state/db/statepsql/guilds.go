@@ -8,12 +8,7 @@ import (
 )
 
 func (db *db) SetGuild(ctx context.Context, id int64, raw []byte) error {
-	select {
-	case db.guildEventCh <- GuildEvent{GuildID: id, Raw: raw}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return db.guildBatcher.Send(ctx, GuildEvent{GuildID: id, Raw: raw})
 }
 
 func (db *db) GetGuild(ctx context.Context, id int64) ([]byte, error) {
@@ -83,7 +78,7 @@ func (db *db) DeleteGuildBan(ctx context.Context, guild, user int64) error {
 func (db *db) processGuildBatch(ctx context.Context, events []GuildEvent) error {
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return xerrors.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -101,7 +96,7 @@ ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
 		datas[i] = string(ev.Raw)
 	}
 	if _, err := tx.ExecContext(ctx, insertQ, pq.Array(ids), pq.Array(datas)); err != nil {
-		return err
+		return xerrors.Errorf("exec insert guilds: %w", err)
 	}
 	return tx.Commit()
 }

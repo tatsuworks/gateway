@@ -3,6 +3,8 @@ package statepsql
 import (
 	"context"
 	"database/sql/driver"
+	"os"
+	"strconv"
 
 	"cdr.dev/slog"
 
@@ -19,10 +21,11 @@ import (
 var _ state.DB = &db{}
 
 type db struct {
-	sql           *sqlx.DB
-	memberEventCh chan<- MemberEvent
-	guildEventCh  chan<- GuildEvent
-	logger        slog.Logger
+	sql             *sqlx.DB
+	memberBatcher   *ShardedBatcher[MemberEvent]
+	presenceBatcher *ShardedBatcher[PresenceEvent]
+	guildBatcher    *ShardedBatcher[GuildEvent]
+	logger          slog.Logger
 }
 
 func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, error) {
@@ -31,16 +34,24 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("open sqlx: %w", err)
 	}
 
-	sqlx.SetMaxOpenConns(4)
-	sqlx.SetMaxIdleConns(4)
+	maxConns := 4
+	if v, err := strconv.Atoi(os.Getenv("PSQL_MAX_CONNS")); err == nil && v > 0 {
+		maxConns = v
+	}
+	sqlx.SetMaxOpenConns(maxConns)
+	sqlx.SetMaxIdleConns(maxConns)
 
 	err = sqlx.Ping()
 	if err != nil {
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
-	dbInstance.memberEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processMemberBatch, logger)
-	dbInstance.guildEventCh = BatchWorker(ctx, 500, 100*time.Millisecond, dbInstance.processGuildBatch, logger)
+	dbInstance.memberBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
+		dbInstance.processMemberBatch, logger)
+	dbInstance.presenceBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
+		dbInstance.processPresenceBatch, logger)
+	dbInstance.guildBatcher = NewShardedBatcher(ctx, maxConns, 500, 100*time.Millisecond,
+		dbInstance.processGuildBatch, logger)
 	return dbInstance, nil
 }
 

@@ -280,7 +280,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	// go s.rotateStatuses()
 
 	s.log.Info(s.ctx, "websocket connected, waiting for events")
-	defer s.persistSeq()
+	defer s.persistShardInfo()
 
 	for {
 		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck), slog.F("last_hb", s.lastHB), slog.F("seq", atomic.LoadInt64(&s.seq)))
@@ -380,11 +380,9 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case 9:
 		s.log.Info(s.ctx, "invalid session, reconnecting")
 		s.sessID = ""
-		s.persistSessID()
 		s.seq = 0
-		s.persistSeq()
 		s.resumeURL = ""
-		s.persistResumeURL()
+		s.persistShardInfo()
 		s.wch = make(chan *Op, 2000)
 
 		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
@@ -418,8 +416,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.resumeURL = resumeURL
 		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("resume_gateway_url", resumeURL),
 			slog.F("guild_count", len(s.guilds)))
-		s.persistSessID()
-		s.persistResumeURL()
+		s.persistShardInfo()
 		s.authed = true
 		s.ready = time.Now()
 
@@ -488,9 +485,7 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 				s.seq = 0
 				s.sessID = ""
 				s.resumeURL = ""
-				s.persistSeq()
-				s.persistSessID()
-				s.persistResumeURL()
+				s.persistShardInfo()
 			}
 		}
 		return nil, xerrors.Errorf("read message: %w", err)

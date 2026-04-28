@@ -10,9 +10,12 @@ import (
 // BatchEvent is implemented by event types to provide routing and dedup keys.
 // RouteKey groups events onto the same worker (guildID); DedupKey collapses
 // duplicate events within a batch (e.g. same member updated twice).
+//
+// DedupKey returns any so composite keys can be a comparable struct/array
+// without lossy bit-packing of two 64-bit Discord snowflakes.
 type BatchEvent interface {
 	RouteKey() uint64
-	DedupKey() uint64
+	DedupKey() any
 }
 
 type MemberEvent struct {
@@ -23,7 +26,7 @@ type MemberEvent struct {
 }
 
 func (e MemberEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e MemberEvent) DedupKey() uint64 { return uint64(e.UserID)<<32 | uint64(e.GuildID)&0xFFFFFFFF }
+func (e MemberEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
 
 type PresenceEvent struct {
 	GuildID int64
@@ -32,7 +35,7 @@ type PresenceEvent struct {
 }
 
 func (e PresenceEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e PresenceEvent) DedupKey() uint64 { return uint64(e.UserID)<<32 | uint64(e.GuildID)&0xFFFFFFFF }
+func (e PresenceEvent) DedupKey() any    { return [2]int64{e.UserID, e.GuildID} }
 
 type GuildEvent struct {
 	GuildID int64
@@ -40,7 +43,7 @@ type GuildEvent struct {
 }
 
 func (e GuildEvent) RouteKey() uint64 { return uint64(e.GuildID) }
-func (e GuildEvent) DedupKey() uint64 { return uint64(e.GuildID) }
+func (e GuildEvent) DedupKey() any    { return e.GuildID }
 
 // ShardedBatcher fans events across N independent batch workers, routed by
 // RouteKey() % N. Events for the same guild cluster on one worker for better
@@ -90,7 +93,7 @@ func runBatcher[T BatchEvent](
 	defer ticker.Stop()
 
 	inFlight := make(chan struct{}, 1)
-	batch := make(map[uint64]T)
+	batch := make(map[any]T)
 
 	flush := func() {
 		if len(batch) == 0 {
@@ -100,7 +103,7 @@ func runBatcher[T BatchEvent](
 		for _, ev := range batch {
 			events = append(events, ev)
 		}
-		batch = make(map[uint64]T)
+		batch = make(map[any]T)
 		inFlight <- struct{}{}
 		go func() {
 			defer func() { <-inFlight }()
@@ -114,6 +117,10 @@ func runBatcher[T BatchEvent](
 		select {
 		case <-ctx.Done():
 			flush()
+			// Wait for the in-flight write (kicked off by flush above, or a
+			// prior tick) to complete before exiting so the final batch isn't
+			// dropped on shutdown.
+			inFlight <- struct{}{}
 			return
 		case ev := <-ch:
 			batch[ev.DedupKey()] = ev

@@ -15,7 +15,7 @@ type testEvent struct {
 }
 
 func (e testEvent) RouteKey() uint64 { return e.route }
-func (e testEvent) DedupKey() uint64 { return e.dedup }
+func (e testEvent) DedupKey() any    { return e.dedup }
 
 func newTestBatcher(t *testing.T, shards, maxBatch int, flushInterval time.Duration) (*ShardedBatcher[testEvent], <-chan []testEvent, context.CancelFunc) {
 	t.Helper()

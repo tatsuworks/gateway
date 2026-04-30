@@ -31,6 +31,13 @@ const (
 	IdentifyWaitTime      = 10 * time.Second
 	IdentifyStabilizeTime = 60 * time.Second
 	TimeoutAllowance      = 10 * time.Second
+
+	// readyGrace bounds how long we wait for READY before unblocking the
+	// identify bucket anyway. Discord's identify pacing only cares about
+	// how long ago the IDENTIFY op was sent, not whether READY arrived,
+	// so once IdentifyWaitTime + readyGrace has elapsed it is safe to
+	// release the bucket regardless.
+	readyGrace = 5 * time.Second
 )
 
 var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
@@ -87,6 +94,16 @@ type Session struct {
 	whitelistedEvents map[string]map[string]struct{}
 
 	hasGuildMembersIntent bool
+
+	// stabilizeSem caps the number of shards that can be in the
+	// post-IDENTIFY backfill window concurrently. Acquired after READY
+	// when this shard intends to request guild members; held for
+	// stabilizeDuration (or until ctx cancels). Decoupled from the
+	// identify mutex so it does not pace identifies.
+	stabilizeSem         chan struct{}
+	stabilizeDuration    time.Duration
+	stabilizeMaxDuration time.Duration
+	identifyPacing       time.Duration
 }
 
 func (s *Session) Status() string {
@@ -133,9 +150,34 @@ type SessionConfig struct {
 	ShardCount        int
 	BufferPool        *sync.Pool
 	WhitelistedEvents map[string]map[string]struct{}
+
+	// StabilizeSem is a buffered channel acting as a weighted semaphore
+	// across all shards in this manager process. Capacity controls how
+	// many shards may be in the post-IDENTIFY backfill window at once.
+	// nil disables the gate (no waiting).
+	StabilizeSem chan struct{}
+	// StabilizeDuration is the per-shard hold time for the stabilize
+	// semaphore. Zero disables the wait.
+	StabilizeDuration time.Duration
+	// StabilizeMaxDuration is an upper bound enforced via context, used
+	// if anything (e.g. shard cancellation) goes wrong while holding
+	// the semaphore. Defaults to 2x StabilizeDuration if zero.
+	StabilizeMaxDuration time.Duration
+	// IdentifyPacing is how long the identify mutex is held after
+	// IDENTIFY is sent. Zero falls back to IdentifyWaitTime.
+	IdentifyPacing time.Duration
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
+	pacing := cfg.IdentifyPacing
+	if pacing <= 0 {
+		pacing = IdentifyWaitTime
+	}
+	stabilizeMax := cfg.StabilizeMaxDuration
+	if stabilizeMax <= 0 && cfg.StabilizeDuration > 0 {
+		stabilizeMax = 2 * cfg.StabilizeDuration
+	}
+
 	sess := &Session{
 		ctx:        context.Background(),
 		name:       cfg.Name,
@@ -159,6 +201,11 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		rc:                cfg.Redis,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
+
+		stabilizeSem:         cfg.StabilizeSem,
+		stabilizeDuration:    cfg.StabilizeDuration,
+		stabilizeMaxDuration: stabilizeMax,
+		identifyPacing:       pacing,
 	}
 
 	// Set hasGuildMembersIntent
@@ -179,16 +226,18 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 func (s *Session) shouldProcessMembers() bool {
 	return !skipMemberRequest && s.hasGuildMembersIntent
 }
-func (s *Session) calcIdentifyWait() time.Duration {
-	totalWaitTime := IdentifyWaitTime
-	if s.shouldProcessMembers() { // allow for more time to process database when getting guild members population
-		totalWaitTime += IdentifyStabilizeTime
-	}
-	return totalWaitTime
+
+// identifyLockHoldTime is the upper bound on how long this shard intends
+// to hold the identify mutex. Sets the etcd lease TTL. The actual hold
+// time is identifyPacing + readyGrace; the TTL has additional headroom
+// so a brief GC pause or etcd hiccup does not collapse the lease while
+// we are still legitimately holding the lock.
+func (s *Session) identifyLockHoldTime() time.Duration {
+	return s.identifyPacing + readyGrace + TimeoutAllowance
 }
 
 func (s *Session) initEtcd() error {
-	timeoutDuration := s.calcIdentifyWait() + TimeoutAllowance
+	timeoutDuration := s.identifyLockHoldTime()
 
 	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
 	if err != nil {
@@ -226,19 +275,6 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		return err
 	}
 
-	// only acquire the identify lock if we know we won't send a resume
-	if !s.shouldResume() {
-		s.log.Debug(s.ctx, "acquiring lock, no ability to resume")
-		err = s.acquireIdentifyLock()
-		if err != nil {
-			return xerrors.Errorf("grab identify lock: %w", err)
-		}
-		s.log.Debug(s.ctx, "lock acquired")
-
-	} else {
-		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", s.seq))
-	}
-
 	r, err := czlib.NewReader(bytes.NewReader(nil))
 	if err != nil {
 		return xerrors.Errorf("initialize zlib: %w", err)
@@ -246,6 +282,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	s.zr = r
 	defer r.Close()
 
+	// Dial + HELLO happen outside the identify mutex. Discord's identify
+	// pacing only applies to the IDENTIFY op itself, so doing the WS
+	// handshake before holding the lock removes dial/HELLO latency from
+	// the bucket's serialized critical section.
 	s.curState = "connecting"
 	c, _, err := websocket.Dial(s.ctx, s.GatewayURL(), nil)
 	if err != nil {
@@ -258,6 +298,20 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	err = s.readHello()
 	if err != nil {
 		return xerrors.Errorf("handle hello message: %w", err)
+	}
+
+	// only acquire the identify lock if we know we won't send a resume
+	if !s.shouldResume() {
+		s.log.Debug(s.ctx, "acquiring lock, no ability to resume")
+		lockWaitStart := time.Now()
+		err = s.acquireIdentifyLock()
+		if err != nil {
+			return xerrors.Errorf("grab identify lock: %w", err)
+		}
+		s.log.Info(s.ctx, "identify lock acquired",
+			slog.F("wait", time.Since(lockWaitStart).String()))
+	} else {
+		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", s.seq))
 	}
 
 	go s.writer()
@@ -273,6 +327,13 @@ func (s *Session) Open(ctx context.Context, token string) error {
 			s.prioch = make(chan *Op)
 		}
 		s.lastIdentify = time.Now()
+		// Release the identify mutex after the pacing window elapses,
+		// regardless of whether READY has arrived. Discord's identify
+		// rate limit is keyed on time since IDENTIFY was sent, not on
+		// READY arrival, so other shards in the bucket can identify
+		// once the pacing window has elapsed. The READY-handler path
+		// is now responsible only for stabilize (backfill draining).
+		s.scheduleIdentifyLockRelease()
 	}
 
 	go s.sendHeartbeats()
@@ -420,14 +481,15 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		s.authed = true
 		s.ready = time.Now()
 
-		go func() {
-			totalWaitTime := s.calcIdentifyWait()
-			time.Sleep(totalWaitTime)
-			err = s.releaseIdentifyLock()
-			if err != nil {
-				s.log.Error(s.ctx, "release identify lock after ready", slog.Error(err))
-			}
-		}()
+		// Identify lock release is scheduled separately right after
+		// IDENTIFY is sent (see scheduleIdentifyLockRelease). Here we
+		// only need to take the stabilize gate, which paces the
+		// per-shard backfill burst (Request Guild Members → chunks)
+		// against state.DB writes. Skipped for shards that won't be
+		// requesting members.
+		if s.shouldProcessMembers() {
+			go s.holdStabilize()
+		}
 
 		return true, nil
 
@@ -463,6 +525,78 @@ func (s *Session) releaseIdentifyLock() error {
 		}
 	}
 	return nil
+}
+
+// scheduleIdentifyLockRelease unblocks the identify bucket after the
+// pacing window elapses. Runs in a goroutine; survives the parent's
+// event loop unwinding via context.Background, but races against
+// invalid-session cleanup which releases the lock eagerly. The
+// IsOwner guard makes the second release a no-op.
+func (s *Session) scheduleIdentifyLockRelease() {
+	pacing := s.identifyPacing
+	if pacing <= 0 {
+		pacing = IdentifyWaitTime
+	}
+	hold := pacing + readyGrace
+	go func() {
+		t := time.NewTimer(hold)
+		defer t.Stop()
+		select {
+		case <-t.C:
+		case <-s.ctx.Done():
+		}
+		if s.identifyMu == nil || s.identifyMu.Key() == "" {
+			return
+		}
+		if s.identifyMu.IsOwner().Result != etcdserverpb.Compare_EQUAL {
+			return
+		}
+		if err := s.releaseIdentifyLock(); err != nil {
+			s.log.Error(s.ctx, "release identify lock after pacing", slog.Error(err))
+		}
+	}()
+}
+
+// holdStabilize acquires the cross-shard stabilize semaphore (if
+// configured) and holds it for stabilizeDuration to pace per-shard
+// backfill bursts. Bounded by stabilizeMaxDuration as a safety. Does
+// not block the caller — runs in its own goroutine.
+func (s *Session) holdStabilize() {
+	if s.stabilizeSem == nil || s.stabilizeDuration <= 0 {
+		return
+	}
+
+	max := s.stabilizeMaxDuration
+	if max <= 0 {
+		max = 2 * s.stabilizeDuration
+	}
+
+	acquireStart := time.Now()
+	select {
+	case s.stabilizeSem <- struct{}{}:
+	case <-s.ctx.Done():
+		return
+	}
+	acquired := time.Now()
+	s.log.Info(s.ctx, "stabilize semaphore acquired",
+		slog.F("wait", acquired.Sub(acquireStart).String()))
+
+	defer func() {
+		select {
+		case <-s.stabilizeSem:
+		default:
+		}
+		s.log.Info(s.ctx, "stabilize semaphore released",
+			slog.F("held", time.Since(acquired).String()))
+	}()
+
+	hold := min(s.stabilizeDuration, max)
+	t := time.NewTimer(hold)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-s.ctx.Done():
+	}
 }
 
 func (s *Session) Cancel() {

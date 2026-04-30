@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,44 @@ type Manager struct {
 	bufferPool *sync.Pool
 
 	whitelistedEvents map[string]map[string]struct{}
+
+	// stabilizeSem caps how many shards may be in the post-IDENTIFY
+	// backfill window concurrently. Shared across all sessions started
+	// by this manager. nil disables the gate.
+	stabilizeSem         chan struct{}
+	stabilizeDuration    time.Duration
+	stabilizeMaxDuration time.Duration
+	identifyPacing       time.Duration
+}
+
+// envDuration parses a positive integer-seconds env var, falling back
+// to def when unset, empty, or invalid (with a warn log on invalid).
+func envDuration(logger slog.Logger, ctx context.Context, name string, def time.Duration) time.Duration {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		logger.Warn(ctx, "invalid duration env var, using default",
+			slog.F("var", name), slog.F("raw", raw), slog.F("default", def.String()))
+		return def
+	}
+	return time.Duration(n) * time.Second
+}
+
+func envInt(logger slog.Logger, ctx context.Context, name string, def int) int {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		logger.Warn(ctx, "invalid int env var, using default",
+			slog.F("var", name), slog.F("raw", raw), slog.F("default", def))
+		return def
+	}
+	return n
 }
 
 type Config struct {
@@ -113,6 +152,21 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		cfg.Logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
+	stabilizeConcurrency := envInt(cfg.Logger, ctx, "IDENTIFY_STABILIZE_CONCURRENCY", 1)
+	stabilizeDuration := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS", gatewayws.IdentifyStabilizeTime)
+	stabilizeMax := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS_MAX", 2*stabilizeDuration)
+	identifyPacing := envDuration(cfg.Logger, ctx, "IDENTIFY_PACING_SECONDS", gatewayws.IdentifyWaitTime)
+
+	var stabilizeSem chan struct{}
+	if stabilizeConcurrency > 0 && stabilizeDuration > 0 {
+		stabilizeSem = make(chan struct{}, stabilizeConcurrency)
+	}
+	cfg.Logger.Info(ctx, "identify pacing config",
+		slog.F("pacing", identifyPacing.String()),
+		slog.F("stabilize_concurrency", stabilizeConcurrency),
+		slog.F("stabilize_duration", stabilizeDuration.String()),
+		slog.F("stabilize_max", stabilizeMax.String()))
+
 	return &Manager{
 		ctx:  ctx,
 		name: cfg.Name,
@@ -136,6 +190,11 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		},
 
 		whitelistedEvents: redisWhitelistedEvents,
+
+		stabilizeSem:         stabilizeSem,
+		stabilizeDuration:    stabilizeDuration,
+		stabilizeMaxDuration: stabilizeMax,
+		identifyPacing:       identifyPacing,
 	}
 }
 
@@ -157,18 +216,22 @@ func (m *Manager) Start(start, stop int) error {
 
 func (m *Manager) startShard(shard int) {
 	s, err := gatewayws.NewSession(&gatewayws.SessionConfig{
-		Name:              m.name,
-		Logger:            m.log,
-		DB:                m.db,
-		WorkGroup:         m.wg,
-		Redis:             m.rdb,
-		Etcd:              m.etcd,
-		Token:             m.token,
-		Intents:           m.intents,
-		ShardID:           shard,
-		ShardCount:        m.shardCount,
-		BufferPool:        m.bufferPool,
-		WhitelistedEvents: m.whitelistedEvents,
+		Name:                 m.name,
+		Logger:               m.log,
+		DB:                   m.db,
+		WorkGroup:            m.wg,
+		Redis:                m.rdb,
+		Etcd:                 m.etcd,
+		Token:                m.token,
+		Intents:              m.intents,
+		ShardID:              shard,
+		ShardCount:           m.shardCount,
+		BufferPool:           m.bufferPool,
+		WhitelistedEvents:    m.whitelistedEvents,
+		StabilizeSem:         m.stabilizeSem,
+		StabilizeDuration:    m.stabilizeDuration,
+		StabilizeMaxDuration: m.stabilizeMaxDuration,
+		IdentifyPacing:       m.identifyPacing,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

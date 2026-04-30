@@ -10,6 +10,15 @@ import (
 
 type EventPayload struct {
 	GuildID int64
+
+	// DiscordMemberCount is the member_count field reported by Discord
+	// in the GUILD_CREATE/GUILD_UPDATE payload, or 0 when not present.
+	DiscordMemberCount int64
+	// CachedMemberCount is the count of member rows currently held in
+	// state.DB for the guild, or 0 when not yet populated. Set on
+	// GUILD_CREATE/GUILD_UPDATE so callers can decide whether to issue
+	// a full member backfill.
+	CachedMemberCount int64
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
@@ -21,11 +30,9 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		guildId, err := c.GuildCreate(ctx, e.D)
-		return &EventPayload{GuildID: guildId}, err
+		return c.GuildCreate(ctx, e.D)
 	case "GUILD_UPDATE":
-		guildId, err := c.GuildCreate(ctx, e.D)
-		return &EventPayload{GuildID: guildId}, err
+		return c.GuildCreate(ctx, e.D)
 	case "GUILD_DELETE":
 		return nil, c.GuildDelete(ctx, e.D)
 	case "GUILD_BAN_ADD":

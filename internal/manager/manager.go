@@ -45,6 +45,11 @@ type Manager struct {
 	stabilizeDuration    time.Duration
 	stabilizeMaxDuration time.Duration
 	identifyPacing       time.Duration
+	divergenceRatio      float64
+
+	sweepEnabled        bool
+	sweepRequestsPerSec int
+	sweepBatch          int
 }
 
 // envDuration parses a positive integer-seconds env var, falling back
@@ -75,6 +80,20 @@ func envInt(logger slog.Logger, ctx context.Context, name string, def int) int {
 		return def
 	}
 	return n
+}
+
+func envFloat(logger slog.Logger, ctx context.Context, name string, def float64) float64 {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(raw, 64)
+	if err != nil || f < 0 {
+		logger.Warn(ctx, "invalid float env var, using default",
+			slog.F("var", name), slog.F("raw", raw), slog.F("default", def))
+		return def
+	}
+	return f
 }
 
 type Config struct {
@@ -156,6 +175,10 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	stabilizeDuration := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS", gatewayws.IdentifyStabilizeTime)
 	stabilizeMax := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS_MAX", 2*stabilizeDuration)
 	identifyPacing := envDuration(cfg.Logger, ctx, "IDENTIFY_PACING_SECONDS", gatewayws.IdentifyWaitTime)
+	divergenceRatio := envFloat(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_RATIO", 0.05)
+	sweepEnabled := os.Getenv("BACKFILL_SWEEP_ENABLED") != "false"
+	sweepRPS := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_REQUESTS_PER_SECOND", 12)
+	sweepBatch := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_BATCH", 200)
 
 	var stabilizeSem chan struct{}
 	if stabilizeConcurrency > 0 && stabilizeDuration > 0 {
@@ -165,7 +188,11 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		slog.F("pacing", identifyPacing.String()),
 		slog.F("stabilize_concurrency", stabilizeConcurrency),
 		slog.F("stabilize_duration", stabilizeDuration.String()),
-		slog.F("stabilize_max", stabilizeMax.String()))
+		slog.F("stabilize_max", stabilizeMax.String()),
+		slog.F("divergence_ratio", divergenceRatio),
+		slog.F("sweep_enabled", sweepEnabled),
+		slog.F("sweep_rps", sweepRPS),
+		slog.F("sweep_batch", sweepBatch))
 
 	return &Manager{
 		ctx:  ctx,
@@ -195,6 +222,11 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		stabilizeDuration:    stabilizeDuration,
 		stabilizeMaxDuration: stabilizeMax,
 		identifyPacing:       identifyPacing,
+		divergenceRatio:      divergenceRatio,
+
+		sweepEnabled:        sweepEnabled,
+		sweepRequestsPerSec: sweepRPS,
+		sweepBatch:          sweepBatch,
 	}
 }
 
@@ -211,6 +243,7 @@ func (m *Manager) Start(start, stop int) error {
 	}
 
 	go m.logHealth()
+	go m.runGuildBackfillSweep(start, stop)
 	return nil
 }
 
@@ -232,6 +265,7 @@ func (m *Manager) startShard(shard int) {
 		StabilizeDuration:    m.stabilizeDuration,
 		StabilizeMaxDuration: m.stabilizeMaxDuration,
 		IdentifyPacing:       m.identifyPacing,
+		DivergenceRatio:      m.divergenceRatio,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

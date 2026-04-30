@@ -104,6 +104,13 @@ type Session struct {
 	stabilizeDuration    time.Duration
 	stabilizeMaxDuration time.Duration
 	identifyPacing       time.Duration
+
+	// divergenceRatio is the fractional gap between Discord's reported
+	// member_count and the cached count above which a Request Guild
+	// Members op is sent on GUILD_CREATE. 0 disables the check (always
+	// request, current pre-Phase-3 behavior). Cold guilds always
+	// request regardless.
+	divergenceRatio float64
 }
 
 func (s *Session) Status() string {
@@ -166,6 +173,9 @@ type SessionConfig struct {
 	// IdentifyPacing is how long the identify mutex is held after
 	// IDENTIFY is sent. Zero falls back to IdentifyWaitTime.
 	IdentifyPacing time.Duration
+	// DivergenceRatio gates GUILD_CREATE-time member backfill. See
+	// Session.divergenceRatio.
+	DivergenceRatio float64
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -206,6 +216,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stabilizeDuration:    cfg.StabilizeDuration,
 		stabilizeMaxDuration: stabilizeMax,
 		identifyPacing:       pacing,
+		divergenceRatio:      cfg.DivergenceRatio,
 	}
 
 	// Set hasGuildMembersIntent
@@ -225,6 +236,34 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 
 func (s *Session) shouldProcessMembers() bool {
 	return !skipMemberRequest && s.hasGuildMembersIntent
+}
+
+// shouldRequestMembers decides whether to send a Request Guild Members
+// op for a GUILD_CREATE we just processed. Cold guilds always request.
+// Otherwise the cached count must diverge from Discord's reported count
+// by more than divergenceRatio. divergenceRatio == 0 disables the check
+// (always request, the pre-Phase-3 behavior).
+func (s *Session) shouldRequestMembers(p *handler.EventPayload) bool {
+	if p == nil {
+		return false
+	}
+	if s.divergenceRatio <= 0 {
+		return true
+	}
+	if p.CachedMemberCount == 0 {
+		return true
+	}
+	if p.DiscordMemberCount <= 0 {
+		// Discord didn't tell us a count; can't compute divergence.
+		// Skip rather than re-pull a possibly-correct roster.
+		return false
+	}
+	diff := p.DiscordMemberCount - p.CachedMemberCount
+	if diff < 0 {
+		diff = -diff
+	}
+	ratio := float64(diff) / float64(p.DiscordMemberCount)
+	return ratio > s.divergenceRatio
 }
 
 // identifyLockHoldTime is the upper bound on how long this shard intends
@@ -378,11 +417,25 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
-		// request for guild member info only on GUILD_CREATE events and if the intent is set
+		// Request members on GUILD_CREATE only when needed. Cold guilds
+		// (no cached members) always request; otherwise compare Discord's
+		// member_count to the cached count and skip when within
+		// divergenceRatio. Catches silent leaves while the gateway was
+		// disconnected without re-pulling rosters that look correct.
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			s.curState = "request guild members"
-			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
-			s.requestGuildMembers(evtPayload.GuildID)
+			if s.shouldRequestMembers(evtPayload) {
+				s.curState = "request guild members"
+				s.log.Debug(s.ctx, "requesting guild members",
+					slog.F("guild", evtPayload.GuildID),
+					slog.F("discord_count", evtPayload.DiscordMemberCount),
+					slog.F("cached_count", evtPayload.CachedMemberCount))
+				s.requestGuildMembers(evtPayload.GuildID)
+			} else {
+				s.log.Debug(s.ctx, "skipping guild member backfill, divergence below threshold",
+					slog.F("guild", evtPayload.GuildID),
+					slog.F("discord_count", evtPayload.DiscordMemberCount),
+					slog.F("cached_count", evtPayload.CachedMemberCount))
+			}
 		}
 
 	}

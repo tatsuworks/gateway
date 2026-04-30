@@ -32,6 +32,53 @@ func (db *DB) GetGuildCount(_ context.Context) (int, error) {
 	return db.keyCountForPrefix(rr)
 }
 
+func (db *DB) GetGuildIDsAfter(_ context.Context, after int64, limit int) ([]int64, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	prefixRange, err := fdb.PrefixRange(db.fmtGuildPrefix())
+	if err != nil {
+		return nil, err
+	}
+
+	begin := fdb.FirstGreaterThan(db.fmtGuildKey(after))
+	end := fdb.FirstGreaterOrEqual(prefixRange.End)
+	r := fdb.SelectorRange{Begin: begin, End: end}
+
+	out := make([]int64, 0, limit)
+	err = db.ReadTransact(func(t fdb.ReadTransaction) error {
+		out = out[:0]
+		ropt := fdb.RangeOptions{Mode: fdb.StreamingModeWantAll, Limit: limit}
+		it := t.Snapshot().GetRange(r, ropt).Iterator()
+		for it.Advance() {
+			kv, err := it.Get()
+			if err != nil {
+				return err
+			}
+			tup, err := db.subs.Guilds.Unpack(kv.Key)
+			if err != nil {
+				return err
+			}
+			if len(tup) == 0 {
+				continue
+			}
+			id, ok := tup[0].(int64)
+			if !ok {
+				// Non-guild-row key (e.g. nested ban entries with extra
+				// tuple components); skip but don't fail.
+				continue
+			}
+			out = append(out, id)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (db *DB) DeleteGuild(_ context.Context, id int64) error {
 	return db.Transact(func(t fdb.Transaction) error {
 		t.Clear(db.fmtGuildKey(id))

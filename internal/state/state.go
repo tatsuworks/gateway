@@ -27,6 +27,13 @@ type DB interface {
 	SetGuild(ctx context.Context, id int64, raw []byte) error
 	GetGuild(ctx context.Context, id int64) ([]byte, error)
 	GetGuildCount(ctx context.Context) (int, error)
+	// GetGuildIDsAfter pages through guild IDs in ascending order,
+	// returning IDs strictly greater than `after`, capped at `limit`.
+	// Used by the bounded-rate background member-resync sweep so we can
+	// iterate the guild set without materializing it all in memory.
+	// Returns an empty slice (not an error) when no IDs are above the
+	// cursor — callers wrap to `after = 0`.
+	GetGuildIDsAfter(ctx context.Context, after int64, limit int) ([]int64, error)
 	DeleteGuild(ctx context.Context, id int64) error
 	SetGuildBan(ctx context.Context, guild, user int64, raw []byte) error
 	GetGuildBan(ctx context.Context, guild, user int64) ([]byte, error)

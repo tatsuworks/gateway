@@ -47,6 +47,35 @@ FROM
 	return c, nil
 }
 
+func (db *db) GetGuildIDsAfter(ctx context.Context, after int64, limit int) ([]int64, error) {
+	const q = `
+SELECT id
+FROM guilds
+WHERE id > $1
+ORDER BY id
+LIMIT $2
+`
+
+	rows, err := db.sql.QueryxContext(ctx, q, after, limit)
+	if err != nil {
+		return nil, xerrors.Errorf("exec select: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]int64, 0, limit)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, xerrors.Errorf("scan: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, xerrors.Errorf("rows: %w", err)
+	}
+	return ids, nil
+}
+
 func (db *db) DeleteGuild(ctx context.Context, id int64) error {
 	const q = `
 DELETE FROM

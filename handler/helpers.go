@@ -13,12 +13,8 @@ type EventPayload struct {
 
 	// DiscordMemberCount is the member_count field reported by Discord
 	// in the GUILD_CREATE/GUILD_UPDATE payload, or 0 when not present.
+	// Used by gatewayws to decide whether divergence checking applies.
 	DiscordMemberCount int64
-	// CachedMemberCount is the count of member rows currently held in
-	// state.DB for the guild, or 0 when not yet populated. Set on
-	// GUILD_CREATE/GUILD_UPDATE so callers can decide whether to issue
-	// a full member backfill.
-	CachedMemberCount int64
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {

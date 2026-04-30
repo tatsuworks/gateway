@@ -181,7 +181,13 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	stabilizeDuration := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS", gatewayws.IdentifyStabilizeTime)
 	stabilizeMax := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS_MAX", 2*stabilizeDuration)
 	identifyPacing := envDuration(cfg.Logger, ctx, "IDENTIFY_PACING_SECONDS", gatewayws.IdentifyWaitTime)
-	divergenceRatio := envFloat(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_RATIO", 0.05)
+	// Default divergence ratio is 0 (disabled): the divergence check
+	// requires a per-GUILD_CREATE COUNT(*) on members which is too
+	// expensive without a maintained guilds.member_count column. Ops
+	// can opt in (e.g. 0.05) once that column lands or the cost is
+	// validated. Until then, behavior matches pre-Phase-3 — every
+	// GUILD_CREATE triggers a Request Guild Members.
+	divergenceRatio := envFloat(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_RATIO", 0)
 	sweepEnabled := os.Getenv("BACKFILL_SWEEP_ENABLED") != "false"
 	sweepRPS := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_REQUESTS_PER_SECOND", 12)
 	sweepBatch := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_BATCH", 200)

@@ -238,32 +238,53 @@ func (s *Session) shouldProcessMembers() bool {
 	return !skipMemberRequest && s.hasGuildMembersIntent
 }
 
-// shouldRequestMembers decides whether to send a Request Guild Members
-// op for a GUILD_CREATE we just processed. Cold guilds always request.
-// Otherwise the cached count must diverge from Discord's reported count
-// by more than divergenceRatio. divergenceRatio == 0 disables the check
-// (always request, the pre-Phase-3 behavior).
-func (s *Session) shouldRequestMembers(p *handler.EventPayload) bool {
+// shouldRequestMembersForGuild decides whether to send a Request Guild
+// Members op for a GUILD_CREATE we just processed.
+//
+//   - divergenceRatio <= 0 (default): always request, current behavior.
+//   - divergenceRatio > 0: lazily look up cached member count for the
+//     guild. Cold guilds (cached == 0) always request. When Discord
+//     supplied a member_count and the divergence between cached and
+//     Discord-reported is within the ratio, skip the request.
+//   - When divergence is enabled but Discord did not supply a count,
+//     fall through to "request" — same as today.
+//
+// The DB read happens only when divergence is on, so the slow
+// COUNT(*) per GUILD_CREATE that would otherwise hit Postgres during
+// mass reconnect is gated behind explicit opt-in.
+func (s *Session) shouldRequestMembersForGuild(ctx context.Context, p *handler.EventPayload) bool {
 	if p == nil {
 		return false
 	}
 	if s.divergenceRatio <= 0 {
 		return true
 	}
-	if p.CachedMemberCount == 0 {
+	if p.DiscordMemberCount <= 0 {
 		return true
 	}
-	if p.DiscordMemberCount <= 0 {
-		// Discord didn't tell us a count; can't compute divergence.
-		// Skip rather than re-pull a possibly-correct roster.
-		return false
+	cached, err := s.stateDB.GetGuildMemberCount(ctx, p.GuildID)
+	if err != nil {
+		s.log.Warn(s.ctx, "divergence check: GetGuildMemberCount failed, falling through to request",
+			slog.F("guild", p.GuildID), slog.Error(err))
+		return true
 	}
-	diff := p.DiscordMemberCount - p.CachedMemberCount
+	if cached == 0 {
+		return true
+	}
+	diff := p.DiscordMemberCount - int64(cached)
 	if diff < 0 {
 		diff = -diff
 	}
 	ratio := float64(diff) / float64(p.DiscordMemberCount)
-	return ratio > s.divergenceRatio
+	if ratio <= s.divergenceRatio {
+		s.log.Debug(s.ctx, "skipping guild member backfill, divergence below threshold",
+			slog.F("guild", p.GuildID),
+			slog.F("discord_count", p.DiscordMemberCount),
+			slog.F("cached_count", cached),
+			slog.F("ratio", ratio))
+		return false
+	}
+	return true
 }
 
 // identifyLockHoldTime is the upper bound on how long this shard intends
@@ -417,24 +438,19 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
-		// Request members on GUILD_CREATE only when needed. Cold guilds
-		// (no cached members) always request; otherwise compare Discord's
-		// member_count to the cached count and skip when within
-		// divergenceRatio. Catches silent leaves while the gateway was
-		// disconnected without re-pulling rosters that look correct.
+		// Request members on GUILD_CREATE. When divergence checking is
+		// disabled (default) this is unconditional — same behavior as
+		// pre-Phase-3. When enabled, lazily fetch the cached count and
+		// skip the request if cached and Discord-reported counts agree
+		// within divergenceRatio. The lazy fetch keeps a slow
+		// COUNT(*) off the hot path unless ops opts in.
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			if s.shouldRequestMembers(evtPayload) {
+			if s.shouldRequestMembersForGuild(ctx, evtPayload) {
 				s.curState = "request guild members"
 				s.log.Debug(s.ctx, "requesting guild members",
 					slog.F("guild", evtPayload.GuildID),
-					slog.F("discord_count", evtPayload.DiscordMemberCount),
-					slog.F("cached_count", evtPayload.CachedMemberCount))
+					slog.F("discord_count", evtPayload.DiscordMemberCount))
 				s.requestGuildMembers(evtPayload.GuildID)
-			} else {
-				s.log.Debug(s.ctx, "skipping guild member backfill, divergence below threshold",
-					slog.F("guild", evtPayload.GuildID),
-					slog.F("discord_count", evtPayload.DiscordMemberCount),
-					slog.F("cached_count", evtPayload.CachedMemberCount))
 			}
 		}
 

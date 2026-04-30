@@ -16,25 +16,26 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 
 	guild := gc.ID
 
-	// Read cached count once. Used by the GUILD_CREATE caller to decide
-	// whether to send a Request Guild Members op (divergence check) and
-	// also to populate gc.Raw's member_count when Discord didn't supply
-	// one. Reading even when MemberCount > 0 costs an extra round trip
-	// per GUILD_CREATE — acceptable until measurement says otherwise.
-	cachedCount, err := c.db.GetGuildMemberCount(ctx, guild)
-	if err != nil {
-		return nil, xerrors.Errorf("GetGuildMemberCount: %w", err)
-	}
-
 	eg := new(errgroup.Group)
 	eg.Go(func() error {
+		// Only read cached count when Discord didn't supply one; this
+		// matches the pre-Phase-3 behavior. Reading on every event
+		// would mean millions of COUNT(*) queries during mass reconnect
+		// — too expensive without a maintained guilds.member_count
+		// column. Divergence-based skipping happens at the call site
+		// (gatewayws) only when explicitly enabled, and uses a
+		// separate lazy fetch.
 		if gc.MemberCount == 0 {
+			mc, err := c.db.GetGuildMemberCount(ctx, guild)
+			if err != nil {
+				return xerrors.Errorf("GetGuildMemberCount: %w", err)
+			}
 			var data map[string]interface{}
-			err := json.Unmarshal(gc.Raw, &data)
+			err = json.Unmarshal(gc.Raw, &data)
 			if err != nil {
 				return xerrors.Errorf("GetGuildMemberCount json Unmarshal: %w", err)
 			}
-			data["member_count"] = cachedCount
+			data["member_count"] = mc
 			gc.Raw, err = json.Marshal(data)
 			if err != nil {
 				return xerrors.Errorf("GetGuildMemberCount json Marshal: %w", err)
@@ -107,7 +108,6 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 	return &EventPayload{
 		GuildID:            guild,
 		DiscordMemberCount: gc.MemberCount,
-		CachedMemberCount:  int64(cachedCount),
 	}, err
 }
 

@@ -134,6 +134,24 @@ func (db *db) SetStatus(ctx context.Context, shard int, name, status string) err
 	return nil
 }
 
+func (db *db) CountUnstableShards(ctx context.Context, name string, start, stop int) (int, error) {
+	const q = `
+SELECT count(*)
+FROM shards
+WHERE name = $1
+  AND id >= $2
+  AND id < $3
+  AND status NOT IN ('read message', 'push event to redis')
+`
+
+	var c int
+	err := db.sql.GetContext(ctx, &c, q, name, start, stop)
+	if err != nil {
+		return 0, xerrors.Errorf("exec select: %w", err)
+	}
+	return c, nil
+}
+
 func (db *db) SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error {
 	const q = `
 		INSERT INTO

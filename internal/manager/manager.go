@@ -50,6 +50,12 @@ type Manager struct {
 	sweepEnabled        bool
 	sweepRequestsPerSec int
 	sweepBatch          int
+
+	// shardStart/shardStop are this process's owned shard range, set
+	// by Start. logHealth and the sweep both need them; capturing once
+	// avoids threading the values through every helper.
+	shardStart int
+	shardStop  int
 }
 
 // envDuration parses a positive integer-seconds env var, falling back
@@ -231,6 +237,9 @@ func New(ctx context.Context, cfg *Config) *Manager {
 }
 
 func (m *Manager) Start(start, stop int) error {
+	m.shardStart = start
+	m.shardStop = stop
+
 	for i := start; i < stop; i++ {
 		m.log.Info(m.ctx, "starting shard", slog.F("shard", i), slog.F("total", m.shardCount))
 
@@ -312,6 +321,29 @@ func (m *Manager) logHealth() {
 			return
 		case <-t.C:
 		}
+
+		// Cheap instability proxy: count shards whose persisted curState
+		// is not in the steady-state inner loop. Persisted at ~1 minute
+		// resolution by Session.logTotalEvents, so trends are what
+		// matter, not single-tick spikes. Healthy fleet should trend
+		// toward zero. Skipped if the DB backend doesn't support it.
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					m.log.Debug(ctx, "CountUnstableShards unsupported on this backend", slog.F("panic", r))
+				}
+			}()
+			cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			n, err := m.db.CountUnstableShards(cctx, m.name, m.shardStart, m.shardStop)
+			if err != nil {
+				m.log.Warn(ctx, "CountUnstableShards failed", slog.Error(err))
+				return
+			}
+			m.log.Info(ctx, "shard stability",
+				slog.F("unstable", n),
+				slog.F("total", m.shardStop-m.shardStart))
+		}()
 
 		var out []string
 		for _, session := range m.shards {

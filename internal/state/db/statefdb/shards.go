@@ -23,6 +23,9 @@ func (db *DB) GetSessionID(ctx context.Context, shard int, name string) (string,
 func (db *DB) SetStatus(ctx context.Context, shard int, name, sess string) error {
 	panic("unimplemented")
 }
+func (db *DB) CountUnstableShards(ctx context.Context, name string, start, stop int) (int, error) {
+	panic("unimplemented")
+}
 func (db *DB) SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error {
 	panic("unimplemented")
 }

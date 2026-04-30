@@ -21,6 +21,13 @@ type DB interface {
 	SetSessionID(ctx context.Context, shard int, name string, sess string) error
 	GetSessionID(ctx context.Context, shard int, name string) (string, error)
 	SetStatus(ctx context.Context, shard int, name string, status string) error
+	// CountUnstableShards returns how many shards in [start, stop) for
+	// this name are currently outside the steady-state inner-loop
+	// (`read message` / `push event to redis`). Used as an instability
+	// proxy during deploys and mass reconnects — a healthy fleet should
+	// trend toward zero. Status is updated by Session.logTotalEvents at
+	// 1-minute resolution, so the count is up to ~1 minute stale.
+	CountUnstableShards(ctx context.Context, name string, start, stop int) (int, error)
 	SetResumeGatewayURL(ctx context.Context, shard int, name string, resumeURL string) error
 	GetResumeGatewayURL(ctx context.Context, shard int, name string) (string, error)
 

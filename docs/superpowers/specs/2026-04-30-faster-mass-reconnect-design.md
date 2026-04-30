@@ -76,40 +76,51 @@ Two new mechanisms replace the single overloaded mutex:
 
 ### Conditional backfill
 
-`shouldRequestMembers(guild)` in Phase 3a replaces today's blanket `shouldProcessMembers()` check at GUILD_CREATE. Decision rule:
+Per-guild metadata (`last_backfilled_at` columns, per-row staleness timestamps) is rejected: at Tatsu's scale (millions of guilds across 1024 shards) the write amplification on every chunk-drain, the cost of finding stale rows, and the storage overhead are not worth the per-guild precision. Two complementary signals are used instead, neither of which requires per-guild metadata.
+
+**Phase 3a — connect-path divergence check.** At GUILD_CREATE, compare Discord's `member_count` against the cached count for the guild. Request members only if the divergence exceeds `BACKFILL_DIVERGENCE_RATIO` (default 0.05).
 
 ```
 should_request_members(guild) =
     !skipMemberRequest
     && hasGuildMembersIntent
     && (
-        last_backfilled_at IS NULL                          // cold guild
-        OR now - last_backfilled_at > STALENESS_THRESHOLD   // stale
+        cached_count == 0                                     // cold guild
         OR abs(discord_member_count - cached_count)
-              / discord_member_count > DIVERGENCE_THRESHOLD // divergent
+              / discord_member_count > DIVERGENCE_THRESHOLD   // divergent
     )
 ```
 
-Triggers:
+`cached_count == 0` cleanly subsumes the "cold" case: a fresh DB has no members for the guild, divergence is 100%, request fires. No new schema. The cached count is computed from `state.DB` (existing GetGuildCount-style read for the guild's member rows, or a maintained counter if cheaper).
 
-| Trigger | Why | Default |
-|---|---|---|
-| Cold | First contact after fresh DB; no cached roster | always |
-| Stale | Bound roster drift over time | 24h |
-| Divergent | Catch silent drift between scheduled refreshes | 5% |
+**Phase 3b — bounded-rate cursor sweep.** One goroutine per process pages through guilds and dispatches Request Guild Members ops at a globally rate-limited pace. Crucially, the sweep never loads more than `BACKFILL_SWEEP_BATCH` (default 200) guild IDs into memory at a time.
 
-Backfill completion: when `chunk_index == chunk_count - 1` for a guild's `GUILD_MEMBER_CHUNK`, write `last_backfilled_at = now` to that guild's row. Per-shard in-memory map tracks in-flight backfills (`guild_id → expected_chunks`).
+```
+loop:
+  1. Read up to BATCH guild IDs from state.DB:
+       SELECT id FROM guilds WHERE id > cursor ORDER BY id LIMIT BATCH
+     (rides the guilds PK index — cheap range scan, no full-table load)
+  2. For each id:
+       owner_shard = (id >> 22) % shard_count
+       if owner_shard outside this process's shard range: skip
+       if shard session offline: skip (next sweep picks it up)
+       send Request Guild Members via that shard's session
+       wait BACKFILL_REQUESTS_PER_SECOND throttle
+  3. cursor = last id from query result
+     if rows < BATCH: cursor = 0  (wrap around)
+  4. persist cursor (1 row total per process), sleep BACKFILL_SWEEP_BATCH_INTERVAL
+```
 
-### Background re-sync sweep (Phase 3b)
+Properties:
 
-One goroutine per process (in the manager, not per shard) walks `state.DB` periodically:
+- **Memory bound:** at most `BACKFILL_SWEEP_BATCH` guild IDs in memory at a time. Never enumerates the full guild set.
+- **Storage:** one cursor per process, persisted in the existing `shards` table or a dedicated tiny `sweep_state` row. No per-guild metadata.
+- **Predictable drift bound:** `full_sweep_period = guild_count / BACKFILL_REQUESTS_PER_SECOND`. For 1M guilds at 12 req/s → ~24h per full sweep. Tunable per ops policy.
+- **Index cost:** the range-scan query uses the guilds PK; no new indexes needed.
+- **Shard ownership filter is in-memory** on the small batch — does not push a `(id >> 22) % shard_count` predicate to the database.
+- **Cursor restart resilience:** persisted cursor survives process restarts; no bias toward low-id guilds after redeploy.
 
-- Tick every `BACKFILL_SWEEP_INTERVAL` (default 1h).
-- Find guilds where `last_backfilled_at < now - STALENESS_THRESHOLD` AND not currently in-flight.
-- For each, look up the shard that owns the guild (`(guildID >> 22) % shardCount`) and route a `Request Guild Members` op through that shard's session.
-- Pace at `BACKFILL_REQUESTS_PER_SECOND` (default 2/s) globally to avoid a thundering herd on Discord and the DB batcher.
-
-The sweep decouples staleness-driven re-sync from the connect path entirely. After Phase 3b lands, the connect-path conditional check in Phase 3a only catches **cold** and **divergent** guilds; routine staleness is the sweep's job.
+The two phases are complementary. Phase 3a catches the urgent "we just reconnected, member_count is way off" case immediately. Phase 3b bounds steady-state drift for guilds that look fine at GUILD_CREATE but quietly accumulate ghosts over time.
 
 ### Failure handling
 
@@ -125,22 +136,14 @@ The sweep decouples staleness-driven re-sync from the connect path entirely. Aft
 |---|---|---|
 | Identify lock (etcd mutex) | `internal/gatewayws` | Discord identify pacing, mod-N bucket |
 | Stabilize semaphore | `internal/manager` (shared across shards) | Cap concurrent backfill bursts hitting `state.DB` |
-| Backfill metadata column | `state.DB` schema (psql + fdb) | Per-guild `last_backfilled_at` |
-| Conditional check | `gatewayws.Session` GUILD_CREATE branch in `Open()` | Decide whether to call `requestGuildMembers`; reads `last_backfilled_at` and `member_count` via `state.DB` |
+| Divergence check | `gatewayws.Session` GUILD_CREATE branch in `Open()` | Compare Discord `member_count` vs cached count; decide whether to call `requestGuildMembers` |
 | Chunk-drain tracker | `gatewayws.Session` | Map of in-flight guild → expected/received chunks |
-| Background sweep | `internal/manager` | Periodic staleness scan, route to shards |
+| Sweep cursor | `internal/manager` (one row in state.DB or dedicated table per process) | Cursor position for the bounded-rate sweep |
+| Background sweep | `internal/manager` | Pages guilds via PK range scan, rate-limited member requests |
 
-Schema delta:
+No per-guild schema delta. No new indexes. The sweep relies on the existing guilds PK; the divergence check relies on the existing member count in `state.DB`.
 
-```sql
-ALTER TABLE guilds ADD COLUMN last_backfilled_at timestamp NULL;
-CREATE INDEX guilds_last_backfilled_at ON guilds (last_backfilled_at)
-    WHERE last_backfilled_at IS NOT NULL;
-```
-
-The partial index supports the sweep's "find stale guilds" query without bloating writes for cold guilds.
-
-The corresponding FoundationDB representation stores the timestamp in the same guild key's value blob (or as a sibling key under the guild prefix — implementation detail for the FDB backend).
+If the cached member count is not cheap to compute on demand (i.e., counting member rows per guild is too heavy at GUILD_CREATE time), introduce a single `member_count` column on the guilds row maintained as a counter via the existing batcher. Cheaper than a timestamp + index, and useful beyond this feature. Decision deferred to Phase 3a implementation based on measured cost of the existing path.
 
 ## Observability
 
@@ -149,11 +152,12 @@ New metrics needed before tuning the knobs:
 - `gateway_identify_lock_wait_seconds` — time from `acquireIdentifyLock` call to acquired
 - `gateway_identify_lock_held_seconds` — time lock is actually held (target: shrinks dramatically)
 - `gateway_stabilize_wait_seconds` — time spent in stabilize semaphore
-- `gateway_backfill_chunks_received_total{guild_id}` — counter
+- `gateway_backfill_chunks_received_total` — counter (no per-guild label)
 - `gateway_backfill_drain_seconds` — time from `requestGuildMembers` send to last chunk for a guild
-- `gateway_backfill_skipped_total{reason}` — `cold|stale|divergent|fresh|disabled`
-- `gateway_sweep_guilds_resynced_total`
-- `gateway_sweep_queue_depth`
+- `gateway_backfill_skipped_total{reason}` — `divergent_below_threshold|disabled|shard_offline`
+- `gateway_sweep_guilds_dispatched_total`
+- `gateway_sweep_cursor_position` — for tracking sweep progress
+- `gateway_sweep_full_cycle_seconds` — time from cursor=0 back to cursor=0
 - `state_db_batcher_queue_depth{event_type}` — already exists or can be added; needed to validate the batcher absorbs the load
 
 ## Phasing
@@ -166,13 +170,13 @@ Move dial + hello before lock acquisition. Reduce lock scope to identify-send th
 
 Replace the fixed `IDENTIFY_STABILIZE_SECONDS` with the chunk-drain tracker. Stabilize is "done" when this shard's outstanding chunk count is zero AND the batcher queue depth is below a threshold. Keeps the upper-bound timeout from Phase 1 as a safety. After this lands, the stabilize semaphore caps concurrent draining shards (still default 1) but the per-shard wait is "as long as actually needed."
 
-**Phase 3a — Conditional backfill at GUILD_CREATE.**
+**Phase 3a — Divergence-only check at GUILD_CREATE.**
 
-Add `last_backfilled_at` column. Implement `shouldRequestMembers(guild)` with cold/stale/divergent triggers. Introduce env knobs: `BACKFILL_STALENESS_HOURS` (default 24), `BACKFILL_DIVERGENCE_RATIO` (default 0.05). Steady-state mass identify on an already-populated DB now skips most member requests entirely — reconnect approaches the Discord-floor lower bound.
+Replace the unconditional `requestGuildMembers` on GUILD_CREATE with a divergence check: request only when `cached_count == 0` (cold) or `|discord_count - cached_count| / discord_count > BACKFILL_DIVERGENCE_RATIO` (default 0.05). Adds one knob and one in-process comparison; no schema changes. Steady-state mass identify on an already-populated DB skips most member requests entirely — reconnect approaches the Discord-floor lower bound.
 
-**Phase 3b — Background re-sync sweep.**
+**Phase 3b — Bounded-rate cursor sweep.**
 
-Implement the manager-level goroutine. Knobs: `BACKFILL_SWEEP_INTERVAL` (default 1h), `BACKFILL_REQUESTS_PER_SECOND` (default 2). Sweep takes over staleness-driven re-syncs; Phase 3a's connect-path check then only fires for cold + divergent guilds.
+Implement the manager-level goroutine described above. Knobs: `BACKFILL_REQUESTS_PER_SECOND` (default 12, sized for ~24h full sweep over 1M guilds), `BACKFILL_SWEEP_BATCH` (default 200), `BACKFILL_SWEEP_BATCH_INTERVAL` (default `BATCH / REQUESTS_PER_SECOND`). Persist the cursor as a single row. Sweep bounds drift independently of the connect path.
 
 Each phase is independently shippable. Phase 1 is the structural change; Phases 2 and 3 progressively reduce the stabilize wait toward zero in steady state.
 
@@ -190,6 +194,7 @@ Each phase is independently shippable. Phase 1 is the structural change; Phases 
 
 None blocking. Items deferred to implementation:
 
-- Exact metric names + label cardinality (member chunk metrics keyed by guild_id may need sampling).
-- FoundationDB representation of `last_backfilled_at` (existing guild value vs sibling key).
+- Exact metric names + label cardinality.
+- Whether the cached `member_count` for the divergence check is computed on demand from member rows (cheap if a counter index exists) or maintained as a column on guilds via the batcher. Decision based on measured cost in Phase 3a implementation.
+- Where the sweep cursor row lives — extending the existing `shards` table vs a new tiny `sweep_state` table.
 - Whether to expose stabilize-semaphore tuning via the existing gRPC management API for live ops.

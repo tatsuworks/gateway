@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Discord Gateway & State Cache service for Tatsu. Two components:
-- **Gateway** (`cmd/gateway/`) — Multiplexes many Discord WebSocket connections (720+ shards at peak, ~4 cores). Publishes events to Redis via RPUSH with ETF-encoded payloads.
+- **Gateway** (`cmd/gateway/`) — Multiplexes many Discord WebSocket connections (1024 shards at peak, ~4 cores). Publishes events to Redis via RPUSH with ETF-encoded payloads.
 - **State Cache** (`cmd/state/`) — HTTP/2 REST API for querying cached Discord state (guilds, channels, members, roles, messages, threads).
 
 ## Build & Run

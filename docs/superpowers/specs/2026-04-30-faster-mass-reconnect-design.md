@@ -4,11 +4,11 @@ Status: Design
 
 ## Problem
 
-When many shards must re-IDENTIFY simultaneously (Discord-side outage long enough to invalidate sessions, or any scenario that pushes most shards off the resume path), wall-clock time to fully re-identify ~720 shards is dominated by an internal serialization, not Discord's identify rate limit.
+When many shards must re-IDENTIFY simultaneously (Discord-side outage long enough to invalidate sessions, or any scenario that pushes most shards off the resume path), wall-clock time to fully re-identify ~1024 shards is dominated by an internal serialization, not Discord's identify rate limit.
 
-Today, `Open()` on a fresh identify acquires an etcd mutex bucketed by `shardID % 16`, then holds that mutex from before the WebSocket dial through 70s after READY (10s `IdentifyWaitTime` + 60s `IdentifyStabilizeTime` when the GuildMembers intent is on). With 720 shards across 16 buckets, that's ~45 serial identifies per bucket × 70s ≈ **52 minutes worst case**.
+Today, `Open()` on a fresh identify acquires an etcd mutex bucketed by `shardID % 16`, then holds that mutex from before the WebSocket dial through 70s after READY (10s `IdentifyWaitTime` + 60s `IdentifyStabilizeTime` when the GuildMembers intent is on). With 1024 shards across 16 buckets, that's 64 serial identifies per bucket × 70s ≈ **75 minutes worst case**.
 
-Discord's identify rate limit (5s per `max_concurrency` slot) would otherwise allow ~7.5 minutes for the same workload at 16 concurrent buckets.
+Discord's identify rate limit (5s per `max_concurrency` slot) would otherwise allow ~5–11 minutes for the same workload at 16 concurrent buckets, depending on pacing margin.
 
 The internal 60s `IdentifyStabilizeTime` exists to "let the DB catch up" while a shard's GUILD_CREATE → `Request Guild Members` → `GUILD_MEMBER_CHUNK` backfill drains. It is currently coupled to identify pacing and to the `IntentGuildMembers` flag, even though those are independent concerns. The `state.DB` PostgreSQL backend already has a sharded, deduping batcher (`internal/state/db/statepsql/batcher.go`) that absorbs hot-key bursts; whether the 60s wait is still load-bearing has not been measured. There is also no full-resync mechanism today, so backfill on every reconnect is the only thing keeping member rosters from drifting.
 
@@ -16,7 +16,7 @@ The "fast intents" deployment mode reconnects in ~15 minutes precisely because i
 
 ## Goals
 
-- Reduce wall-clock time for an identify-storm reconnect of ~720 shards from ~50 minutes toward Discord's identify-throughput floor (~7–8 minutes at the current 16 buckets).
+- Reduce wall-clock time for an identify-storm reconnect of ~1024 shards from ~75 minutes toward Discord's identify-throughput floor (~5–11 minutes at the current 16 buckets).
 - Keep Discord's 5s-per-bucket identify pacing honored.
 - Keep the existing safety property that DB writes don't get hammered by simultaneous member-chunk bursts from many shards — but make that a separate, measurable mechanism instead of a fixed wall inside the identify lock.
 - Bound member-roster drift without forcing a full backfill on every reconnect.
@@ -178,13 +178,13 @@ Each phase is independently shippable. Phase 1 is the structural change; Phases 
 
 ## Expected impact
 
-| Phase | Mass identify of 720 shards | Notes |
+| Phase | Mass identify of 1024 shards | Notes |
 |---|---|---|
-| Today | ~50 min | 45 × 70s, lock dominates |
-| Phase 1, default config | ~45 min | Stabilize runs in parallel with subsequent identifies, but with `IDENTIFY_STABILIZE_CONCURRENCY=1` the stabilize gate becomes the new serial bottleneck (~45 × 60s). Phase 1 alone is mostly about unlocking the tuning surface, not shipping a smaller wall. |
-| Phase 1 + concurrency raised | ~10–15 min | Once metrics confirm the batcher absorbs N concurrent draining shards, raise `IDENTIFY_STABILIZE_CONCURRENCY`. With N=4 → ~12 min; N=8 → ~7.5 min (Discord-floor). |
-| Phase 2 | ~7.5–10 min typical | Drain signal beats fixed 60s for most guilds; concurrency knob still applies |
-| Phase 3a + 3b (steady state) | ~7.5 min (Discord floor) | Most guilds skip backfill entirely; sweep handles staleness out-of-band |
+| Today | ~75 min | 64 × 70s, lock dominates |
+| Phase 1, default config | ~64 min | Stabilize runs in parallel with subsequent identifies, but with `IDENTIFY_STABILIZE_CONCURRENCY=1` the stabilize gate becomes the new serial bottleneck (64 × 60s). Phase 1 alone is mostly about unlocking the tuning surface, not shipping a smaller wall. |
+| Phase 1 + concurrency raised | ~8–16 min | Once metrics confirm the batcher absorbs N concurrent draining shards, raise `IDENTIFY_STABILIZE_CONCURRENCY`. With N=4 → ~16 min; N=8 → ~8 min. |
+| Phase 2 | ~6–10 min typical | Drain signal beats fixed 60s for most guilds; concurrency knob still applies |
+| Phase 3a + 3b (steady state) | ~5–8 min (Discord floor) | Most guilds skip backfill entirely; sweep handles staleness out-of-band |
 
 ## Open questions
 

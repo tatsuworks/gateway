@@ -1,6 +1,6 @@
 # Faster Gateway Mass Reconnect
 
-Status: Design
+Status: Phase 1 + Phase 2 + Phase 3 shipped
 
 ## Problem
 
@@ -169,6 +169,8 @@ Move dial + hello before lock acquisition. Reduce lock scope to identify-send th
 **Phase 2 — Drain-based stabilize signal.**
 
 Replace the fixed `IDENTIFY_STABILIZE_SECONDS` with the chunk-drain tracker. Stabilize is "done" when this shard's outstanding chunk count is zero AND the batcher queue depth is below a threshold. Keeps the upper-bound timeout from Phase 1 as a safety. After this lands, the stabilize semaphore caps concurrent draining shards (still default 1) but the per-shard wait is "as long as actually needed."
+
+Implemented on `feat/faster-mass-reconnect-phase1`. New env `IDENTIFY_STABILIZE_USE_DRAIN` (default true) enables drain-based wait; set to false to fall back to Phase 1 fixed-sleep semantics. `IDENTIFY_STABILIZE_SECONDS` becomes the floor (default 5s with drain on, 60s with drain off); `IDENTIFY_STABILIZE_SECONDS_MAX` is the cap (default 120s, decoupled from the floor). Batcher-queue-depth signal deferred — chunk-drain alone is sufficient for first cut.
 
 **Phase 3a — Divergence-only check at GUILD_CREATE.**
 

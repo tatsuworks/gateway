@@ -15,6 +15,13 @@ type EventPayload struct {
 	// in the GUILD_CREATE/GUILD_UPDATE payload, or 0 when not present.
 	// Used by gatewayws to decide whether divergence checking applies.
 	DiscordMemberCount int64
+
+	// MemberChunkIndex / MemberChunkCount are populated only for
+	// GUILD_MEMBERS_CHUNK events. Both zero means the payload was not a
+	// chunk; ChunkCount > 0 reports Discord's expected total for the
+	// drain window of this guild.
+	MemberChunkIndex int32
+	MemberChunkCount int32
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
@@ -42,7 +49,7 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "GUILD_ROLE_DELETE":
 		return nil, c.RoleDelete(ctx, e.D)
 	case "GUILD_MEMBERS_CHUNK":
-		return nil, c.MemberChunk(ctx, e.D)
+		return c.MemberChunk(ctx, e.D)
 	case "GUILD_MEMBER_ADD":
 		return nil, c.MemberAdd(ctx, e.D, true)
 	case "GUILD_MEMBER_UPDATE":

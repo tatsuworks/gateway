@@ -7,10 +7,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) MemberChunk(ctx context.Context, d []byte) error {
+func (c *Client) MemberChunk(ctx context.Context, d []byte) (*EventPayload, error) {
 	mc, err := c.enc.DecodeMemberChunk(d)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = c.db.SetGuildMembers(ctx, mc.GuildID, mc.Members)
@@ -18,7 +18,11 @@ func (c *Client) MemberChunk(ctx context.Context, d []byte) error {
 		c.log.Error(ctx, "failed to set members", slog.Error(err))
 	}
 
-	return nil
+	return &EventPayload{
+		GuildID:          mc.GuildID,
+		MemberChunkIndex: mc.ChunkIndex,
+		MemberChunkCount: mc.ChunkCount,
+	}, nil
 }
 
 func (c *Client) MemberAdd(ctx context.Context, d []byte, isNew bool) error {

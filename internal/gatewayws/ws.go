@@ -103,6 +103,7 @@ type Session struct {
 	stabilizeSem         chan struct{}
 	stabilizeDuration    time.Duration
 	stabilizeMaxDuration time.Duration
+	stabilizeUseDrain    bool
 	identifyPacing       time.Duration
 
 	// divergenceRatio is the fractional gap between Discord's reported
@@ -172,6 +173,11 @@ type SessionConfig struct {
 	// if anything (e.g. shard cancellation) goes wrong while holding
 	// the semaphore. Defaults to 2x StabilizeDuration if zero.
 	StabilizeMaxDuration time.Duration
+	// StabilizeUseDrain switches holdStabilize from a fixed-duration
+	// sleep (Phase 1) to a per-shard chunk-drain wait (Phase 2). The
+	// StabilizeDuration becomes a soft floor; StabilizeMaxDuration is
+	// the hard cap.
+	StabilizeUseDrain bool
 	// IdentifyPacing is how long the identify mutex is held after
 	// IDENTIFY is sent. Zero falls back to IdentifyWaitTime.
 	IdentifyPacing time.Duration
@@ -217,6 +223,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stabilizeSem:         cfg.StabilizeSem,
 		stabilizeDuration:    cfg.StabilizeDuration,
 		stabilizeMaxDuration: stabilizeMax,
+		stabilizeUseDrain:    cfg.StabilizeUseDrain,
 		identifyPacing:       pacing,
 		divergenceRatio:      cfg.DivergenceRatio,
 
@@ -635,17 +642,20 @@ func (s *Session) scheduleIdentifyLockRelease() {
 }
 
 // holdStabilize acquires the cross-shard stabilize semaphore (if
-// configured) and holds it for stabilizeDuration to pace per-shard
-// backfill bursts. Bounded by stabilizeMaxDuration as a safety. Does
-// not block the caller — runs in its own goroutine.
+// configured) and holds it to pace per-shard backfill bursts. With
+// stabilizeUseDrain=true (Phase 2), the hold lasts until the shard's
+// chunk-drain tracker reports zero pending, with stabilizeDuration as
+// a floor and stabilizeMaxDuration as a cap. With stabilizeUseDrain=
+// false (Phase 1 rollback), the hold is a fixed stabilizeDuration.
+// Runs in its own goroutine — does not block the caller.
 func (s *Session) holdStabilize() {
 	if s.stabilizeSem == nil || s.stabilizeDuration <= 0 {
 		return
 	}
 
-	max := s.stabilizeMaxDuration
-	if max <= 0 {
-		max = 2 * s.stabilizeDuration
+	capDur := s.stabilizeMaxDuration
+	if capDur <= 0 {
+		capDur = 2 * s.stabilizeDuration
 	}
 
 	acquireStart := time.Now()
@@ -664,15 +674,44 @@ func (s *Session) holdStabilize() {
 		default:
 		}
 		s.log.Info(s.ctx, "stabilize semaphore released",
-			slog.F("held", time.Since(acquired).String()))
+			slog.F("held", time.Since(acquired).String()),
+			slog.F("pending_at_release", s.chunks.pendingCount()))
 	}()
 
-	hold := min(s.stabilizeDuration, max)
-	t := time.NewTimer(hold)
-	defer t.Stop()
-	select {
-	case <-t.C:
-	case <-s.ctx.Done():
+	if !s.stabilizeUseDrain {
+		hold := min(s.stabilizeDuration, capDur)
+		t := time.NewTimer(hold)
+		defer t.Stop()
+		select {
+		case <-t.C:
+		case <-s.ctx.Done():
+		}
+		return
+	}
+
+	floor := time.NewTimer(s.stabilizeDuration)
+	defer floor.Stop()
+	capT := time.NewTimer(capDur)
+	defer capT.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-capT.C:
+			s.log.Warn(s.ctx, "stabilize hit max-duration cap before drain",
+				slog.F("pending", s.chunks.pendingCount()))
+			return
+		case <-s.chunks.drained():
+			select {
+			case <-floor.C:
+				return
+			case <-s.ctx.Done():
+				return
+			case <-capT.C:
+				return
+			}
+		}
 	}
 }
 

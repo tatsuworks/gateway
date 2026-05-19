@@ -44,6 +44,7 @@ type Manager struct {
 	stabilizeSem         chan struct{}
 	stabilizeDuration    time.Duration
 	stabilizeMaxDuration time.Duration
+	stabilizeUseDrain    bool
 	identifyPacing       time.Duration
 	divergenceRatio      float64
 
@@ -86,6 +87,23 @@ func envInt(logger slog.Logger, ctx context.Context, name string, def int) int {
 		return def
 	}
 	return n
+}
+
+func envBool(logger slog.Logger, ctx context.Context, name string, def bool) bool {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+	switch raw {
+	case "true", "1", "yes", "on":
+		return true
+	case "false", "0", "no", "off":
+		return false
+	default:
+		logger.Warn(ctx, "invalid bool env var, using default",
+			slog.F("var", name), slog.F("raw", raw), slog.F("default", def))
+		return def
+	}
 }
 
 func envFloat(logger slog.Logger, ctx context.Context, name string, def float64) float64 {
@@ -177,9 +195,18 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		cfg.Logger.Fatal(ctx, "failed to connect to etcd", slog.Error(err))
 	}
 
+	stabilizeUseDrain := envBool(cfg.Logger, ctx, "IDENTIFY_STABILIZE_USE_DRAIN", true)
 	stabilizeConcurrency := envInt(cfg.Logger, ctx, "IDENTIFY_STABILIZE_CONCURRENCY", 1)
-	stabilizeDuration := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS", gatewayws.IdentifyStabilizeTime)
-	stabilizeMax := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS_MAX", 2*stabilizeDuration)
+	// With drain on, the drain signal does the gating; the floor only
+	// matters for shards that have nothing to drain, so a small value
+	// suffices. With drain off (rollback), restore Phase 1's fixed-hold
+	// behaviour by defaulting to the larger floor.
+	defaultFloor := gatewayws.IdentifyStabilizeTime
+	if stabilizeUseDrain {
+		defaultFloor = 5 * time.Second
+	}
+	stabilizeDuration := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS", defaultFloor)
+	stabilizeMax := envDuration(cfg.Logger, ctx, "IDENTIFY_STABILIZE_SECONDS_MAX", 120*time.Second)
 	identifyPacing := envDuration(cfg.Logger, ctx, "IDENTIFY_PACING_SECONDS", gatewayws.IdentifyWaitTime)
 	// Default divergence ratio is 0 (disabled): the divergence check
 	// requires a per-GUILD_CREATE COUNT(*) on members which is too
@@ -198,8 +225,9 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	}
 	cfg.Logger.Info(ctx, "identify pacing config",
 		slog.F("pacing", identifyPacing.String()),
+		slog.F("stabilize_use_drain", stabilizeUseDrain),
 		slog.F("stabilize_concurrency", stabilizeConcurrency),
-		slog.F("stabilize_duration", stabilizeDuration.String()),
+		slog.F("stabilize_floor", stabilizeDuration.String()),
 		slog.F("stabilize_max", stabilizeMax.String()),
 		slog.F("divergence_ratio", divergenceRatio),
 		slog.F("sweep_enabled", sweepEnabled),
@@ -233,6 +261,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		stabilizeSem:         stabilizeSem,
 		stabilizeDuration:    stabilizeDuration,
 		stabilizeMaxDuration: stabilizeMax,
+		stabilizeUseDrain:    stabilizeUseDrain,
 		identifyPacing:       identifyPacing,
 		divergenceRatio:      divergenceRatio,
 
@@ -279,6 +308,7 @@ func (m *Manager) startShard(shard int) {
 		StabilizeSem:         m.stabilizeSem,
 		StabilizeDuration:    m.stabilizeDuration,
 		StabilizeMaxDuration: m.stabilizeMaxDuration,
+		StabilizeUseDrain:    m.stabilizeUseDrain,
 		IdentifyPacing:       m.identifyPacing,
 		DivergenceRatio:      m.divergenceRatio,
 	})

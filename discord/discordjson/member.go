@@ -25,6 +25,13 @@ func (_ decoder) DecodeMemberChunk(buf []byte) (*discord.MemberChunk, error) {
 		return nil, xerrors.Errorf("extract guild id: %w", err)
 	}
 
+	if v := jsoniter.Get(buf, "chunk_index"); v.LastError() == nil {
+		mc.ChunkIndex = int32(v.ToInt())
+	}
+	if v := jsoniter.Get(buf, "chunk_count"); v.LastError() == nil {
+		mc.ChunkCount = int32(v.ToInt())
+	}
+
 	return &mc, nil
 }
 

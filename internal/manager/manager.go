@@ -47,6 +47,7 @@ type Manager struct {
 	stabilizeUseDrain    bool
 	identifyPacing       time.Duration
 	divergenceRatio      float64
+	divergenceTiming     *gatewayws.DivergenceTiming
 
 	sweepEnabled        bool
 	sweepRequestsPerSec int
@@ -215,6 +216,13 @@ func New(ctx context.Context, cfg *Config) *Manager {
 	// validated. Until then, behavior matches pre-Phase-3 — every
 	// GUILD_CREATE triggers a Request Guild Members.
 	divergenceRatio := envFloat(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_RATIO", 0)
+	divergenceSlowMS := envInt(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_TIMING_SLOW_MS", 100)
+	divergenceSummaryEvery := envInt(cfg.Logger, ctx, "BACKFILL_DIVERGENCE_TIMING_SUMMARY_CALLS", 1000)
+	divergenceTiming := gatewayws.NewDivergenceTiming(
+		cfg.Logger,
+		time.Duration(divergenceSlowMS)*time.Millisecond,
+		int64(divergenceSummaryEvery),
+	)
 	sweepEnabled := os.Getenv("BACKFILL_SWEEP_ENABLED") != "false"
 	sweepRPS := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_REQUESTS_PER_SECOND", 12)
 	sweepBatch := envInt(cfg.Logger, ctx, "BACKFILL_SWEEP_BATCH", 200)
@@ -230,6 +238,8 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		slog.F("stabilize_floor", stabilizeDuration.String()),
 		slog.F("stabilize_max", stabilizeMax.String()),
 		slog.F("divergence_ratio", divergenceRatio),
+		slog.F("divergence_slow_ms", divergenceSlowMS),
+		slog.F("divergence_summary_calls", divergenceSummaryEvery),
 		slog.F("sweep_enabled", sweepEnabled),
 		slog.F("sweep_rps", sweepRPS),
 		slog.F("sweep_batch", sweepBatch))
@@ -264,6 +274,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		stabilizeUseDrain:    stabilizeUseDrain,
 		identifyPacing:       identifyPacing,
 		divergenceRatio:      divergenceRatio,
+		divergenceTiming:     divergenceTiming,
 
 		sweepEnabled:        sweepEnabled,
 		sweepRequestsPerSec: sweepRPS,
@@ -311,6 +322,7 @@ func (m *Manager) startShard(shard int) {
 		StabilizeUseDrain:    m.stabilizeUseDrain,
 		IdentifyPacing:       m.identifyPacing,
 		DivergenceRatio:      m.divergenceRatio,
+		DivergenceTiming:     m.divergenceTiming,
 	})
 	if err != nil {
 		m.log.Error(m.ctx, "make gateway session", slog.Error(err))

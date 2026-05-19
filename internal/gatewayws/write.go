@@ -192,6 +192,9 @@ func (s *Session) requestGuildMembers(guild int64) {
 			GuildID: guild,
 		},
 	}:
+		if s.chunks != nil {
+			s.chunks.registerRequest(guild)
+		}
 	default:
 		s.log.Error(s.ctx, "write channel full")
 	}

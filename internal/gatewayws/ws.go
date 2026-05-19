@@ -111,6 +111,8 @@ type Session struct {
 	// request, current pre-Phase-3 behavior). Cold guilds always
 	// request regardless.
 	divergenceRatio float64
+
+	chunks *chunkTracker
 }
 
 func (s *Session) Status() string {
@@ -217,6 +219,8 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stabilizeMaxDuration: stabilizeMax,
 		identifyPacing:       pacing,
 		divergenceRatio:      cfg.DivergenceRatio,
+
+		chunks: newChunkTracker(),
 	}
 
 	// Set hasGuildMembersIntent
@@ -432,6 +436,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		if err != nil {
 			s.log.Error(s.ctx, "handle state event", slog.Error(err))
 			continue
+		}
+
+		if ev.T == "GUILD_MEMBERS_CHUNK" && evtPayload != nil && s.chunks != nil {
+			s.chunks.recordChunk(evtPayload.GuildID, evtPayload.MemberChunkIndex, evtPayload.MemberChunkCount)
 		}
 
 		s.curState = "push event to redis"

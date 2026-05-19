@@ -111,7 +111,8 @@ type Session struct {
 	// Members op is sent on GUILD_CREATE. 0 disables the check (always
 	// request, current pre-Phase-3 behavior). Cold guilds always
 	// request regardless.
-	divergenceRatio float64
+	divergenceRatio  float64
+	divergenceTiming *DivergenceTiming
 
 	chunks *chunkTracker
 }
@@ -184,6 +185,9 @@ type SessionConfig struct {
 	// DivergenceRatio gates GUILD_CREATE-time member backfill. See
 	// Session.divergenceRatio.
 	DivergenceRatio float64
+	// DivergenceTiming, when non-nil, records per-call durations for
+	// the divergence DB read. Shared across shards in a process.
+	DivergenceTiming *DivergenceTiming
 }
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
@@ -226,6 +230,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		stabilizeUseDrain:    cfg.StabilizeUseDrain,
 		identifyPacing:       pacing,
 		divergenceRatio:      cfg.DivergenceRatio,
+		divergenceTiming:     cfg.DivergenceTiming,
 
 		chunks: newChunkTracker(),
 	}
@@ -273,7 +278,9 @@ func (s *Session) shouldRequestMembersForGuild(ctx context.Context, p *handler.E
 	if p.DiscordMemberCount <= 0 {
 		return true
 	}
+	start := time.Now()
 	cached, err := s.stateDB.GetGuildMemberCount(ctx, p.GuildID)
+	s.divergenceTiming.record(ctx, time.Since(start))
 	if err != nil {
 		s.log.Warn(s.ctx, "divergence check: GetGuildMemberCount failed, falling through to request",
 			slog.F("guild", p.GuildID), slog.Error(err))

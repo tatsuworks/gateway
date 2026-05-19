@@ -252,6 +252,11 @@ func (s *Session) RequestGuildMembers(guildID int64) {
 		},
 	}
 
-	s.log.Info(s.ctx, "sending members request", slog.F("guild", guildID))
-	s.wch <- op
+	select {
+	case s.wch <- op:
+		s.log.Debug(s.ctx, "sending members request", slog.F("guild", guildID))
+	default:
+		s.log.Warn(s.ctx, "write channel full, dropping RequestGuildMembers",
+			slog.F("guild", guildID))
+	}
 }

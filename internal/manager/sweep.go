@@ -11,10 +11,17 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// sweepCursorKey is where the manager stores its current sweep cursor
-// position in etcd. One key per process name so multiple gateway
-// processes (different shard ranges, same name) don't share a cursor.
+// sweepCursorKey is the etcd prefix under which each manager stores its
+// sweep cursor position. The full key is keyed by name AND shard range
+// so multiple gateway processes sharing a name (different shard ranges,
+// same deployment) maintain independent cursors and don't race on
+// writes or end up redundantly scanning guilds outside their range.
 const sweepCursorKey = "/gateway/sweep_cursor/"
+
+func (m *Manager) sweepCursorEtcdKey() string {
+	return sweepCursorKey + m.name + "/" +
+		strconv.Itoa(m.shardStart) + "-" + strconv.Itoa(m.shardStop)
+}
 
 // runGuildBackfillSweep is the bounded-rate background re-sync. It
 // pages through all guilds in id-order, dispatches Request Guild
@@ -133,7 +140,7 @@ func (m *Manager) loadSweepCursor() int64 {
 	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
 
-	resp, err := m.etcd.Get(ctx, sweepCursorKey+m.name)
+	resp, err := m.etcd.Get(ctx, m.sweepCursorEtcdKey())
 	if err != nil {
 		m.log.Warn(m.ctx, "load sweep cursor failed, starting from 0",
 			slog.Error(err))
@@ -155,7 +162,7 @@ func (m *Manager) persistSweepCursor(cursor int64) {
 	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := m.etcd.Put(ctx, sweepCursorKey+m.name, strconv.FormatInt(cursor, 10))
+	_, err := m.etcd.Put(ctx, m.sweepCursorEtcdKey(), strconv.FormatInt(cursor, 10))
 	if err != nil && !errors.Is(err, context.Canceled) {
 		m.log.Warn(m.ctx, "persist sweep cursor failed",
 			slog.F("cursor", cursor), slog.Error(err))

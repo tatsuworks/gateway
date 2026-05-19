@@ -347,6 +347,14 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	s.lastAck = time.Time{}
 
+	// Fresh tracker per Open(). The tracker is per session-attempt: any
+	// RGM whose chunks never arrive (deleted guild, dropped frames,
+	// session closed mid-burst) would otherwise leave a permanent
+	// entry that prevents drained() from ever firing on the next
+	// reconnect, silently regressing the stabilize wait to the
+	// max-duration cap.
+	s.chunks = newChunkTracker()
+
 	var err error
 	err = s.initEtcd()
 	if err != nil {

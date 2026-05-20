@@ -31,6 +31,7 @@ const (
 	IdentifyWaitTime      = 10 * time.Second
 	IdentifyStabilizeTime = 60 * time.Second
 	TimeoutAllowance      = 10 * time.Second
+	LargeThreshold        = 250
 )
 
 var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
@@ -319,9 +320,14 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			s.curState = "request guild members"
-			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
-			s.requestGuildMembers(evtPayload.GuildID)
+			if evtPayload.MemberCount > 0 && evtPayload.MemberCount <= LargeThreshold {
+				// GUILD_CREATE already contains every member for small guilds.
+				s.log.Debug(s.ctx, "skipping rgm: small guild", slog.F("guild", evtPayload.GuildID), slog.F("member_count", evtPayload.MemberCount))
+			} else {
+				s.curState = "request guild members"
+				s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
+				s.requestGuildMembers(evtPayload.GuildID)
+			}
 		}
 
 	}

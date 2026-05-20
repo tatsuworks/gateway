@@ -8,13 +8,14 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, error) {
+func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, int64, error) {
 	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
-		return 0, xerrors.Errorf("parse guild create: %w", err)
+		return 0, 0, xerrors.Errorf("parse guild create: %w", err)
 	}
 
 	guild := gc.ID
+	memberCount := gc.MemberCount
 
 	eg := new(errgroup.Group)
 	eg.Go(func() error {
@@ -98,7 +99,7 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, error) {
 		return nil
 	})
 	err = eg.Wait()
-	return guild, err
+	return guild, memberCount, err
 }
 
 func (c *Client) GuildDelete(ctx context.Context, d []byte) error {

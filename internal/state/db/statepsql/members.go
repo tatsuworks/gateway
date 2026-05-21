@@ -97,6 +97,17 @@ WHERE
 	return c, nil
 }
 
+func (db *db) GuildHasMembers(ctx context.Context, guildID int64) (bool, error) {
+	const q = `SELECT EXISTS(SELECT 1 FROM members WHERE guild_id = $1)`
+
+	var has bool
+	err := db.sql.GetContext(ctx, &has, q, guildID)
+	if err != nil {
+		return false, xerrors.Errorf("exec exists: %w", err)
+	}
+	return has, nil
+}
+
 func (db *db) GetGuildMemberCount(ctx context.Context, guildID int64) (int, error) {
 	const q = `
 SELECT

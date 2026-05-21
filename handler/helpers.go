@@ -11,6 +11,7 @@ import (
 type EventPayload struct {
 	GuildID     int64
 	MemberCount int64
+	HadMembers  bool
 }
 
 func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPayload, error) {
@@ -22,10 +23,10 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		guildId, memberCount, err := c.GuildCreate(ctx, e.D)
-		return &EventPayload{GuildID: guildId, MemberCount: memberCount}, err
+		guildId, memberCount, hadMembers, err := c.GuildCreate(ctx, e.D)
+		return &EventPayload{GuildID: guildId, MemberCount: memberCount, HadMembers: hadMembers}, err
 	case "GUILD_UPDATE":
-		guildId, _, err := c.GuildCreate(ctx, e.D)
+		guildId, _, _, err := c.GuildCreate(ctx, e.D)
 		return &EventPayload{GuildID: guildId}, err
 	case "GUILD_DELETE":
 		return nil, c.GuildDelete(ctx, e.D)

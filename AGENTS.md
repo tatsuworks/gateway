@@ -99,8 +99,8 @@ Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Man
 - `internal/manager/` — Multi-shard orchestration, Redis event routing, gRPC management server
 - `handler/` — Discord event processing (guild, channel, member, message, role, emoji, thread events)
 - `internal/state/` — `state.DB` interface (~93 methods) abstracting storage backends
-- `internal/state/db/statefdb/` — FoundationDB implementation (primary)
-- `internal/state/db/statepsql/` — PostgreSQL implementation (fallback)
+- `internal/state/db/statepsql/` — PostgreSQL implementation (**primary / source of truth**)
+- `internal/state/db/statefdb/` — FoundationDB implementation (legacy; data is stale, several methods are `panic("unimplemented")`, do not trust as source of truth for cache-dependent optimizations)
 - `internal/state/api/` — REST API handlers for state queries (fasthttp + httprouter)
 - `discord/discordetf/` — Custom ETF (Erlang Term Format) encoder/decoder built from scratch
 - `discord/discordjson/` — JSON encoding alternative
@@ -123,9 +123,9 @@ Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Man
 - `SHARDS` — Total shard count
 - `START`/`STOP` — Shard range (inclusive/exclusive)
 - `INTENTS` — Discord intent set: `default`, `all`, `fast`
-- `PSQL` — PostgreSQL address (fallback; otherwise uses FoundationDB)
+- `PSQL` — PostgreSQL address (primary store)
 - `PROD` — Enables production logging (JSON/stackdriver vs human-readable)
 
 ## Dependencies
 
-Requires FoundationDB client libraries (v6.2.27) installed on the system. Redis and etcd must be available at runtime.
+Requires PostgreSQL at runtime (primary store). Redis and etcd must also be available. FoundationDB client libraries (v6.2.27) are still required to build, but the FDB backend is legacy and not actively maintained — new optimizations that depend on cached state being accurate should target PSQL and have FDB fall back to the slow path.

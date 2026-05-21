@@ -8,7 +8,7 @@ as time permits.
 
 A custom ETF parser was written from the ground up. During peak traffic, gateway uses ~4 cores for 720 shards.
 
-State is stored in [foundationdb](https://www.foundationdb.org/) and accessed via the State Cache (cmd/state).
+State is stored in [PostgreSQL](https://www.postgresql.org/) and accessed via the State Cache (cmd/state). A [FoundationDB](https://www.foundationdb.org/) backend also exists in `internal/state/db/statefdb/` but is legacy and no longer the source of truth.
 
 Events are pushed to [redis](https://redis.io) using `RPUSH`. The content is the `d` key of the event encoded as ETF.
 

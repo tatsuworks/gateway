@@ -4,6 +4,9 @@ hmm.js
 node_modules
 cmd/state/state
 cmd/gateway/gateway
+cmd/gatewayc/gatewayc
+cmd/forceidentify/forceidentify
+cmd/requestmembers/requestmembers
 cmd/gateway/token.go
 dump.rdb
 logs.txt

@@ -321,13 +321,13 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		// request for guild member info only on GUILD_CREATE events and if the intent is set
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
 			switch {
-			case evtPayload.MemberCount > 0 && evtPayload.MemberCount <= LargeThreshold:
-				// GUILD_CREATE already contains every member for small guilds.
-				s.log.Debug(s.ctx, "skipping rgm: small guild", slog.F("guild", evtPayload.GuildID), slog.F("member_count", evtPayload.MemberCount))
 			case evtPayload.HadMembers:
-				// Members were already in the store before this GUILD_CREATE landed,
-				// implying a prior RGM backfill — no need to re-fetch.
 				s.log.Debug(s.ctx, "skipping rgm: already backfilled", slog.F("guild", evtPayload.GuildID))
+			case evtPayload.MemberCount > 0 &&
+				evtPayload.MemberCount <= LargeThreshold &&
+				int64(evtPayload.ReceivedMemberCount) >= evtPayload.MemberCount:
+				// All expected members arrived in the GUILD_CREATE payload.
+				s.log.Debug(s.ctx, "skipping rgm: all members in guild create", slog.F("guild", evtPayload.GuildID), slog.F("member_count", evtPayload.MemberCount))
 			default:
 				s.curState = "request guild members"
 				s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))

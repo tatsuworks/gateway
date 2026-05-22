@@ -8,21 +8,21 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, int64, bool, error) {
+func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, int64, int, bool, error) {
 	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
-		return 0, 0, false, xerrors.Errorf("parse guild create: %w", err)
+		return 0, 0, 0, false, xerrors.Errorf("parse guild create: %w", err)
 	}
 
 	guild := gc.ID
 	memberCount := gc.MemberCount
+	receivedMemberCount := len(gc.Members)
 
 	// Check whether members already exist for this guild before the errgroup
 	// writes the initial slice. A true result implies a prior backfill in an
 	// earlier session, so RGM is unnecessary on this connect cycle.
 	hadMembers, herr := c.db.GuildHasMembers(ctx, guild)
 	if herr != nil {
-		// Fail-safe: on uncertainty, treat as not-backfilled so RGM still fires.
 		hadMembers = false
 	}
 
@@ -108,7 +108,7 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, int64, bool,
 		return nil
 	})
 	err = eg.Wait()
-	return guild, memberCount, hadMembers, err
+	return guild, memberCount, receivedMemberCount, hadMembers, err
 }
 
 func (c *Client) GuildDelete(ctx context.Context, d []byte) error {

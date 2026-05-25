@@ -11,8 +11,8 @@ cd "$ROOT_DIR"
 # Repo-specific notes:
 # Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only — full tests require infra.
 
-INSTALL_CMD=(bash -c 'go mod download')
-VERIFY_CMD=(bash -c 'go build ./...')
+INSTALL_CMD=(go mod download)
+VERIFY_CMD=(go build ./...)
 START_CMD=(bash -c '(cd cmd/gateway && go run .)')
 
 echo "==> Working directory: $PWD"

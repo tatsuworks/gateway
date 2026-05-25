@@ -1,5 +1,6 @@
 {
   "project": "gateway",
+  "scope": "Seeds with the agent-workspace harness's own bootstrap task. This is not a snapshot of the team backlog \u2014 actual in-flight work is tracked in the team's primary tooling (Linear, etc.). Agents add tasks here as they bootstrap their own sessions in this repo.",
   "last_updated": "2026-05-25",
   "rules": {
     "single_active_feature": true,
@@ -27,7 +28,7 @@
         "If anything fails, edit init.sh and re-run"
       ],
       "evidence": [],
-      "notes": "Inferred commands: install='go mod download', verify='go build ./...', start='(cd cmd/gateway && go run .)'. Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only — full tests require infra."
+      "notes": "Inferred commands: install='go mod download', verify='go build ./...', start='(cd cmd/gateway && go run .)'. Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only \u2014 full tests require infra."
     }
   ]
 }

@@ -23,8 +23,7 @@ echo "==> Running baseline verification"
 "${VERIFY_CMD[@]}"
 
 echo "==> Startup command"
-printf '    %q' "${START_CMD[@]}"
-printf '\n'
+printf '    '; printf '%q ' "${START_CMD[@]}"; echo
 
 if [ "${RUN_START_COMMAND:-0}" = "1" ]; then
   echo "==> Starting the app"

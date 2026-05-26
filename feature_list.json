@@ -1,0 +1,34 @@
+{
+  "project": "gateway",
+  "scope": "Seeds with the agent-workspace harness's own bootstrap task. This is not a snapshot of the team backlog \u2014 actual in-flight work is tracked in the team's primary tooling (Linear, etc.). Agents add tasks here as they bootstrap their own sessions in this repo.",
+  "last_updated": "2026-05-25",
+  "rules": {
+    "single_active_feature": true,
+    "passing_requires_evidence": true,
+    "do_not_skip_verification": true
+  },
+  "status_legend": {
+    "not_started": "Work has not begun.",
+    "in_progress": "The feature is the current active task.",
+    "blocked": "Work cannot continue until a documented blocker is resolved.",
+    "passing": "Required verification has passed and evidence is recorded."
+  },
+  "features": [
+    {
+      "id": "harness-001",
+      "priority": 1,
+      "area": "harness",
+      "title": "Verify init.sh runs cleanly",
+      "user_visible_behavior": "Running ./init.sh from a clean checkout installs deps, runs verification, and prints the start command without errors.",
+      "status": "in_progress",
+      "verification": [
+        "cd into this repo from a clean checkout",
+        "Run ./init.sh",
+        "Confirm install, verify, and start-command-print steps all succeed",
+        "If anything fails, edit init.sh and re-run"
+      ],
+      "evidence": [],
+      "notes": "Inferred commands: install='go mod download', verify='go build ./...', start='(cd cmd/gateway && go run .)'. Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only \u2014 full tests require infra."
+    }
+  ]
+}

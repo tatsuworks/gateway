@@ -1,12 +1,12 @@
 # AGENTS.md — gateway
 
-> This repo is a submodule of [`tatsuworks/agent-workspace`](https://github.com/tatsuworks/agent-workspace) (path: `repos/gateway`). When checked out inside that workspace, workspace-wide rules live in [`../../AGENTS.md`](../../AGENTS.md). Repo-specific rules and context follow.
+> This repo is a plain clone inside [`tatsuworks/agent-workspace`](https://github.com/tatsuworks/agent-workspace) at `repos/gateway` — listed in that workspace's `repos.txt` manifest, **not** a submodule. When checked out inside that workspace, workspace-wide rules live in [`../../AGENTS.md`](../../AGENTS.md). Repo-specific rules and context follow.
 
 ## Harness Operating Loop
 
 Before writing code in this repo:
 
-1. Run `pwd` and confirm you are inside the `gateway` submodule (i.e. `<agent-workspace-root>/repos/gateway`).
+1. Run `pwd` and confirm you are inside the `gateway` clone (i.e. `<agent-workspace-root>/repos/gateway`).
 2. Read `agent-progress.md` here for the latest verified state and next step.
 3. Read `feature_list.json` here and choose the highest-priority unfinished feature.
 4. Review recent commits: `git log --oneline -5`.
@@ -22,7 +22,7 @@ If baseline verification is already failing, fix that first. Do not stack new fe
 - Keep changes within the selected feature scope unless a blocker forces a narrow supporting fix.
 - Do not silently change verification rules during implementation.
 - Prefer durable repo artifacts over chat summaries.
-- This repo is a submodule of the workspace. Commit harness changes here, then update the parent workspace's submodule pointer.
+- This repo is a plain clone inside the workspace — tracked in its `repos.txt` manifest, **not** a submodule. Commit harness changes here and push them through this repo's own PR route; the workspace records no commit SHA, so there is no parent pointer to bump.
 
 ## Required Harness Artifacts
 

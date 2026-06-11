@@ -86,9 +86,8 @@ func (db *DB) GetGuildMemberCount(ctx context.Context, guildID int64) (int, erro
 	panic("unimplemented")
 }
 
-func (db *DB) GuildHasMembers(_ context.Context, guild int64) (bool, error) {
-	// FDB store is no longer the live source of truth; defer to RGM.
-	return false, nil
+func (db *DB) GuildHasMembers(ctx context.Context, guild int64) (bool, error) {
+	panic("unimplemented")
 }
 
 func (db *DB) SetPresence(ctx context.Context, guildID, userID int64, data []byte) error {

@@ -90,6 +90,14 @@ should_request_members(guild) =
     )
 ```
 
+> **Implementation status (this PR):** the `last_backfilled_at` column and the
+> staleness/divergence arms above are not yet built. The first increment ships
+> the cold-guild arm only, using a `GuildHasMembers(guild)` `EXISTS` check
+> (`SELECT EXISTS(SELECT 1 FROM members WHERE guild_id = $1)`) as a proxy for
+> `last_backfilled_at IS NULL`: if any members are already cached we skip RGM on
+> this connect cycle, otherwise we request. The schema change and the
+> stale/divergent arms land in a follow-up.
+
 Triggers:
 
 | Trigger | Why | Default |

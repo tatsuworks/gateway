@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"cdr.dev/slog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
@@ -23,6 +24,10 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, int64, int, 
 	// earlier session, so RGM is unnecessary on this connect cycle.
 	hadMembers, herr := c.db.GuildHasMembers(ctx, guild)
 	if herr != nil {
+		// Fail safe: assume no prior backfill and let RGM run. Log it so a
+		// consistently-failing check (which would silently negate this
+		// optimization during mass reconnects) is diagnosable.
+		c.log.Warn(ctx, "GuildHasMembers check failed; defaulting to RGM", slog.Error(herr), slog.F("guild", guild))
 		hadMembers = false
 	}
 

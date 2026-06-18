@@ -13,8 +13,11 @@ Status: Design (approved, supersedes the `GuildHasMembers` mechanism on `feat/ga
 > partial/interrupted roster (the fatal flaw of the bare `EXISTS(members)`
 > probe), so it dominates that mechanism on the speed path. Roster drift is no
 > longer bounded by the skip; it is bounded **out-of-band** by (a) the
-> reconciliation delete that runs on every real backfill and (b) the Phase 3b
-> background sweep, which is now load-bearing rather than optional. The
+> reconciliation delete that runs on every real backfill and (b) cold
+> re-backfills whenever the UNLOGGED cache is reset. A Phase 3b background sweep
+> remains an **optional, deferred** further bound — built only if roster
+> staleness becomes a real complaint, since drift only accrues during
+> disconnect windows and good uptime keeps that small. The
 > `BACKFILL_STALENESS_HOURS` window and per-guild jitter move from "skip expiry"
 > to "sweep cadence." The sweep is the only avenue that removes members who
 > departed while the gateway was disconnected (Discord never reports offline-window

@@ -419,8 +419,12 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		// backfilled_at IS NOT NULL, and the completion marker is only stamped on
 		// the final chunk (or a small-guild payload reconcile) — so unlike a bare
 		// EXISTS(members) probe this never skips a partial/interrupted roster.
-		// Roster drift is bounded out-of-band (reconciliation delete on each real
-		// backfill + the Phase 3b background sweep), not by expiring the skip here.
+		// Roster drift is accepted as small: live member events keep rosters
+		// accurate whenever connected, so drift only accrues during rare/short
+		// disconnect windows, and the UNLOGGED cache is reset wholesale on any
+		// unclean PG restart (forcing a cold re-backfill). An optional Phase 3b
+		// background sweep can bound it further if staleness ever becomes a real
+		// problem; it is not required for this skip to be correct.
 		s.backfilled = map[int64]struct{}{}
 		ids := make([]int64, 0, len(s.guilds))
 		for id := range s.guilds {

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"cdr.dev/slog/sloggers/sloghuman"
 	"cdr.dev/slog/sloggers/slogtest/assert"
@@ -17,12 +16,17 @@ func newTestDB(t *testing.T) *db {
 	return d.(*db)
 }
 
-// seedMember inserts a members row with an explicit last_updated.
-func seedMember(t *testing.T, d *db, guild, user int64, lastUpdated time.Time) {
+// seedMember inserts a members row, setting last_updated DB-side relative to
+// the Postgres clock (now() + the given interval). It must use the DB clock,
+// not Go's: started_at is stamped by now(), and the reconciliation delete
+// compares the two — seeding from the app clock would introduce exactly the
+// skew the design forbids. Rows use random IDs, so the INSERT never conflicts
+// (and the BEFORE UPDATE trigger never fires to clobber last_updated).
+func seedMember(t *testing.T, d *db, guild, user int64, interval string) {
 	_, err := d.sql.Exec(
-		`INSERT INTO members (guild_id, user_id, data, last_updated) VALUES ($1,$2,'{}'::jsonb,$3)
-		 ON CONFLICT (guild_id, user_id) DO UPDATE SET last_updated = EXCLUDED.last_updated`,
-		guild, user, lastUpdated,
+		`INSERT INTO members (guild_id, user_id, data, last_updated)
+		 VALUES ($1,$2,'{}'::jsonb, now() + $3::interval)`,
+		guild, user, interval,
 	)
 	assert.Success(t, "seed member", err)
 }
@@ -81,8 +85,8 @@ func TestCompleteReconciliationDelete(t *testing.T) {
 
 	// ghost predates this backfill; fresh is updated during the drain.
 	assert.Success(t, "begin", d.BeginGuildBackfill(ctx, guild))
-	seedMember(t, d, guild, ghost, time.Now().Add(-time.Hour)) // before started_at
-	seedMember(t, d, guild, fresh, time.Now().Add(time.Hour))  // after started_at
+	seedMember(t, d, guild, ghost, "-1 hour") // last_updated before started_at
+	seedMember(t, d, guild, fresh, "1 hour")  // last_updated after started_at
 
 	assert.Success(t, "complete", d.CompleteGuildBackfill(ctx, guild))
 
@@ -101,8 +105,8 @@ func TestReconcileGuildMembers(t *testing.T) {
 	keep := rand.Int63()
 	drop := rand.Int63()
 
-	seedMember(t, d, guild, keep, time.Now())
-	seedMember(t, d, guild, drop, time.Now())
+	seedMember(t, d, guild, keep, "0")
+	seedMember(t, d, guild, drop, "0")
 
 	assert.Success(t, "reconcile", d.ReconcileGuildMembers(ctx, guild, []int64{keep}))
 

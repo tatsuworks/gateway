@@ -69,8 +69,9 @@ type Session struct {
 	ready        time.Time
 	lastIdentify time.Time
 
-	guilds   map[int64]struct{}
-	curState string
+	guilds     map[int64]struct{}
+	backfilled map[int64]struct{}
+	curState   string
 
 	bufferPool *sync.Pool
 	buf        *bytes.Buffer
@@ -317,11 +318,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
-		// request for guild member info only on GUILD_CREATE events and if the intent is set
+		// request guild members on GUILD_CREATE, gated by the backfill marker
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			s.curState = "request guild members"
-			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
-			s.requestGuildMembers(evtPayload.GuildID)
+			s.curState = "maybe request guild members"
+			s.maybeRequestGuildMembers(ctx, evtPayload)
 		}
 
 	}
@@ -410,6 +410,22 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 		for i := range guilds {
 			s.guilds[i] = struct{}{}
+		}
+
+		s.backfilled = map[int64]struct{}{}
+		ids := make([]int64, 0, len(s.guilds))
+		for id := range s.guilds {
+			ids = append(ids, id)
+		}
+		if times, terr := s.stateDB.GetGuildBackfillTimes(s.ctx, ids); terr != nil {
+			s.log.Error(s.ctx, "preload guild backfill times", slog.Error(terr))
+		} else {
+			window := backfillStalenessWindow()
+			for id, at := range times {
+				if isFresh(id, at, window) {
+					s.backfilled[id] = struct{}{}
+				}
+			}
 		}
 
 		s.sessID = sess

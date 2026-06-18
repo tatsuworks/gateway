@@ -110,7 +110,7 @@ func (s *Session) writeIdentify() {
 				Device:  runtime.Version(),
 			},
 			Compress:       false,
-			LargeThreshold: 250,
+			LargeThreshold: LargeThreshold,
 			Shard:          []int{s.shardID, s.shardCount},
 			Intents:        s.intents.Collect(),
 			Presence: updatePresence{

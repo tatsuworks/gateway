@@ -3,13 +3,14 @@ package gatewayws
 import (
 	"context"
 	"database/sql"
+	"sync/atomic"
 
 	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 )
 
 func (s *Session) persistShardInfo() {
-	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, s.seq, s.sessID, s.resumeURL)
+	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, atomic.LoadInt64(&s.seq), s.sessID, s.resumeURL)
 	if err != nil {
 		s.log.Error(s.ctx, "save shard info", slog.Error(err))
 	}

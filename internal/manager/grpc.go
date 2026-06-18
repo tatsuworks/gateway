@@ -28,7 +28,12 @@ func (m *Manager) RestartShard(ctx context.Context, req *gatewaypb.RestartShardR
 		return nil, status.Errorf(codes.NotFound, "unknown shard")
 	}
 
-	s.Cancel()
+	if req.ForceIdentify {
+		m.log.Info(ctx, "force identifying shard", slog.F("shard", req.Shard))
+		s.ForceIdentify()
+	} else {
+		s.Cancel()
+	}
 	return &gatewaypb.EmptyResponse{}, nil
 }
 

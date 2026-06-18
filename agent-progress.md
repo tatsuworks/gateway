@@ -54,3 +54,22 @@
 - Verification run: `go build ./...` success; `go vet ./internal/gatewayws/` clean; `go test ./internal/gatewayws/` PASS.
 - Decision (drift): Phase 3b sweep is **deferred / optional**, not required. Drift only accrues during disconnect windows (live member events keep rosters accurate while connected), so good uptime keeps it small; the UNLOGGED cache is also reset wholesale on any unclean PG restart, forcing cold re-backfills. Build the sweep only if roster staleness becomes a real complaint. Watch items: drift peaks during a rare long fleet-wide outage (skip declines to reconcile then), and role/permission queries over a ghost return a stale positive (low impact — ghosts are dormant rows).
 - Next best step: **staging validation** of the branch as-is — confirm real Discord `chunk_index`/`chunk_count` stamp `guild_backfills` markers, the no-expiry skip fires on reconnect, and small-guild payload reconcile works. Requires: push (maintainer authorization) → build gateway image → apply `guild_backfills` (init.sql, IF NOT EXISTS) to the staging `state` DB → deploy via `helm` (`yarn switchStaging` → `staging_deploy.sh`/`restartGateway`) on a small shard range. Then seed the prod baseline via one full re-IDENTIFY.
+
+### Session 002c — 2026-06-18 (surgical force-identify control)
+
+- Goal: Add an in-process per-shard force-identify path so staging/prod can exercise the READY/backfill-marker RGM-skip path without deleting shard rows and racing the old pod's graceful shutdown persist, and without restarting all 64 shards in a pod.
+- Finding: `force-reload-guild.sh` and `reidentify.sh` delete shard rows before a graceful pod delete; the running process can reinsert the old resume tuple via `persistShardInfo` before the replacement reads it. A SIGKILL would avoid that race but would also skip safe final seq persistence for the other shards in the pod, making their resume rows stale.
+- Completed:
+  1. Added `force_identify` to `gatewaypb.RestartShardRequest` and regenerated `gatewaypb/gateway.pb.go`.
+  2. Added `(*gatewayws.Session).ForceIdentify()`, which clears `seq`/`sessID`/`resumeURL`, persists the cleared tuple, then cancels only that shard's active context.
+  3. Updated `Manager.RestartShard` to call `ForceIdentify` when `force_identify` is true; existing restart behavior remains a plain `Cancel`.
+  4. Made `shouldResume` and `persistShardInfo` read `seq` with `atomic.LoadInt64`, matching the existing atomic writes in the read loop.
+  5. Added tests for `ForceIdentify` clearing/persisting/canceling and protobuf round-trip of `force_identify`.
+- Verification run:
+  - `./init.sh` → success (dependency sync + baseline verification).
+  - `GOCACHE=/tmp/go-build-cache go test ./internal/gatewayws ./gatewaypb ./internal/manager` → PASS (`internal/manager` has no test files).
+  - `GOCACHE=/tmp/go-build-cache go build ./...` → success.
+  - `GOCACHE=/tmp/go-build-cache go test ./discord/... ./internal/gatewayws/... ./gatewaypb` → PASS.
+  - `GOCACHE=/tmp/go-build-cache go vet ./...` → clean.
+- Notes: `gen.sh` still contains the old `GO111MODULE=off go get` generator install command, which fails on this Go toolchain. The generated protobuf was refreshed with `PATH="$(go env GOPATH)/bin:$PATH" protoc -Igatewaypb --gogofaster_out=plugins=grpc:gatewaypb gatewaypb/gateway.proto` after installing `protoc-gen-gogofaster@v1.3.2`.
+- Next best step: deploy the branch to staging, call `RestartShard` with `force_identify: true` for shard 0, and confirm logs show `force identifying shard` → `sending identify` → `ready` → `preload guild backfill times`/RGM skip behavior.

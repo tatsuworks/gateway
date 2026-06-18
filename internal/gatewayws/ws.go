@@ -202,7 +202,15 @@ func (s *Session) initEtcd() error {
 }
 
 func (s *Session) shouldResume() bool {
-	return s.seq != 0 && s.sessID != ""
+	return atomic.LoadInt64(&s.seq) != 0 && s.sessID != ""
+}
+
+func (s *Session) ForceIdentify() {
+	atomic.StoreInt64(&s.seq, 0)
+	s.sessID = ""
+	s.resumeURL = ""
+	s.persistShardInfo()
+	s.Cancel()
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
@@ -492,7 +500,9 @@ func (s *Session) releaseIdentifyLock() error {
 }
 
 func (s *Session) Cancel() {
-	s.cancel()
+	if s.cancel != nil {
+		s.cancel()
+	}
 }
 
 func (s *Session) readAndDecodeEvent() (*discord.Event, error) {

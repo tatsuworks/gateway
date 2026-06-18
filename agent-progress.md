@@ -73,3 +73,26 @@
   - `GOCACHE=/tmp/go-build-cache go vet ./...` → clean.
 - Notes: `gen.sh` still contains the old `GO111MODULE=off go get` generator install command, which fails on this Go toolchain. The generated protobuf was refreshed with `PATH="$(go env GOPATH)/bin:$PATH" protoc -Igatewaypb --gogofaster_out=plugins=grpc:gatewaypb gatewaypb/gateway.proto` after installing `protoc-gen-gogofaster@v1.3.2`.
 - Next best step: deploy the branch to staging, call `RestartShard` with `force_identify: true` for shard 0, and confirm logs show `force identifying shard` → `sending identify` → `ready` → `preload guild backfill times`/RGM skip behavior.
+
+### Session 002d — 2026-06-18 (force-identify thread-safety fix + staging validation)
+
+- Goal: Fix a data race found while reviewing Session 002c's force-identify, then run the staging end-to-end validation that was the last gate on the feature.
+- Findings (review of 002c's `ForceIdentify`):
+  1. `ForceIdentify` mutated the read-loop-owned `seq`/`sessID`/`resumeURL` from the gRPC handler goroutine while the read loop was live — a data race (torn string reads on `sessID`/`resumeURL`). The 002c `seq` atomic conversion was also incomplete (plain writes remained on the invalid-session and 4006 paths, plain read in the resume payload).
+  2. Persist/cancel ordering window: the cancelled connection's deferred `persistShardInfo` could rewrite the stale resume tuple after the eager clear.
+- Completed (commit `58195f2`):
+  1. `ForceIdentify` is now a pure signal — sets an atomic `forceIdentify` flag and cancels; no field mutation on the caller goroutine.
+  2. The clear moved to `applyForceIdentify`, run on the read-loop goroutine at the top of `Open`, so `sessID`/`resumeURL` stay single-goroutine.
+  3. `persistShardInfo` is flag-aware: while a force is pending it persists a cleared tuple, closing the deferred-persist window.
+  4. Completed the `seq` atomic conversion (invalid-session, 4006, resume payload, ready-resume log).
+  5. Fixed `gen.sh` (`go install ...@v1.3.2` + `PATH`; the removed `GO111MODULE=off go get` form is gone) — regenerates `gatewaypb` with zero diff.
+  6. Tests rewritten to the signal/apply split + a `-race` concurrency test (1000 `ForceIdentify` calls vs a stand-in read loop).
+- Verification (local): `go build ./...`, `go vet ./...`, `go test -race ./internal/gatewayws/... ./gatewaypb`, `./gen.sh` (zero diff) — all pass.
+- Staging validation (deployed `gateway:58195f2` via `helm`; staging runs `shards: 1`, so all guilds are on shard 0):
+  - Force-identify shard 0 → logs `force identifying shard` → `force identify requested, discarding resume state` → `sending identify` (NOT `sending resume`) → `ready` with a fresh session id. Thread-safe signal/apply path confirmed end-to-end.
+  - Small guild (≤250): delete members + marker, force-identify → members repopulate from the inline GUILD_CREATE roster with no RGM; `guild_backfills` re-stamped by the reconcile path. Confirms small-guild reconcile + no-RGM-storm.
+  - Large guild (>250, ~1.2k members): delete marker, force-identify → `members` refills to ~1.2k. A >250 guild's GUILD_CREATE cannot carry the full offline roster inline (large_threshold=250), so the only source is `GUILD_MEMBERS_CHUNK` — i.e. the automatic RGM fired and the chunk path stamped the marker. 1.2k members = 2 chunks, so **multi-chunk** assembly (chunk_index 0→1, `Complete` on the last) was exercised too.
+  - Skip gate: with a marker present, RGM/reconcile are bypassed.
+- Key finding (observability, not a bug): the AUTOMATIC RGM path (`requestGuildMembers`, `internal/gatewayws/write.go:187`) logs nothing on success; only the MANUAL gRPC path (exported `RequestGuildMembers`) logs `"sending members request"`. So that grep is NOT a valid auto-RGM signal — verify via the DB (member count / marker) instead. Left unlogged deliberately (prod log volume).
+- gRPC testing note: gogofaster + grpc-reflection makes grpcurl *invoke* fail with "does not expose service" even though `list` works; pass `-proto gatewaypb/gateway.proto` to bypass reflection.
+- Next best step: open the PR to `master`; after merge + deploy, seed the prod baseline via one full re-IDENTIFY.

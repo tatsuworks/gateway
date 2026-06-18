@@ -138,7 +138,7 @@ func (s *Session) writeResume() {
 		D: Resume{
 			Token:     s.token,
 			SessionID: s.sessID,
-			Sequence:  s.seq,
+			Sequence:  atomic.LoadInt64(&s.seq),
 		},
 	}
 }

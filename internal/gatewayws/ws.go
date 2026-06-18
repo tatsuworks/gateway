@@ -54,6 +54,12 @@ type Session struct {
 	resumeURL string
 	last      int64
 
+	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
+	// request that the next Open discard the resume tuple and IDENTIFY. It is
+	// consumed by the read-loop goroutine in applyForceIdentify; sessID/resumeURL
+	// are only ever mutated there, never from the caller of ForceIdentify.
+	forceIdentify int32
+
 	wsConn *websocket.Conn
 	zr     io.ReadCloser
 
@@ -205,12 +211,31 @@ func (s *Session) shouldResume() bool {
 	return atomic.LoadInt64(&s.seq) != 0 && s.sessID != ""
 }
 
+// ForceIdentify requests that the shard discard its resume tuple and IDENTIFY
+// on its next connect instead of resuming. It is safe to call from any
+// goroutine (e.g. the gRPC management handler): it only sets an atomic flag and
+// cancels the active connection. The resume-state mutation itself happens in
+// the read-loop goroutine via applyForceIdentify, so sessID/resumeURL are never
+// written concurrently. persistShardInfo is flag-aware, so the moment the flag
+// is set the cleared tuple is what gets persisted — a crash before reconnect
+// cannot leave a resumable row behind.
 func (s *Session) ForceIdentify() {
+	atomic.StoreInt32(&s.forceIdentify, 1)
+	s.Cancel()
+}
+
+// applyForceIdentify clears the resume tuple if a force-identify is pending.
+// It must run on the read-loop goroutine (it mutates sessID/resumeURL) and is
+// called at the top of Open before the resume decision.
+func (s *Session) applyForceIdentify() {
+	if atomic.SwapInt32(&s.forceIdentify, 0) == 0 {
+		return
+	}
+	s.log.Info(s.ctx, "force identify requested, discarding resume state", slog.F("shard", s.shardID))
 	atomic.StoreInt64(&s.seq, 0)
 	s.sessID = ""
 	s.resumeURL = ""
 	s.persistShardInfo()
-	s.Cancel()
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
@@ -229,6 +254,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	s.lastAck = time.Time{}
 
+	// Consume any pending force-identify before deciding whether to resume, so a
+	// forced shard discards its resume tuple and IDENTIFYs this connect.
+	s.applyForceIdentify()
+
 	var err error
 	err = s.initEtcd()
 	if err != nil {
@@ -245,7 +274,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "lock acquired")
 
 	} else {
-		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", s.seq))
+		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", atomic.LoadInt64(&s.seq)))
 	}
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
@@ -388,7 +417,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case 9:
 		s.log.Info(s.ctx, "invalid session, reconnecting")
 		s.sessID = ""
-		s.seq = 0
+		atomic.StoreInt64(&s.seq, 0)
 		s.resumeURL = ""
 		s.persistShardInfo()
 		s.wch = make(chan *Op, 2000)
@@ -500,6 +529,8 @@ func (s *Session) releaseIdentifyLock() error {
 }
 
 func (s *Session) Cancel() {
+	// cancel is nil until the first Open; a management call (Cancel /
+	// ForceIdentify) can land before the shard has connected, so guard it.
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -518,7 +549,7 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 			// valid session associated with a different
 			// token.
 			if werr.Code == 4006 {
-				s.seq = 0
+				atomic.StoreInt64(&s.seq, 0)
 				s.sessID = ""
 				s.resumeURL = ""
 				s.persistShardInfo()

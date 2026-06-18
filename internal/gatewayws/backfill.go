@@ -25,8 +25,10 @@ func membersComplete(p *handler.EventPayload, threshold int) bool {
 		p.ReceivedMembers >= int(p.MemberCount)
 }
 
-// backfillStalenessWindow is the base marker lifetime, from
-// BACKFILL_STALENESS_HOURS (default 24h).
+// backfillStalenessWindow is the base re-backfill cadence, from
+// BACKFILL_STALENESS_HOURS (default 24h). It schedules the Phase 3b background
+// sweep (which guilds are due for a refresh while connected); it is NOT part of
+// the connect-time skip decision, which is no-expiry.
 func backfillStalenessWindow() time.Duration {
 	if v, err := strconv.Atoi(os.Getenv("BACKFILL_STALENESS_HOURS")); err == nil && v > 0 {
 		return time.Duration(v) * time.Hour
@@ -34,9 +36,10 @@ func backfillStalenessWindow() time.Duration {
 	return 24 * time.Hour
 }
 
-// jitterFactor maps a guild ID deterministically into [0.75, 1.25) so markers
-// stamped together (e.g. a cold deploy) expire spread over a ~12h band instead
-// of all at once.
+// jitterFactor maps a guild ID deterministically into [0.75, 1.25). The Phase
+// 3b sweep multiplies the staleness window by it so guilds backfilled together
+// (e.g. a cold deploy) come due for refresh spread over a ~12h band instead of
+// all at once. Not used by the (no-expiry) skip decision.
 func jitterFactor(guildID int64) float64 {
 	h := fnv.New32a()
 	var b [8]byte
@@ -48,7 +51,8 @@ func jitterFactor(guildID int64) float64 {
 }
 
 // isFresh reports whether a backfill completed within the guild's jittered
-// staleness threshold.
+// staleness threshold. The Phase 3b sweep uses it to decide which connected
+// guilds are due for a re-backfill; it is NOT part of the (no-expiry) skip.
 func isFresh(guildID int64, backfilledAt time.Time, base time.Duration) bool {
 	threshold := time.Duration(float64(base) * jitterFactor(guildID))
 	return time.Since(backfilledAt) < threshold

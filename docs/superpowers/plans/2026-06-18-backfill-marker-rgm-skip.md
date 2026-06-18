@@ -17,6 +17,7 @@
 - **Fail open.** Any marker read/write error logs and falls back to RGM (empty set / slow path). Never block event processing on marker errors.
 - **`LargeThreshold = 250`** (Discord's `large_threshold` in the IDENTIFY payload). Small-guild completeness predicate: `0 < MemberCount <= LargeThreshold && ReceivedMembers >= MemberCount`.
 - **`BACKFILL_STALENESS_HOURS`** env knob, default **24**. Effective per-guild threshold is `staleness × jitter(guild_id)`, `jitter ∈ [0.75, 1.25]`, derived from a deterministic hash of the guild ID.
+- **REVISION 2026-06-18 — no-expiry skip.** Task 5's skip decision is now no-expiry: skip RGM for any guild with `backfilled_at IS NOT NULL`, regardless of age (reconnect-storm speed is the priority — see the design doc's 2026-06-18 revision banner). The READY preload no longer applies the `isFresh` staleness filter; `backfillStalenessWindow`/`isFresh`/`jitterFactor` are retained only for the forthcoming Phase 3b background sweep's cadence, not the skip. Step 6 below reflects the original expiring model; the shipped code drops the filter.
 - **Statepsql tests are integration tests** requiring a live Postgres at `postgresql://tatsu@localhost/state?sslmode=disable` (see `channels_test.go`). They are skipped by reviewers without a DB but MUST be run by the implementer against a real DB before marking the DB task done.
 
 ---

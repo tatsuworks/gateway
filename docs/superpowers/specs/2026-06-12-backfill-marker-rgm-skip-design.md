@@ -2,6 +2,27 @@
 
 Status: Design (approved, supersedes the `GuildHasMembers` mechanism on `feat/gate-rgm-on-reidentify`)
 
+> **Revision 2026-06-18 — no-expiry skip (reconnect-storm speed is the priority).**
+> The skip decision below originally expired at a jittered ~18–30h staleness
+> window. That means a mass re-IDENTIFY after long uptime (the rare, expensive
+> case) finds every marker stale and re-backfills *all* guilds — no storm relief
+> at exactly the moment it matters. **The skip is now no-expiry: skip RGM for any
+> guild whose backfill has ever completed (`backfilled_at IS NOT NULL`),
+> regardless of age.** Because the completion marker is only stamped on the final
+> chunk / a small-guild payload reconcile, this still never skips a
+> partial/interrupted roster (the fatal flaw of the bare `EXISTS(members)`
+> probe), so it dominates that mechanism on the speed path. Roster drift is no
+> longer bounded by the skip; it is bounded **out-of-band** by (a) the
+> reconciliation delete that runs on every real backfill and (b) the Phase 3b
+> background sweep, which is now load-bearing rather than optional. The
+> `BACKFILL_STALENESS_HOURS` window and per-guild jitter move from "skip expiry"
+> to "sweep cadence." The sweep is the only avenue that removes members who
+> departed while the gateway was disconnected (Discord never reports offline-window
+> departures, so detecting them requires an RGM somewhere — the sweep moves that
+> RGM off the synchronized storm into a paced background trickle). Sections
+> "Session preload" and "Skip decision (ws.go)" below describe the original
+> expiring model; read them with this revision in force.
+
 ## Problem
 
 The current branch skips `Request Guild Members` (RGM) on GUILD_CREATE when

@@ -48,7 +48,7 @@
         "2026-06-18: build/vet clean; all unit tests pass; 4 statepsql marker tests pass against local-stack PG14 (guild_backfills created in the state DB). Integration run caught and fixed an app-clock vs DB-clock test-seeding bug.",
         "Design: docs/superpowers/specs/2026-06-12-backfill-marker-rgm-skip-design.md; Plan: docs/superpowers/plans/2026-06-18-backfill-marker-rgm-skip.md"
       ],
-      "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). Status stays in_progress until staging validation runs; per Definition of Done a feature is 'passing' only after the required end-to-end verification actually runs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the staging state DB before deploy."
+      "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). 2026-06-18 pivot: skip is now NO-EXPIRY (skip if backfilled_at IS NOT NULL, any age) because reconnect-storm speed is the priority — a jittered staleness skip gave no relief for the storm-after-long-uptime case it most needs to help. Drift is bounded out-of-band by the reconciliation delete + the Phase 3b background sweep, which is now REQUIRED for accuracy and not yet implemented. Status stays in_progress until staging validation runs; per Definition of Done a feature is 'passing' only after the required end-to-end verification actually runs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the staging state DB before deploy."
     }
   ]
 }

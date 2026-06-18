@@ -412,6 +412,15 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 			s.guilds[i] = struct{}{}
 		}
 
+		// No-expiry skip (reconnect-storm speed is the priority): skip RGM for any
+		// guild that has ever *completed* a backfill, regardless of age, so a mass
+		// re-identify after long uptime skips every populated guild instead of
+		// re-backfilling all of them. GetGuildBackfillTimes already filters to
+		// backfilled_at IS NOT NULL, and the completion marker is only stamped on
+		// the final chunk (or a small-guild payload reconcile) — so unlike a bare
+		// EXISTS(members) probe this never skips a partial/interrupted roster.
+		// Roster drift is bounded out-of-band (reconciliation delete on each real
+		// backfill + the Phase 3b background sweep), not by expiring the skip here.
 		s.backfilled = map[int64]struct{}{}
 		ids := make([]int64, 0, len(s.guilds))
 		for id := range s.guilds {
@@ -420,11 +429,8 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		if times, terr := s.stateDB.GetGuildBackfillTimes(s.ctx, ids); terr != nil {
 			s.log.Error(s.ctx, "preload guild backfill times", slog.Error(terr))
 		} else {
-			window := backfillStalenessWindow()
-			for id, at := range times {
-				if isFresh(id, at, window) {
-					s.backfilled[id] = struct{}{}
-				}
+			for id := range times {
+				s.backfilled[id] = struct{}{}
 			}
 		}
 

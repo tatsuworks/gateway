@@ -5,7 +5,6 @@ go 1.25
 require (
 	cdr.dev/slog v1.3.0
 	cloud.google.com/go v0.49.0
-	github.com/apple/foundationdb/bindings/go v0.0.0-20190730174800-17cfc127fa57
 	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/etcd-io/etcd v3.3.15+incompatible

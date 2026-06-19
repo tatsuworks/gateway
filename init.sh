@@ -9,7 +9,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 # Repo-specific notes:
-# Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only — full tests require infra.
+# Runtime requires Postgres (pass -psqlAddr to the gateway / -psql to state) plus Redis + etcd + Discord TOKEN. The verify command runs a build only — full tests require infra.
 
 INSTALL_CMD=(go mod download)
 VERIFY_CMD=(go build ./...)

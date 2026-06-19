@@ -65,10 +65,10 @@ func isFresh(guildID int64, backfilledAt time.Time, base time.Duration) bool {
 func (s *Session) maybeRequestGuildMembers(ctx context.Context, p *handler.EventPayload) {
 	switch {
 	case s.isBackfilled(p.GuildID):
-		s.log.Debug(s.ctx, "skipping rgm: backfilled", slog.F("guild", p.GuildID))
+		s.log.Debug(ctx, "skipping rgm: backfilled", slog.F("guild", p.GuildID))
 	case membersComplete(p, LargeThreshold):
 		if err := s.stateDB.ReconcileGuildMembers(ctx, p.GuildID, p.MemberIDs); err != nil {
-			s.log.Error(s.ctx, "reconcile guild members", slog.Error(err), slog.F("guild", p.GuildID))
+			s.log.Error(ctx, "reconcile guild members", slog.Error(err), slog.F("guild", p.GuildID))
 		}
 	default:
 		s.requestGuildMembers(p.GuildID)

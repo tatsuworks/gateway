@@ -11,8 +11,11 @@ import (
 )
 
 func newTestDB(t *testing.T) *db {
+	t.Helper()
 	d, err := NewDB(context.Background(), "postgresql://tatsu@localhost/state?sslmode=disable", sloghuman.Make(os.Stderr))
-	assert.Success(t, "open postgres", err)
+	if err != nil {
+		t.Skipf("skipping: postgres not available: %v", err)
+	}
 	return d.(*db)
 }
 

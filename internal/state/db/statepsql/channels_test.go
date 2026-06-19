@@ -16,7 +16,9 @@ var channelJSON = []byte(`{"id": "$id", "name": "general", "nsfw": true, "type":
 
 func TestChannels(t *testing.T) {
 	db, err := NewDB(context.Background(), "postgresql://tatsu@localhost/state?sslmode=disable", sloghuman.Make(os.Stderr))
-	assert.Success(t, "failed to open postgres", err)
+	if err != nil {
+		t.Skipf("skipping: postgres not available: %v", err)
+	}
 
 	var (
 		ctx   = context.Background()

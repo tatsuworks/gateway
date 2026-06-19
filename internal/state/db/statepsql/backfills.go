@@ -27,6 +27,15 @@ DO UPDATE SET started_at = now()
 // CompleteGuildBackfill removes members untouched since this backfill's
 // started_at (departed ghosts) and stamps backfilled_at, in one transaction.
 func (db *db) CompleteGuildBackfill(ctx context.Context, guild int64) error {
+	// Flush pending member upserts for this guild so members queued by
+	// SetGuildMembers are persisted (with a fresh last_updated) before the
+	// reconcile DELETE below. Otherwise a current member whose row still
+	// carries an old last_updated could be deleted here and only re-inserted
+	// by the batcher moments later — a window where a live member is absent.
+	if err := db.memberBatcher.FlushForShard(ctx, uint64(guild)); err != nil {
+		return xerrors.Errorf("flush member batcher: %w", err)
+	}
+
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
 		return xerrors.Errorf("begin tx: %w", err)
@@ -58,6 +67,12 @@ WHERE guild_id = $1
 // stamps a completed marker, in one transaction. The delete is exact (roster
 // IDs, no timestamps) so it is immune to member-batcher ordering.
 func (db *db) ReconcileGuildMembers(ctx context.Context, guild int64, roster []int64) error {
+	// Guard against an empty roster: `user_id != ALL($2)` with an empty array
+	// matches every row, which would delete the entire guild's members.
+	if len(roster) == 0 {
+		return nil
+	}
+
 	tx, err := db.sql.BeginTx(ctx, nil)
 	if err != nil {
 		return xerrors.Errorf("begin tx: %w", err)

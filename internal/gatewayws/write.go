@@ -23,6 +23,11 @@ func (s *Session) writer() {
 		isPrio bool
 	)
 
+	// A dead writer means the connection is unusable. Cancel it on exit so the
+	// read loop and sendHeartbeats can't block forever on the unbuffered
+	// prioch/wch sends (nothing else drains them once writer is gone).
+	defer s.Cancel()
+
 	for {
 		var msg *Op
 		select {
@@ -100,7 +105,10 @@ type updatePresence struct {
 }
 
 func (s *Session) writeIdentify() {
-	s.prioch <- &Op{
+	select {
+	case <-s.ctx.Done():
+		return
+	case s.prioch <- &Op{
 		Op: 2,
 		D: Identify{
 			Token: s.token,
@@ -123,6 +131,7 @@ func (s *Session) writeIdentify() {
 				Status: "online",
 			},
 		},
+	}:
 	}
 }
 
@@ -133,20 +142,28 @@ type Resume struct {
 }
 
 func (s *Session) writeResume() {
-	s.prioch <- &Op{
+	select {
+	case <-s.ctx.Done():
+	case s.prioch <- &Op{
 		Op: 6,
 		D: Resume{
 			Token:     s.token,
 			SessionID: s.sessID,
 			Sequence:  atomic.LoadInt64(&s.seq),
 		},
+	}:
 	}
 }
 
 func (s *Session) writeHeartbeat() {
-	s.prioch <- &Op{
+	// Abort if the connection is being torn down. prioch is unbuffered, so a bare
+	// send wedges the read loop forever once writer() has exited.
+	select {
+	case s.prioch <- &Op{
 		Op: 1,
 		D:  atomic.LoadInt64(&s.seq),
+	}:
+	case <-s.ctx.Done():
 	}
 }
 
@@ -250,5 +267,8 @@ func (s *Session) RequestGuildMembers(guildID int64) {
 	}
 
 	s.log.Info(s.ctx, "sending members request", slog.F("guild", guildID))
-	s.wch <- op
+	select {
+	case s.wch <- op:
+	case <-s.ctx.Done():
+	}
 }

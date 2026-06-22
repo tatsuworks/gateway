@@ -252,7 +252,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	s.log.Info(ctx, "encoding", slog.F("name", s.enc.Name()))
 
-	s.lastAck = time.Time{}
+	s.resetHeartbeat()
 
 	// Consume any pending force-identify before deciding whether to resume, so a
 	// forced shard discards its resume tuple and IDENTIFYs this connect.

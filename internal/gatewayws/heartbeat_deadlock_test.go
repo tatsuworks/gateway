@@ -114,6 +114,59 @@ func TestRequestGuildMembersUnblocksOnCancel(t *testing.T) {
 	assertUnblocksOnCancel(t, "RequestGuildMembers", func(s *Session) { s.RequestGuildMembers(123) })
 }
 
+// heartbeatStale is the watchdog's death signal: a heartbeat we sent has gone
+// unacked for at least one interval. The original condition
+// (lastAck.Sub(lastHB) >= interval) was inverted — once ACKs stop, lastAck falls
+// behind lastHB so the difference goes negative and the check can never fire,
+// leaving a zombie connection (writes still accepted, no ACKs) wedged forever.
+func TestHeartbeatStale(t *testing.T) {
+	const interval = 40 * time.Second
+	base := time.Now()
+
+	cases := []struct {
+		name           string
+		lastHB, lastAck time.Time
+		now            time.Time
+		want           bool
+	}{
+		{"never sent a heartbeat", time.Time{}, time.Time{}, base, false},
+		{"acked promptly", base, base.Add(time.Millisecond), base.Add(interval), false},
+		{"unacked but within interval", base, base.Add(-2 * interval), base.Add(interval / 2), false},
+		{"unacked past interval", base, base.Add(-2 * interval), base.Add(interval), true},
+		{"first heartbeat never acked", base, time.Time{}, base.Add(interval), true},
+	}
+
+	for _, c := range cases {
+		s := &Session{lastHB: c.lastHB, lastAck: c.lastAck, interval: interval}
+		if got := s.heartbeatStale(c.now); got != c.want {
+			t.Errorf("%s: heartbeatStale(%v) = %v, want %v", c.name, c.now, got, c.want)
+		}
+	}
+}
+
+// A Session is reused across reconnects, so heartbeat state from the previous
+// connection must be cleared when a new one starts. If lastHB carried over while
+// lastAck is reset to zero, heartbeatStale would read that old heartbeat as
+// unacked and cancel the fresh connection on its first tick — a reconnect loop.
+// resetHeartbeat must clear both timestamps together.
+func TestResetHeartbeatPreventsStaleCancelAfterReconnect(t *testing.T) {
+	old := time.Now().Add(-time.Hour)
+	s := &Session{
+		lastHB:   old,                      // heartbeat sent on the previous connection
+		lastAck:  old.Add(10 * time.Millisecond), // and acked then
+		interval: 40 * time.Second,
+	}
+
+	s.resetHeartbeat()
+
+	if !s.lastHB.IsZero() || !s.lastAck.IsZero() {
+		t.Fatalf("resetHeartbeat left state: lastHB=%v lastAck=%v", s.lastHB, s.lastAck)
+	}
+	if s.heartbeatStale(time.Now()) {
+		t.Fatal("heartbeatStale fired on a freshly reset connection; would cause a reconnect loop")
+	}
+}
+
 // The fix must not break the happy path: with a receiver draining prioch and a
 // live context, writeHeartbeat still delivers the heartbeat op.
 func TestWriteHeartbeatDeliversWhenDrained(t *testing.T) {

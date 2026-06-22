@@ -1,6 +1,7 @@
 package gatewayws
 
 import (
+	"context"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -69,7 +70,17 @@ func (s *Session) writeOp(op *Op) error {
 		return xerrors.Errorf("encode op: %w", err)
 	}
 
-	w, err := s.wsConn.Writer(s.ctx, websocket.MessageBinary)
+	// Bound the write the same way readMessage bounds the read. Without a
+	// deadline a black-holed socket (remote stopped reading, send buffer full)
+	// blocks here indefinitely: the writer never returns, never reaches its
+	// defer s.Cancel(), and the read loop wedges on the unbuffered prioch send
+	// inside writeHeartbeat — the "handle internal event " freeze seen in prod.
+	// With the deadline a stuck write fails, the writer exits and cancels the
+	// connection, and the read loop unwinds and reconnects.
+	ctx, cancel := context.WithTimeout(s.ctx, connectionTimeout*time.Second)
+	defer cancel()
+
+	w, err := s.wsConn.Writer(ctx, websocket.MessageBinary)
 	if err != nil {
 		return xerrors.Errorf("get writer: %w", err)
 	}
@@ -167,6 +178,30 @@ func (s *Session) writeHeartbeat() {
 	}
 }
 
+// resetHeartbeat clears heartbeat tracking for a new connection. Both timestamps
+// must be cleared together: a Session is reused across reconnects, so a lastHB
+// left over from the previous connection (while lastAck is reset to zero) would
+// make heartbeatStale fire on the first tick and cancel the fresh connection
+// before it ever heartbeats — a reconnect loop.
+func (s *Session) resetHeartbeat() {
+	s.lastHB = time.Time{}
+	s.lastAck = time.Time{}
+}
+
+// heartbeatStale reports whether the most recent heartbeat we sent has gone
+// unacked for at least one interval — i.e. the gateway has stopped responding
+// and the connection is dead. It returns false until we have actually sent a
+// heartbeat (lastHB zero) or while the latest send has been acked (lastAck at or
+// after lastHB). Measuring "time since the unacked send" rather than
+// lastAck.Sub(lastHB) is deliberate: once ACKs stop, lastAck falls behind lastHB
+// and the old difference went negative, so the watchdog could never fire.
+func (s *Session) heartbeatStale(now time.Time) bool {
+	if s.lastHB.IsZero() {
+		return false
+	}
+	return s.lastHB.After(s.lastAck) && now.Sub(s.lastHB) >= s.interval
+}
+
 func (s *Session) sendHeartbeats() {
 	var (
 		t      = time.NewTicker(s.interval)
@@ -182,12 +217,11 @@ func (s *Session) sendHeartbeats() {
 		case <-t.C:
 		}
 
-		if !s.lastHB.IsZero() {
-			if s.lastAck.Sub(s.lastHB) >= s.interval {
-				s.log.Warn(s.ctx, "no response to heartbeat")
-				cancel()
-				return
-			}
+		if s.heartbeatStale(time.Now()) {
+			s.log.Warn(s.ctx, "no response to heartbeat; tearing down connection",
+				slog.F("last_hb", s.lastHB), slog.F("last_ack", s.lastAck))
+			cancel()
+			return
 		}
 
 		s.writeHeartbeat()

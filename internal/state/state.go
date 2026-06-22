@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"time"
 
 	"github.com/tatsuworks/gateway/discord"
 )
@@ -52,6 +53,10 @@ type DB interface {
 	GetGuildMembersWithRole(ctx context.Context, guild, role int64) ([][]byte, error)
 	DeleteGuildMember(ctx context.Context, guild, user int64) error
 	SearchGuildMembers(ctx context.Context, guildID int64, query string, limit int) ([][]byte, error)
+	BeginGuildBackfill(ctx context.Context, guild int64) error
+	CompleteGuildBackfill(ctx context.Context, guild int64) error
+	ReconcileGuildMembers(ctx context.Context, guild int64, roster []int64) error
+	GetGuildBackfillTimes(ctx context.Context, guilds []int64) (map[int64]time.Time, error)
 	SetPresence(ctx context.Context, guild, user int64, raw []byte) error
 	GetUserPresence(ctx context.Context, guildID, userID int64) ([]byte, error)
 	SetPresences(ctx context.Context, guildID int64, presences map[int64][]byte) error

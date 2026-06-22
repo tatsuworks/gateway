@@ -97,6 +97,41 @@ func TestShardedBatcherFlushesOnInterval(t *testing.T) {
 	}
 }
 
+func TestShardedBatcherFlushForShardIsSynchronous(t *testing.T) {
+	// A long flush interval means nothing flushes on its own within the test
+	// window; FlushForShard must force the queued events out and only return
+	// once process() has run.
+	b, batches, cancel := newTestBatcher(t, 4, 1000, 10*time.Second)
+	defer cancel()
+
+	ctx := context.Background()
+	_ = b.Send(ctx, testEvent{route: 7, dedup: 1})
+	_ = b.Send(ctx, testEvent{route: 7, dedup: 2})
+
+	if err := b.FlushForShard(ctx, 7); err != nil {
+		t.Fatalf("FlushForShard: %v", err)
+	}
+
+	// On return the batch must already be available (not pending the ticker).
+	select {
+	case batch := <-batches:
+		if len(batch) != 2 {
+			t.Fatalf("expected 2 flushed events, got %d: %+v", len(batch), batch)
+		}
+	default:
+		t.Fatal("FlushForShard returned before the batch was processed")
+	}
+}
+
+func TestShardedBatcherFlushForShardEmptyIsNoop(t *testing.T) {
+	b, _, cancel := newTestBatcher(t, 2, 1000, 10*time.Second)
+	defer cancel()
+
+	if err := b.FlushForShard(context.Background(), 3); err != nil {
+		t.Fatalf("FlushForShard on empty shard should be a no-op, got %v", err)
+	}
+}
+
 func TestShardedBatcherRoutesByKey(t *testing.T) {
 	// With 4 shards, RouteKey 0 and RouteKey 2 land on different shards
 	// (0%4=0, 2%4=2). Each shard has its own goroutine and batch, so events
@@ -133,4 +168,3 @@ func TestShardedBatcherRoutesByKey(t *testing.T) {
 		t.Errorf("expected 5 events per route, got %+v", seenRoutes)
 	}
 }
-

@@ -41,4 +41,5 @@ message RequestGuildMembersRequest {
 
 message RestartShardRequest {
     int32 shard = 1;
+    bool force_identify = 2;
 }

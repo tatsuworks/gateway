@@ -3,13 +3,22 @@ package gatewayws
 import (
 	"context"
 	"database/sql"
+	"sync/atomic"
 
 	"cdr.dev/slog"
 	"golang.org/x/xerrors"
 )
 
 func (s *Session) persistShardInfo() {
-	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, s.seq, s.sessID, s.resumeURL)
+	seq, sessID, resumeURL := atomic.LoadInt64(&s.seq), s.sessID, s.resumeURL
+	if atomic.LoadInt32(&s.forceIdentify) == 1 {
+		// A force-identify is pending: the resume tuple is being discarded, so
+		// never persist it. This covers the connection's own deferred persist on
+		// shutdown — between ForceIdentify and the next Open clearing the state —
+		// so a crash in that window can't leave a resumable row behind.
+		seq, sessID, resumeURL = 0, "", ""
+	}
+	err := s.stateDB.SetShardInfo(context.Background(), s.shardID, s.name, seq, sessID, resumeURL)
 	if err != nil {
 		s.log.Error(s.ctx, "save shard info", slog.Error(err))
 	}

@@ -110,7 +110,7 @@ func (s *Session) writeIdentify() {
 				Device:  runtime.Version(),
 			},
 			Compress:       false,
-			LargeThreshold: 250,
+			LargeThreshold: LargeThreshold,
 			Shard:          []int{s.shardID, s.shardCount},
 			Intents:        s.intents.Collect(),
 			Presence: updatePresence{
@@ -138,7 +138,7 @@ func (s *Session) writeResume() {
 		D: Resume{
 			Token:     s.token,
 			SessionID: s.sessID,
-			Sequence:  s.seq,
+			Sequence:  atomic.LoadInt64(&s.seq),
 		},
 	}
 }

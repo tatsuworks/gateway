@@ -47,8 +47,10 @@ type VoiceState struct {
 }
 
 type MemberChunk struct {
-	GuildID int64
-	Members map[int64][]byte
+	GuildID    int64
+	Members    map[int64][]byte
+	ChunkIndex int
+	ChunkCount int
 }
 
 type Member struct {

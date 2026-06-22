@@ -18,6 +18,18 @@ func (c *Client) MemberChunk(ctx context.Context, d []byte) error {
 		c.log.Error(ctx, "failed to set members", slog.Error(err))
 	}
 
+	if mc.ChunkIndex == 0 {
+		if err := c.db.BeginGuildBackfill(ctx, mc.GuildID); err != nil {
+			c.log.Error(ctx, "begin guild backfill", slog.Error(err), slog.F("guild", mc.GuildID))
+		}
+	}
+	// ChunkCount > 0 guard: a payload missing the field decodes to 0 and can never stamp a marker.
+	if mc.ChunkCount > 0 && mc.ChunkIndex == mc.ChunkCount-1 {
+		if err := c.db.CompleteGuildBackfill(ctx, mc.GuildID); err != nil {
+			c.log.Error(ctx, "complete guild backfill", slog.Error(err), slog.F("guild", mc.GuildID))
+		}
+	}
+
 	return nil
 }
 

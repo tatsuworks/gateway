@@ -1,7 +1,7 @@
 {
   "project": "gateway",
   "scope": "Seeds with the agent-workspace harness's own bootstrap task. This is not a snapshot of the team backlog \u2014 actual in-flight work is tracked in the team's primary tooling (Linear, etc.). Agents add tasks here as they bootstrap their own sessions in this repo.",
-  "last_updated": "2026-05-25",
+  "last_updated": "2026-06-18",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -29,6 +29,34 @@
       ],
       "evidence": [],
       "notes": "Inferred commands: install='go mod download', verify='go build ./...', start='(cd cmd/gateway && go run .)'. Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only \u2014 full tests require infra."
+    },
+    {
+      "id": "backfill-marker-rgm-skip",
+      "priority": 1,
+      "area": "gateway/state",
+      "title": "Backfill-completion marker for RGM skip",
+      "user_visible_behavior": "On reconnect, the gateway can force a targeted shard to IDENTIFY and then skip Request Guild Members for guilds with completed backfill markers, reconciles small guilds straight from the GUILD_CREATE payload, and removes ghost members who left while disconnected \u2014 instead of re-requesting every guild's members on every connect.",
+      "status": "passing",
+      "verification": [
+        "go build ./... (success)",
+        "go vet ./... (clean)",
+        "go test ./discord/... ./internal/gatewayws/... (PASS \u2014 decoder field tests, membersComplete, jitterFactor)",
+        "go test ./internal/state/db/statepsql/ -run 'Backfill|Reconcile|Complete' (4/4 PASS against live PostgreSQL 14)",
+        "go test -race ./internal/gatewayws/... ./gatewaypb (PASS - force-identify signal/apply split + 1000-call concurrency race test, protobuf flag round-trip)",
+        "./gen.sh (regenerates gatewaypb with zero diff after the go install fix)",
+        "STAGING (gateway:58195f2, shards:1): force-identify shard 0 -> 'force identifying shard' / 'discarding resume state' / 'sending identify' (not resume) / 'ready' with fresh session id",
+        "STAGING small guild (<=250): delete members+marker, force-identify -> roster repopulates from inline GUILD_CREATE, no RGM, marker re-stamped via reconcile",
+        "STAGING large guild (>250, ~1.2k): delete marker, force-identify -> members refill to ~1.2k via GUILD_MEMBERS_CHUNK (auto-RGM fired; 2 chunks = multi-chunk path), marker stamped via Begin/Complete",
+        "STAGING skip gate: marker present -> RGM/reconcile bypassed"
+      ],
+      "evidence": [
+        "2026-06-18: build/vet clean; all unit tests pass; 4 statepsql marker tests pass against local-stack PG14 (guild_backfills created in the state DB). Integration run caught and fixed an app-clock vs DB-clock test-seeding bug.",
+        "2026-06-18: added surgical per-shard force-identify through RestartShardRequest.force_identify; verified with ./init.sh, go build ./..., go vet ./..., go test ./internal/gatewayws ./gatewaypb ./internal/manager, and go test ./discord/... ./internal/gatewayws/... ./gatewaypb.",
+        "2026-06-18 (commit 58195f2): made force-identify thread-safe (signal-on-gRPC-goroutine + apply-on-read-loop-goroutine; flag-aware persist; completed seq atomics; fixed gen.sh). Verified with go build/vet, go test -race, and ./gen.sh zero-diff.",
+        "2026-06-18: staging end-to-end validation on gateway:58195f2 (see agent-progress.md Session 002d) - force-identify, small-guild reconcile/no-RGM, large-guild auto-RGM + multi-chunk, and the skip gate all confirmed against live Discord.",
+        "Design: docs/superpowers/specs/2026-06-12-backfill-marker-rgm-skip-design.md; Plan: docs/superpowers/plans/2026-06-18-backfill-marker-rgm-skip.md"
+      ],
+      "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). 2026-06-18 pivot: skip is now NO-EXPIRY (skip if backfilled_at IS NOT NULL, any age) because reconnect-storm speed is the priority — a jittered staleness skip gave no relief for the storm-after-long-uptime case it most needs to help. Drift is bounded by the reconciliation delete on real backfills + cold re-backfills on UNLOGGED cache reset; it only accrues during disconnect windows, so good uptime keeps it small. A Phase 3b background sweep is DEFERRED/OPTIONAL (build only if roster staleness becomes a real complaint), not required. 2026-06-18 force-identify control: RestartShardRequest.force_identify signals the shard (atomic flag) and cancels it; the next Open clears+persists the resume tuple on the read-loop goroutine (rewritten in commit 58195f2 from the original racy in-gRPC-goroutine clear), avoiding DB-delete/pod-shutdown races and a 64-shard pod restart. Status flipped to 'passing' 2026-06-18 after staging validation ran (agent-progress.md Session 002d): no-RGM-storm small-guild reconcile, large-guild auto-RGM + multi-chunk decode, and the skip gate were all confirmed on staging. Observability caveat: the AUTOMATIC RGM path (write.go:187) logs nothing on success (only the manual gRPC path logs 'sending members request') - verify auto-RGM via the DB, not logs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the state DB before deploy; after prod deploy, seed the baseline via one full re-IDENTIFY."
     }
   ]
 }

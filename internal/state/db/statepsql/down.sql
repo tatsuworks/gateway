@@ -6,3 +6,4 @@ drop TABLE messages;
 drop TABLE roles;
 drop TABLE threads;
 drop table presence;
+drop TABLE guild_backfills;

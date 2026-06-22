@@ -8,18 +8,16 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, error) {
+func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, error) {
 	gc, err := c.enc.DecodeGuildCreate(d)
 	if err != nil {
-		return 0, xerrors.Errorf("parse guild create: %w", err)
+		return nil, xerrors.Errorf("parse guild create: %w", err)
 	}
-
-	guild := gc.ID
 
 	eg := new(errgroup.Group)
 	eg.Go(func() error {
 		if gc.MemberCount == 0 {
-			mc, err := c.db.GetGuildMemberCount(ctx, guild)
+			mc, err := c.db.GetGuildMemberCount(ctx, gc.ID)
 			if err != nil {
 				return xerrors.Errorf("GetGuildMemberCount: %w", err)
 			}
@@ -97,8 +95,21 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (int64, error) {
 		}
 		return nil
 	})
-	err = eg.Wait()
-	return guild, err
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	memberIDs := make([]int64, 0, len(gc.Members))
+	for id := range gc.Members {
+		memberIDs = append(memberIDs, id)
+	}
+
+	return &EventPayload{
+		GuildID:         gc.ID,
+		MemberCount:     gc.MemberCount,
+		ReceivedMembers: len(gc.Members),
+		MemberIDs:       memberIDs,
+	}, nil
 }
 
 func (c *Client) GuildDelete(ctx context.Context, d []byte) error {

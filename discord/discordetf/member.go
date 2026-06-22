@@ -38,7 +38,22 @@ func (_ decoder) DecodeMemberChunk(buf []byte) (*discord.MemberChunk, error) {
 				return nil, xerrors.Errorf("extract members list from map: %w", err)
 			}
 
+		case "chunk_index":
+			mc.ChunkIndex, err = d.readIntWithTagIntoInt()
+			if err != nil {
+				return nil, xerrors.Errorf("extract chunk_index from map: %w", err)
+			}
+
+		case "chunk_count":
+			mc.ChunkCount, err = d.readIntWithTagIntoInt()
+			if err != nil {
+				return nil, xerrors.Errorf("extract chunk_count from map: %w", err)
+			}
+
 		default:
+			if err := d.readTerm(); err != nil {
+				return nil, xerrors.Errorf("skip member chunk key %q: %w", key, err)
+			}
 		}
 
 	}

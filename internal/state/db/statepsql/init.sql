@@ -160,3 +160,13 @@ IF NOT EXISTS presence
 CREATE INDEX CONCURRENTLY
 IF NOT EXISTS presence_guild_id ON presence
 ("guild_id");
+
+CREATE UNLOGGED TABLE
+IF NOT EXISTS guild_backfills
+(
+	"guild_id" int8 NOT NULL,
+	"started_at" timestamp NOT NULL DEFAULT now(),
+	"backfilled_at" timestamp NULL,
+	PRIMARY KEY
+("guild_id")
+);

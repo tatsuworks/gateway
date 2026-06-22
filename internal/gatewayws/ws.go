@@ -54,6 +54,12 @@ type Session struct {
 	resumeURL string
 	last      int64
 
+	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
+	// request that the next Open discard the resume tuple and IDENTIFY. It is
+	// consumed by the read-loop goroutine in applyForceIdentify; sessID/resumeURL
+	// are only ever mutated there, never from the caller of ForceIdentify.
+	forceIdentify int32
+
 	wsConn *websocket.Conn
 	zr     io.ReadCloser
 
@@ -69,8 +75,9 @@ type Session struct {
 	ready        time.Time
 	lastIdentify time.Time
 
-	guilds   map[int64]struct{}
-	curState string
+	guilds     map[int64]struct{}
+	backfilled map[int64]struct{}
+	curState   string
 
 	bufferPool *sync.Pool
 	buf        *bytes.Buffer
@@ -201,7 +208,34 @@ func (s *Session) initEtcd() error {
 }
 
 func (s *Session) shouldResume() bool {
-	return s.seq != 0 && s.sessID != ""
+	return atomic.LoadInt64(&s.seq) != 0 && s.sessID != ""
+}
+
+// ForceIdentify requests that the shard discard its resume tuple and IDENTIFY
+// on its next connect instead of resuming. It is safe to call from any
+// goroutine (e.g. the gRPC management handler): it only sets an atomic flag and
+// cancels the active connection. The resume-state mutation itself happens in
+// the read-loop goroutine via applyForceIdentify, so sessID/resumeURL are never
+// written concurrently. persistShardInfo is flag-aware, so the moment the flag
+// is set the cleared tuple is what gets persisted — a crash before reconnect
+// cannot leave a resumable row behind.
+func (s *Session) ForceIdentify() {
+	atomic.StoreInt32(&s.forceIdentify, 1)
+	s.Cancel()
+}
+
+// applyForceIdentify clears the resume tuple if a force-identify is pending.
+// It must run on the read-loop goroutine (it mutates sessID/resumeURL) and is
+// called at the top of Open before the resume decision.
+func (s *Session) applyForceIdentify() {
+	if atomic.SwapInt32(&s.forceIdentify, 0) == 0 {
+		return
+	}
+	s.log.Info(s.ctx, "force identify requested, discarding resume state", slog.F("shard", s.shardID))
+	atomic.StoreInt64(&s.seq, 0)
+	s.sessID = ""
+	s.resumeURL = ""
+	s.persistShardInfo()
 }
 
 func (s *Session) Open(ctx context.Context, token string) error {
@@ -220,6 +254,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	s.lastAck = time.Time{}
 
+	// Consume any pending force-identify before deciding whether to resume, so a
+	// forced shard discards its resume tuple and IDENTIFYs this connect.
+	s.applyForceIdentify()
+
 	var err error
 	err = s.initEtcd()
 	if err != nil {
@@ -236,7 +274,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "lock acquired")
 
 	} else {
-		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", s.seq))
+		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", atomic.LoadInt64(&s.seq)))
 	}
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
@@ -317,11 +355,10 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		s.pushEventToRedis(ev)
 
-		// request for guild member info only on GUILD_CREATE events and if the intent is set
+		// request guild members on GUILD_CREATE, gated by the backfill marker
 		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			s.curState = "request guild members"
-			s.log.Debug(s.ctx, "requesting guild members", slog.F("guild", evtPayload.GuildID))
-			s.requestGuildMembers(evtPayload.GuildID)
+			s.curState = "maybe request guild members"
+			s.maybeRequestGuildMembers(ctx, evtPayload)
 		}
 
 	}
@@ -380,7 +417,7 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case 9:
 		s.log.Info(s.ctx, "invalid session, reconnecting")
 		s.sessID = ""
-		s.seq = 0
+		atomic.StoreInt64(&s.seq, 0)
 		s.resumeURL = ""
 		s.persistShardInfo()
 		s.wch = make(chan *Op, 2000)
@@ -410,6 +447,32 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 		for i := range guilds {
 			s.guilds[i] = struct{}{}
+		}
+
+		// No-expiry skip (reconnect-storm speed is the priority): skip RGM for any
+		// guild that has ever *completed* a backfill, regardless of age, so a mass
+		// re-identify after long uptime skips every populated guild instead of
+		// re-backfilling all of them. GetGuildBackfillTimes already filters to
+		// backfilled_at IS NOT NULL, and the completion marker is only stamped on
+		// the final chunk (or a small-guild payload reconcile) — so unlike a bare
+		// EXISTS(members) probe this never skips a partial/interrupted roster.
+		// Roster drift is accepted as small: live member events keep rosters
+		// accurate whenever connected, so drift only accrues during rare/short
+		// disconnect windows, and the UNLOGGED cache is reset wholesale on any
+		// unclean PG restart (forcing a cold re-backfill). An optional Phase 3b
+		// background sweep can bound it further if staleness ever becomes a real
+		// problem; it is not required for this skip to be correct.
+		s.backfilled = map[int64]struct{}{}
+		ids := make([]int64, 0, len(s.guilds))
+		for id := range s.guilds {
+			ids = append(ids, id)
+		}
+		if times, terr := s.stateDB.GetGuildBackfillTimes(s.ctx, ids); terr != nil {
+			s.log.Error(s.ctx, "preload guild backfill times", slog.Error(terr))
+		} else {
+			for id := range times {
+				s.backfilled[id] = struct{}{}
+			}
 		}
 
 		s.sessID = sess
@@ -466,7 +529,11 @@ func (s *Session) releaseIdentifyLock() error {
 }
 
 func (s *Session) Cancel() {
-	s.cancel()
+	// cancel is nil until the first Open; a management call (Cancel /
+	// ForceIdentify) can land before the shard has connected, so guard it.
+	if s.cancel != nil {
+		s.cancel()
+	}
 }
 
 func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
@@ -482,7 +549,7 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 			// valid session associated with a different
 			// token.
 			if werr.Code == 4006 {
-				s.seq = 0
+				atomic.StoreInt64(&s.seq, 0)
 				s.sessID = ""
 				s.resumeURL = ""
 				s.persistShardInfo()

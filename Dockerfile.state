@@ -13,7 +13,10 @@ ENV GO111MODULE=on
 RUN cd /go/src/github.com/tatsuworks/gateway/cmd/state && go build -o /go/state .
 
 FROM ubuntu:24.04
-RUN apt update && apt install -y adduser zlib1g
+# ca-certificates: ubuntu base ships no CA bundle. Restores parity with the
+# pre-FDB-removal image (was pulled in transitively by `wget`). zlib1g: shared
+# lib for czlib.
+RUN apt update && apt install -y adduser zlib1g ca-certificates
 
 COPY --from=0 /go/state /
 COPY entrypoint-state.sh /

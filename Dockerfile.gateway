@@ -13,7 +13,10 @@ ENV GO111MODULE=on
 RUN cd /go/src/github.com/tatsuworks/gateway/cmd/gateway && go build -o /go/gateway .
 
 FROM ubuntu:24.04
-RUN apt update && apt install -y adduser zlib1g
+# ca-certificates: ubuntu base ships no CA bundle; the gateway needs it to
+# verify Discord's TLS cert. Previously pulled in transitively by `wget` on
+# the (removed) FoundationDB install line. zlib1g: shared lib for czlib.
+RUN apt update && apt install -y adduser zlib1g ca-certificates
 
 COPY --from=0 /go/gateway /
 COPY entrypoint-gateway.sh /

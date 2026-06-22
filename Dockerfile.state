@@ -3,13 +3,17 @@ FROM golang:1.25
 COPY go.mod go.sum /go/src/github.com/tatsuworks/gateway/
 RUN cd /go/src/github.com/tatsuworks/gateway && go mod download
 
+# zlib is required by github.com/tatsuworks/czlib (CGO zlib-stream decoder),
+# independent of the (removed) FoundationDB client libs.
+RUN apt update && apt install -y zlib1g zlib1g-dev
+
 COPY . /go/src/github.com/tatsuworks/gateway
 ENV GO111MODULE=on
 
 RUN cd /go/src/github.com/tatsuworks/gateway/cmd/state && go build -o /go/state .
 
 FROM ubuntu:24.04
-RUN apt update && apt install -y adduser
+RUN apt update && apt install -y adduser zlib1g
 
 COPY --from=0 /go/state /
 COPY entrypoint-state.sh /

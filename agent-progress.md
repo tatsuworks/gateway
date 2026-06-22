@@ -112,3 +112,16 @@
 - Note (2026-06-22 merge): merged after #75 (backfill-marker RGM skip); the no-op `statefdb/backfills.go` that #75 added to satisfy the interface was removed here with the rest of the FDB backend.
 - Known risk or unresolved issue: This is a behavior change — Postgres is now mandatory; any deployment relying on the implicit FDB default must set the psql address. helm #59 drops the dead FDB mount from the gateway/state templates (merged alongside this).
 - Next best step: deploy to staging via `helm` and confirm gateway/state boot Postgres-only.
+
+### Session 004 — staging + PROD deploy of #75 + #76 (2026-06-22)
+
+- Goal: ship the merged force-identify + backfill-marker RGM-skip (#75) and FDB removal (#76) to staging then production via `helm`.
+- Merges: #75 (`627a790`) and #76 (`7118fe0`) to `master`; #76 needed a conflict resolution — #75 had added a no-op `internal/state/db/statefdb/backfills.go` to satisfy the new backfill interface for the FDB backend, removed here with the rest of `statefdb`. Post-merge `go build`/`vet`/tests clean; `foundationdb` absent from go.mod/go.sum.
+- **Two Docker regressions in #76, found at image-build/deploy time and fixed before prod** (#76 deleted an `apt install` line that bundled non-FDB deps):
+  - **#77** (`92b1bcd`): restored `zlib1g/zlib1g-dev` — required by `github.com/tatsuworks/czlib` (CGO zlib-stream decoder in `internal/gatewayws`), independent of FDB. Without it the Docker *build* failed: `pkg-config … Package zlib was not found`.
+  - **#78** (`67d0133`): restored `ca-certificates` — was pulled in transitively by the removed `wget`; `ubuntu:24.04` ships no CA bundle, so the gateway *runtime* hit `tls: x509: certificate signed by unknown authority` dialing Discord and reconnect-looped (pod stayed Running, 0 connections). Added to the runtime stage of both Dockerfiles.
+- Image deployed: `gateway`/`state` `67d0133-release` (includes #75 + #76 + #77 + #78).
+- **Staging** (helm rev 707): gateway-0 + state 1/1 Running, 0 restarts, Postgres-only boot; identify→ready (34 guilds), resuming cleanly; no x509.
+- **Production** (helm rev 2327, deployed by maintainer): gateway StatefulSet 16/16 + state 16/16 ready on `67d0133-release`. **All 1024 shards RESUMED** on the rolling restart — fleet-wide log scan: 0 `sending identify`, 0 `x509`, 0 fatal/panic across every pod; ~64 `resumed`/pod. The graceful-persist→load-on-startup→`shouldResume` path carried the whole fleet; **no RGM storm** (resume replays the stream rather than re-backfilling).
+- Verification (prod): `helm history` rev 2327 `deployed`; pod images + `kubectl get statefulset/deploy` 16/16 ready; per-pod `kubectl logs` grep for x509/fatal/identify = 0. `guild_backfills` confirmed present in prod `state` DB; READY-preload (`ws.go:470`) + marker stamping (`handler/member.go:22-30`, `backfill.go:70`) all log-and-continue on a table error → no fleet-outage path.
+- Known risk / next step: because every shard resumed, **no backfill markers were stamped and the RGM-skip path never fired** — the feature is live but unexercised in prod. To seed the baseline (so a future mass re-identify skips RGM), run one controlled full re-IDENTIFY into the now-present `guild_backfills` table. Rollback: re-pin gateway/state → `9c68d57`/`1f814af-release` (or `helm rollback tatsu 2326`).

@@ -5,17 +5,12 @@ import (
 	"path"
 
 	"cdr.dev/slog"
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/julienschmidt/httprouter"
 	"github.com/valyala/fasthttp/reuseport"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/tatsuworks/gateway/internal/state"
-)
-
-var (
-	FDBRangeWantAll = fdb.RangeOptions{Mode: fdb.StreamingModeWantAll}
 )
 
 type Server struct {

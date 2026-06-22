@@ -14,7 +14,6 @@ import (
 	"github.com/google/gops/agent"
 	"github.com/tatsuworks/gateway/internal/state"
 	"github.com/tatsuworks/gateway/internal/state/api"
-	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
 	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
 )
 
@@ -22,7 +21,6 @@ var (
 	prod     string
 	usePprof bool
 	addr     string
-	usePsql  bool
 	psqlAddr string
 
 	Version string
@@ -51,16 +49,12 @@ func main() {
 	defer logger.Sync()
 
 	var statedb state.DB
-	if psqlAddr != "" {
-		statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
-		if err != nil {
-			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
-		}
-	} else {
-		statedb, err = statefdb.NewDB()
-		if err != nil {
-			logger.Fatal(ctx, "failed to init fdb state", slog.Error(err))
-		}
+	if psqlAddr == "" {
+		logger.Fatal(ctx, "psql address required (set -psql)")
+	}
+	statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
+	if err != nil {
+		logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
 	}
 
 	if usePprof {

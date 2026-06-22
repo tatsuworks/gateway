@@ -18,7 +18,6 @@ import (
 	"github.com/tatsuworks/gateway/internal/gatewayws"
 	"github.com/tatsuworks/gateway/internal/manager"
 	"github.com/tatsuworks/gateway/internal/state"
-	"github.com/tatsuworks/gateway/internal/state/db/statefdb"
 	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -29,7 +28,6 @@ var (
 	token    string
 	etcdHost string
 	pprof    string
-	psql     bool
 	psqlAddr string
 	addr     string
 	intents  string
@@ -53,7 +51,6 @@ func init() {
 	flag.IntVar(&stop, "stop", 1, "Last shard (non-inclusive)")
 
 	flag.Parse()
-	psql = psqlAddr != ""
 }
 
 func main() {
@@ -88,16 +85,12 @@ func main() {
 
 	defer logger.Sync()
 
-	if psql {
-		statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
-		if err != nil {
-			logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
-		}
-	} else {
-		statedb, err = statefdb.NewDB()
-		if err != nil {
-			logger.Fatal(ctx, "failed to init fdb state", slog.Error(err))
-		}
+	if psqlAddr == "" {
+		logger.Fatal(ctx, "psql address required (set -psqlAddr)")
+	}
+	statedb, err = statepsql.NewDB(ctx, psqlAddr, logger)
+	if err != nil {
+		logger.Fatal(ctx, "failed to init Postgres state", slog.Error(err))
 	}
 
 	var ints gatewayws.Intents

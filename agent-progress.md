@@ -96,3 +96,19 @@
 - Key finding (observability, not a bug): the AUTOMATIC RGM path (`requestGuildMembers`, `internal/gatewayws/write.go:187`) logs nothing on success; only the MANUAL gRPC path (exported `RequestGuildMembers`) logs `"sending members request"`. So that grep is NOT a valid auto-RGM signal — verify via the DB (member count / marker) instead. Left unlogged deliberately (prod log volume).
 - gRPC testing note: gogofaster + grpc-reflection makes grpcurl *invoke* fail with "does not expose service" even though `list` works; pass `-proto gatewaypb/gateway.proto` to bypass reflection.
 - Next best step: open the PR to `master`; after merge + deploy, seed the prod baseline via one full re-IDENTIFY.
+
+### Session 003 — 2026-06-19
+
+- Goal: Remove the deprecated FoundationDB (FDB) state backend, leaving Postgres as the sole store.
+- Completed:
+  - Deleted `internal/state/db/statefdb/` (entire FDB implementation, 11 files).
+  - `cmd/gateway/main.go` & `cmd/state/main.go`: dropped the statefdb import and the FDB fallback branch; Postgres address is now required (binaries `Fatal` if `-psqlAddr`/`-psql` is empty).
+  - `internal/state/api/api.go`: removed the now-dead `apple/foundationdb` import and unused `FDBRangeWantAll` var (statefdb had its own copy in `helpers.go`).
+  - `go mod tidy` dropped `github.com/apple/foundationdb/bindings/go` from go.mod/go.sum.
+  - Dockerfile.gateway & Dockerfile.state: removed the FDB client-lib `.deb` install steps (both build and runtime stages).
+  - Docs: init.sh comment, README.md, AGENTS.md (Repo Context), workspace `docs/repos/gateway.md` and `docs/stack.md` updated to reflect Postgres-only storage.
+- Verification run: `go build ./...` (exit 0), `go vet ./...` (exit 0), `go test ./discord/... ./internal/state/...` — all pass except `statepsql.TestChannels`, which fails only because it needs a live Postgres (pre-existing infra dependency, password auth), unrelated to this change.
+- Evidence captured: build/vet/test output in session; foundationdb absent from go.mod/go.sum confirmed via grep.
+- Note (2026-06-22 merge): merged after #75 (backfill-marker RGM skip); the no-op `statefdb/backfills.go` that #75 added to satisfy the interface was removed here with the rest of the FDB backend.
+- Known risk or unresolved issue: This is a behavior change — Postgres is now mandatory; any deployment relying on the implicit FDB default must set the psql address. helm #59 drops the dead FDB mount from the gateway/state templates (merged alongside this).
+- Next best step: deploy to staging via `helm` and confirm gateway/state boot Postgres-only.

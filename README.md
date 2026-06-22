@@ -8,14 +8,14 @@ as time permits.
 
 A custom ETF parser was written from the ground up. During peak traffic, gateway uses ~4 cores for 720 shards.
 
-State is stored in [PostgreSQL](https://www.postgresql.org/) and accessed via the State Cache (cmd/state). A [FoundationDB](https://www.foundationdb.org/) backend also exists in `internal/state/db/statefdb/` but is legacy and no longer the source of truth.
+State is stored in [Postgres](https://www.postgresql.org/) and accessed via the State Cache (cmd/state). Pass the Postgres address with `-psqlAddr` (gateway) or `-psql` (state); it is required.
 
 Events are pushed to [redis](https://redis.io) using `RPUSH`. The content is the `d` key of the event encoded as ETF.
 
 ## Common Dependencies
 
 1. Ensure you have Go 1.13 or higher.
-2. Install [foundationdb](https://www.foundationdb.org/download/) (both the server and clients package).
+2. Install [Postgres](https://www.postgresql.org/download/).
 3. Install [redis](https://redis.io).
 
 ## Setting up the Gateway

@@ -62,20 +62,20 @@ func isFresh(guildID int64, backfilledAt time.Time, base time.Duration) bool {
 // (fresh marker), reconcile a small guild straight from the payload roster, or
 // fall back to RGM. Only the small-guild branch does DB work, and that at most
 // once per guild per staleness window.
-func (s *Session) maybeRequestGuildMembers(ctx context.Context, p *handler.EventPayload) {
+func (c *conn) maybeRequestGuildMembers(ctx context.Context, p *handler.EventPayload) {
 	switch {
-	case s.isBackfilled(p.GuildID):
-		s.log.Debug(ctx, "skipping rgm: backfilled", slog.F("guild", p.GuildID))
+	case c.isBackfilled(p.GuildID):
+		c.s.log.Debug(ctx, "skipping rgm: backfilled", slog.F("guild", p.GuildID))
 	case membersComplete(p, LargeThreshold):
-		if err := s.stateDB.ReconcileGuildMembers(ctx, p.GuildID, p.MemberIDs); err != nil {
-			s.log.Error(ctx, "reconcile guild members", slog.Error(err), slog.F("guild", p.GuildID))
+		if err := c.s.stateDB.ReconcileGuildMembers(ctx, p.GuildID, p.MemberIDs); err != nil {
+			c.s.log.Error(ctx, "reconcile guild members", slog.Error(err), slog.F("guild", p.GuildID))
 		}
 	default:
-		s.requestGuildMembers(p.GuildID)
+		c.requestGuildMembers(p.GuildID)
 	}
 }
 
-func (s *Session) isBackfilled(guildID int64) bool {
-	_, ok := s.backfilled[guildID] // nil-map read is safe and returns false
+func (c *conn) isBackfilled(guildID int64) bool {
+	_, ok := c.s.backfilled[guildID] // nil-map read is safe and returns false
 	return ok
 }

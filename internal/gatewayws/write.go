@@ -248,8 +248,10 @@ func (c *conn) requestGuildMembers(guild int64) {
 	// the buffer usually has room) is silently orphaned. This path runs under
 	// the parent ctx, so a disconnect mid-GUILD_CREATE still reaches here with a
 	// dead conn. Drop + log instead. The guild is re-requested on the next
-	// IDENTIFY (which replays GUILD_CREATE); a RESUME does not replay it, so
-	// recovery there is via the staleness sweep or a manual RequestGuildMembers.
+	// IDENTIFY (which replays GUILD_CREATE); a RESUME does not replay it, so a
+	// guild dropped here stays un-backfilled until the next full IDENTIFY or a
+	// manual RequestGuildMembers. (A background staleness sweep was designed to
+	// cover this gap but is currently deferred/unbuilt — see feature_list.json.)
 	if c.ctx.Err() != nil {
 		c.s.log.Info(c.ctx, "drop guild member backfill: connection closed", slog.F("guild", guild))
 		return
@@ -293,7 +295,13 @@ func (c *conn) rotateStatuses() {
 
 			c.s.log.Debug(c.ctx, "writing status", slog.F("status", e))
 
-			c.wch <- &Op{
+			// ctx-guarded send: wch is per-conn and the writer is its only
+			// drainer, so a bare send wedges this goroutine forever if the writer
+			// has exited. (This path is currently disabled — see the commented
+			// `go c.rotateStatuses()` in run — but keep it safe-by-construction so
+			// re-enabling it can't reintroduce the writer-exit deadlock.)
+			select {
+			case c.wch <- &Op{
 				Op: 3,
 				D: updatePresence{
 					Activities: []*activity{
@@ -304,6 +312,9 @@ func (c *conn) rotateStatuses() {
 					},
 					Status: "online",
 				},
+			}:
+			case <-ctx.Done():
+				return
 			}
 			time.Sleep(time.Minute)
 		}

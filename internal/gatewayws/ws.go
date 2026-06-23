@@ -530,8 +530,17 @@ func (c *conn) acquireIdentifyLock() error {
 func (c *conn) releaseIdentifyLock() error {
 	c.s.log.Info(c.ctx, "release identify lock", slog.F("key", c.identifyMu.Key()))
 	if c.identifyMu.Key() != "" {
-		err := c.identifyMu.Unlock(c.ctx)
-		if err != nil {
+		// Unlock on a fresh background context, NOT c.ctx. The post-READY release
+		// runs only after the rate-limit hold (calcIdentifyWait, up to ~70s), by
+		// which point a reconnecting shard's c.ctx is already cancelled; the
+		// INVALID_SESSION release runs mid-teardown for the same reason. The
+		// pre-refactor code unlocked with the durable Session context — c.ctx here
+		// fails the Unlock with "context canceled" and leaks the cross-shard
+		// identify lock until its lease TTL. The etcd client is Session-durable, so
+		// a background context completes the key delete regardless of conn state.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := c.identifyMu.Unlock(ctx); err != nil {
 			return xerrors.Errorf("release identify lock: %w", err)
 		}
 	}

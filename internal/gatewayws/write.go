@@ -21,7 +21,6 @@ func (c *conn) writer() {
 		ctx    = c.ctx
 		wch    = c.wch
 		prioch = c.prioch
-		isPrio bool
 	)
 
 	// A dead writer means the connection is unusable. Cancel it on exit so the
@@ -37,10 +36,17 @@ func (c *conn) writer() {
 		// we always check the prio channel first since that should
 		// take precedence over other messages
 		case msg = <-prioch:
-			isPrio = true
 		case msg = <-wch:
 			if !c.authed.Load() {
-				wch <- msg
+				// Not authed yet: hold the op until READY/RESUMED instead of
+				// sending it pre-auth. The requeue is context-aware so a full
+				// wch can't wedge the writer here (we are its only drainer)
+				// before its deferred cancel runs.
+				select {
+				case wch <- msg:
+				case <-ctx.Done():
+					return
+				}
 				time.Sleep(25 * time.Millisecond)
 				continue
 			}
@@ -53,13 +59,15 @@ func (c *conn) writer() {
 
 		err = c.writeOp(msg)
 		if err != nil {
-			if !isPrio {
-				wch <- msg
-			}
+			// The connection is dead (write failed). Don't requeue: wch is
+			// per-conn, so the next Open allocates a fresh one and a requeued
+			// op is orphaned anyway — and a blocking requeue into a full wch
+			// would wedge the writer before its deferred cancel runs, the exact
+			// teardown stall this refactor removes. Log and exit; defer
+			// c.cancel() tears the conn down and the read loop reconnects.
 			c.s.log.Error(c.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
 			return
 		}
-		isPrio = false
 		time.Sleep(25 * time.Millisecond)
 	}
 }
@@ -304,8 +312,16 @@ func (c *conn) rotateStatuses() {
 
 // requestGuildMembersExternal is the management-RPC path (gRPC). Unlike the
 // internal default-drop variant it blocks on the send, aborting only if the
-// connection is torn down.
+// connection is torn down. Callers (RequestGuildMembers) gate on an authed
+// conn; the ctx check here closes the residual window where the conn dies
+// between that gate and the send, so the op is dropped + logged rather than
+// orphaned into a wch the dead writer will never drain.
 func (c *conn) requestGuildMembersExternal(guildID int64) {
+	if c.ctx.Err() != nil {
+		c.s.log.Info(c.ctx, "drop members request: connection closed", slog.F("guild", guildID))
+		return
+	}
+
 	op := &Op{
 		Op: 8,
 		D: RequestGuildMembers{

@@ -65,6 +65,24 @@ func TestAutoRequestGuildMembersDroppedOnTornDownConn(t *testing.T) {
 	}
 }
 
+// cur is published at the top of Open, before auth, so a non-nil-but-unauthed
+// conn is not a usable connection. A manual (gRPC) RequestGuildMembers in that
+// window must be dropped + logged, not enqueued into a wch that may never be
+// drained (which would return RPC success while silently orphaning the op).
+func TestExternalRequestGuildMembersDroppedWhenConnNotAuthed(t *testing.T) {
+	s := &Session{log: slogtest.Make(t, nil)}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := s.newConn(ctx, cancel)
+	s.cur.Store(c) // published but never authed (mid-connect)
+
+	s.RequestGuildMembers(123)
+
+	if n := len(c.wch); n != 0 {
+		t.Fatalf("RequestGuildMembers enqueued %d op(s) into a pre-auth conn; want 0 (dropped)", n)
+	}
+}
+
 // Status/LongLastAck report disconnected when there is no active connection.
 func TestStatusWhenDisconnected(t *testing.T) {
 	s := &Session{log: slogtest.Make(t, nil), shardID: 9}

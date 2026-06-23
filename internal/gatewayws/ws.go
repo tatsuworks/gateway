@@ -546,7 +546,13 @@ func (s *Session) Cancel() {
 
 func (s *Session) RequestGuildMembers(guildID int64) {
 	c := s.cur.Load()
-	if c == nil {
+	// cur is published at the top of Open, before the etcd lock / dial / hello /
+	// writer startup / auth complete, so a non-nil cur is not yet a usable
+	// connection. Gate on authed: enqueueing into a pre-auth (or never-started)
+	// conn's wch would return RPC success while the op sits undrained until the
+	// conn dies and the next Open allocates a fresh wch — a silent orphan. Drop
+	// + log instead, matching the documented no-active-connection behavior.
+	if c == nil || !c.authed.Load() {
 		s.log.Info(context.Background(), "drop members request: no active connection", slog.F("guild", guildID))
 		return
 	}

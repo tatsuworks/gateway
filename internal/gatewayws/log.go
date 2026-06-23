@@ -28,6 +28,7 @@ func (c *conn) logTotalEvents() {
 		case <-logT.C:
 			seq := atomic.LoadInt64(&c.s.seq)
 			since := seq - atomic.LoadInt64(&c.s.last)
+			curState, _, _, _ := c.snapshot()
 
 			c.s.log.Info(
 				c.ctx,
@@ -37,12 +38,13 @@ func (c *conn) logTotalEvents() {
 				slog.F("/sec", float64(since)/LogInterval.Seconds()),
 				slog.F("write_queue", len(c.wch)),
 				slog.F("waiting", c.s.state.WaitingQueries()),
-				slog.F("state", c.curState),
+				slog.F("state", curState),
 			)
-			c.s.persistStatus(c.curState)
+			c.s.persistStatus(curState)
 			atomic.StoreInt64(&c.s.last, seq)
 		case <-statusT.C:
-			c.s.persistStatus(c.curState)
+			curState, _, _, _ := c.snapshot()
+			c.s.persistStatus(curState)
 		}
 	}
 }

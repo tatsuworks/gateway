@@ -192,6 +192,8 @@ func (c *conn) writeHeartbeat() {
 // lastAck.Sub(lastHB) is deliberate: once ACKs stop, lastAck falls behind lastHB
 // and the old difference went negative, so the watchdog could never fire.
 func (c *conn) heartbeatStale(now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.lastHB.IsZero() {
 		return false
 	}
@@ -214,14 +216,15 @@ func (c *conn) sendHeartbeats() {
 		}
 
 		if c.heartbeatStale(time.Now()) {
+			_, lastHB, lastAck, _ := c.snapshot()
 			c.s.log.Warn(c.ctx, "no response to heartbeat; tearing down connection",
-				slog.F("last_hb", c.lastHB), slog.F("last_ack", c.lastAck))
+				slog.F("last_hb", lastHB), slog.F("last_ack", lastAck))
 			cancel()
 			return
 		}
 
 		c.writeHeartbeat()
-		c.lastHB = time.Now()
+		c.markHB(time.Now())
 	}
 }
 

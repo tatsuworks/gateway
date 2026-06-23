@@ -56,3 +56,38 @@ func (s *Session) newConn(ctx context.Context, cancel context.CancelFunc) *conn 
 		prioch: make(chan *Op),
 	}
 }
+
+// The accessors below guard the timing/state fields: the read-loop and
+// heartbeat goroutines write them while Status/LongLastAck (manager goroutine)
+// read them.
+
+func (c *conn) setState(state string) {
+	c.mu.Lock()
+	c.curState = state
+	c.mu.Unlock()
+}
+
+func (c *conn) markHB(t time.Time) {
+	c.mu.Lock()
+	c.lastHB = t
+	c.mu.Unlock()
+}
+
+func (c *conn) markAck(t time.Time) {
+	c.mu.Lock()
+	c.lastAck = t
+	c.mu.Unlock()
+}
+
+func (c *conn) markReady(t time.Time) {
+	c.mu.Lock()
+	c.ready = t
+	c.mu.Unlock()
+}
+
+// snapshot returns the guarded state fields in one locked read.
+func (c *conn) snapshot() (curState string, lastHB, lastAck, ready time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.curState, c.lastHB, c.lastAck, c.ready
+}

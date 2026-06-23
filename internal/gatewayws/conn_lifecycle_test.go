@@ -57,3 +57,28 @@ func TestStatusWhenDisconnected(t *testing.T) {
 		t.Fatal("LongLastAck should report true (no acks) on nil cur")
 	}
 }
+
+// Status/LongLastAck run on the manager goroutine while the read-loop and
+// heartbeat goroutines write curState/lastAck/lastHB. Those reads and writes
+// must go through the conn mutex; -race fails here otherwise.
+func TestStatusRaceWithConnectionWrites(t *testing.T) {
+	s := &Session{log: slogtest.Make(t, nil), shardID: 7}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := s.newConn(ctx, cancel)
+	s.cur.Store(c)
+
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 1000; i++ {
+			c.setState("handle internal event X")
+			c.markAck(time.Now())
+		}
+		close(done)
+	}()
+	for i := 0; i < 1000; i++ {
+		_ = s.Status()
+		_ = s.LongLastAck(time.Minute)
+	}
+	<-done
+}

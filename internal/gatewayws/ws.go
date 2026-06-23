@@ -94,7 +94,8 @@ func (s *Session) Status() string {
 	if c == nil {
 		return fmt.Sprintf("%v: <disconnected>", s.shardID)
 	}
-	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, c.curState, c.lastAck.Format(time.RFC3339))
+	curState, _, lastAck, _ := c.snapshot()
+	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, curState, lastAck.Format(time.RFC3339))
 }
 
 func (s *Session) LongLastAck(threshold time.Duration) bool {
@@ -103,8 +104,9 @@ func (s *Session) LongLastAck(threshold time.Duration) bool {
 		// no active connection => definitionally not acking
 		return true
 	}
+	_, _, lastAck, ready := c.snapshot()
 	cutoff := time.Now().Add(-threshold)
-	return c.lastAck.Before(cutoff) && c.ready.Before(cutoff)
+	return lastAck.Before(cutoff) && ready.Before(cutoff)
 }
 
 func (c *conn) cleanupBuffer() {
@@ -261,7 +263,7 @@ func (s *Session) Open(ctx context.Context, token string) error {
 func (c *conn) run(parent context.Context) error {
 	defer c.authed.Store(false)
 
-	c.curState = "begin"
+	c.setState("begin")
 
 	c.s.log.Info(parent, "encoding", slog.F("name", c.s.enc.Name()))
 
@@ -295,7 +297,7 @@ func (c *conn) run(parent context.Context) error {
 	c.zr = r
 	defer r.Close()
 
-	c.curState = "connecting"
+	c.setState("connecting")
 	ws, _, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
 	if err != nil {
 		return xerrors.Errorf("dial gateway: %w", err)
@@ -303,7 +305,7 @@ func (c *conn) run(parent context.Context) error {
 	c.wsConn = ws
 	c.wsConn.SetReadLimit(512 << 20)
 
-	c.curState = "read hello"
+	c.setState("read hello")
 	err = c.readHello()
 	if err != nil {
 		return xerrors.Errorf("handle hello message: %w", err)
@@ -328,7 +330,8 @@ func (c *conn) run(parent context.Context) error {
 	defer c.s.persistShardInfo()
 
 	for {
-		c.s.log.Debug(c.ctx, "received event", slog.F("last_ack", c.lastAck), slog.F("last_hb", c.lastHB), slog.F("seq", atomic.LoadInt64(&c.s.seq)))
+		_, lastHB, lastAck, _ := c.snapshot()
+		c.s.log.Debug(c.ctx, "received event", slog.F("last_ack", lastAck), slog.F("last_hb", lastHB), slog.F("seq", atomic.LoadInt64(&c.s.seq)))
 
 		ev, err := c.readAndDecodeEvent()
 		if err != nil {
@@ -340,7 +343,7 @@ func (c *conn) run(parent context.Context) error {
 		}
 		c.s.log.Debug(c.ctx, "decoded event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 
-		c.curState = "handle internal event " + ev.T
+		c.setState("handle internal event " + ev.T)
 		c.s.log.Debug(c.ctx, "handling internal event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		var handled bool
 		if handled, err = c.handleInternalEvent(ev); handled {
@@ -350,7 +353,7 @@ func (c *conn) run(parent context.Context) error {
 			continue
 		}
 
-		c.curState = "handle state event " + ev.T
+		c.setState("handle state event " + ev.T)
 		c.s.log.Debug(c.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		// parent ctx: in-flight state/DB work must NOT be aborted by a disconnect.
 		evtPayload, err := c.s.state.HandleEvent(parent, ev)
@@ -359,20 +362,20 @@ func (c *conn) run(parent context.Context) error {
 			continue
 		}
 
-		c.curState = "push event to redis"
+		c.setState("push event to redis")
 		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		c.pushEventToRedis(ev)
 
 		// request guild members on GUILD_CREATE, gated by the backfill marker
 		if c.s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			c.curState = "maybe request guild members"
+			c.setState("maybe request guild members")
 			// parent ctx: same rationale as HandleEvent above.
 			c.maybeRequestGuildMembers(parent, evtPayload)
 		}
 
 	}
 
-	c.curState = "close"
+	c.setState("close")
 	_ = ws.Close(4000, "")
 	c.s.log.Info(c.ctx, "closed")
 	return err
@@ -412,7 +415,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case 6:
 		c.s.log.Info(c.ctx, "resumed")
 		c.authed.Store(true)
-		c.ready = time.Now()
+		c.markReady(time.Now())
 
 		return true, nil
 
@@ -441,7 +444,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	// HEARTBEAT_ACK
 	case 11:
-		c.lastAck = time.Now()
+		c.markAck(time.Now())
 		return true, nil
 	}
 
@@ -489,7 +492,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 			slog.F("guild_count", len(c.s.guilds)))
 		c.s.persistShardInfo()
 		c.authed.Store(true)
-		c.ready = time.Now()
+		c.markReady(time.Now())
 
 		go func() {
 			totalWaitTime := c.s.calcIdentifyWait()
@@ -504,7 +507,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 	case "RESUMED":
 		c.s.log.Info(c.ctx, "resumed")
 		c.authed.Store(true)
-		c.ready = time.Now()
+		c.markReady(time.Now())
 
 		return true, nil
 	}
@@ -551,7 +554,7 @@ func (s *Session) RequestGuildMembers(guildID int64) {
 }
 
 func (c *conn) readAndDecodeEvent() (*discord.Event, error) {
-	c.curState = "read message"
+	c.setState("read message")
 	c.buf = c.s.bufferPool.Get().(*bytes.Buffer)
 	defer c.cleanupBuffer()
 
@@ -572,7 +575,7 @@ func (c *conn) readAndDecodeEvent() (*discord.Event, error) {
 		return nil, xerrors.Errorf("read message: %w", err)
 	}
 
-	c.curState = "decode event"
+	c.setState("decode event")
 	var ev *discord.Event
 	ev, err = c.s.enc.DecodeT(c.buf.Bytes())
 	if err != nil {

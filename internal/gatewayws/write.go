@@ -53,27 +53,14 @@ func (s *Session) writer() {
 
 		err = s.writeOp(msg)
 		if err != nil {
-			s.log.Error(s.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
 			if !isPrio {
-				s.requeue(msg)
+				wch <- msg
 			}
+			s.log.Error(s.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
 			return
 		}
 		isPrio = false
 		time.Sleep(25 * time.Millisecond)
-	}
-}
-
-// requeue best-effort returns a failed non-priority op to the write queue for
-// the next connection. It never blocks: writer() is the only drainer of wch, so
-// a blocking send on a full queue would wedge writer() before its deferred
-// s.Cancel() runs. If the queue is full the op is dropped — the connection is
-// being torn down anyway and presence/RGM ops are re-driven on reconnect.
-func (s *Session) requeue(op *Op) {
-	select {
-	case s.wch <- op:
-	default:
-		s.log.Error(s.ctx, "dropping op; write queue full during teardown", slog.F("op", op.Op))
 	}
 }
 
@@ -97,19 +84,11 @@ func (s *Session) writeOp(op *Op) error {
 	if err != nil {
 		return xerrors.Errorf("get writer: %w", err)
 	}
+	defer w.Close()
 
-	if _, err := w.Write(raw); err != nil {
-		w.Close()
+	_, err = w.Write(raw)
+	if err != nil {
 		return xerrors.Errorf("write payload: %w", err)
-	}
-
-	// Close writes the FIN frame and flushes to the socket — for small messages
-	// that final flush (and a deadline expiry on a black-holed connection) lands
-	// here, not in Write. A deferred Close would discard the error and writeOp
-	// would return nil, so writer() would treat a dropped op as delivered and
-	// spin on a dead connection instead of exiting and cancelling. Propagate it.
-	if err := w.Close(); err != nil {
-		return xerrors.Errorf("flush payload: %w", err)
 	}
 
 	return nil
@@ -209,23 +188,18 @@ func (s *Session) resetHeartbeat() {
 	s.lastAck = time.Time{}
 }
 
-// heartbeatStale reports whether the heartbeat we most recently sent has gone
-// unacked — the gateway has stopped responding and the connection is a zombie.
-// It is evaluated once per interval on the heartbeat ticker, so an unacked
-// lastHB means a full interval elapsed with no ACK in response.
-//
-// It compares lastAck to lastHB rather than measuring now-minus-lastHB on
-// purpose. The ticker fires on a fixed cadence, but lastHB is recorded slightly
-// after each tick (the writer's post-write sleep / an in-flight write delay it),
-// so a now-minus-lastHB >= interval check always read just under interval and
-// could never fire — leaving the zombie connection wedged. Comparing timestamps
-// is timing-robust: lastAck not strictly after lastHB means the last heartbeat
-// is still unacked at this tick.
-func (s *Session) heartbeatStale() bool {
+// heartbeatStale reports whether the most recent heartbeat we sent has gone
+// unacked for at least one interval — i.e. the gateway has stopped responding
+// and the connection is dead. It returns false until we have actually sent a
+// heartbeat (lastHB zero) or while the latest send has been acked (lastAck at or
+// after lastHB). Measuring "time since the unacked send" rather than
+// lastAck.Sub(lastHB) is deliberate: once ACKs stop, lastAck falls behind lastHB
+// and the old difference went negative, so the watchdog could never fire.
+func (s *Session) heartbeatStale(now time.Time) bool {
 	if s.lastHB.IsZero() {
 		return false
 	}
-	return !s.lastAck.After(s.lastHB)
+	return s.lastHB.After(s.lastAck) && now.Sub(s.lastHB) >= s.interval
 }
 
 func (s *Session) sendHeartbeats() {
@@ -243,7 +217,7 @@ func (s *Session) sendHeartbeats() {
 		case <-t.C:
 		}
 
-		if s.heartbeatStale() {
+		if s.heartbeatStale(time.Now()) {
 			s.log.Warn(s.ctx, "no response to heartbeat; tearing down connection",
 				slog.F("last_hb", s.lastHB), slog.F("last_ack", s.lastAck))
 			cancel()

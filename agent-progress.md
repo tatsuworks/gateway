@@ -125,3 +125,15 @@
 - **Production** (helm rev 2327, deployed by maintainer): gateway StatefulSet 16/16 + state 16/16 ready on `67d0133-release`. **All 1024 shards RESUMED** on the rolling restart — fleet-wide log scan: 0 `sending identify`, 0 `x509`, 0 fatal/panic across every pod; ~64 `resumed`/pod. The graceful-persist→load-on-startup→`shouldResume` path carried the whole fleet; **no RGM storm** (resume replays the stream rather than re-backfilling).
 - Verification (prod): `helm history` rev 2327 `deployed`; pod images + `kubectl get statefulset/deploy` 16/16 ready; per-pod `kubectl logs` grep for x509/fatal/identify = 0. `guild_backfills` confirmed present in prod `state` DB; READY-preload (`ws.go:470`) + marker stamping (`handler/member.go:22-30`, `backfill.go:70`) all log-and-continue on a table error → no fleet-outage path.
 - Known risk / next step: because every shard resumed, **no backfill markers were stamped and the RGM-skip path never fired** — the feature is live but unexercised in prod. To seed the baseline (so a future mass re-identify skips RGM), run one controlled full re-IDENTIFY into the now-present `guild_backfills` table. Rollback: re-pin gateway/state → `9c68d57`/`1f814af-release` (or `helm rollback tatsu 2326`).
+
+### Session 005 — remove local write-hook additions (2026-06-23)
+
+- Goal: Remove the two local-only write-path hook additions from `fix/ws-send-deadlock-on-writer-exit` while preserving the upstream heartbeat/dead-writer fix.
+- Completed: removed the nonblocking `requeue` helper/path and its test; restored `writeOp` to defer `w.Close()` without separately surfacing flush errors; restored the upstream `heartbeatStale(now time.Time)` test shape. `internal/gatewayws/write.go` and `internal/gatewayws/heartbeat_deadlock_test.go` now have no diff versus `origin/fix/ws-send-deadlock-on-writer-exit`.
+- Verification run:
+  - `./init.sh` -> exit 0; ran dependency sync and baseline `go build ./...` (Go emitted a non-fatal read-only module stat-cache warning in this sandbox).
+  - `go test ./discord/... ./internal/gatewayws/...` -> PASS before edits.
+  - `env GOCACHE=/tmp/go-build-cache go test ./internal/gatewayws` -> PASS.
+  - `env GOCACHE=/tmp/go-build-cache go test ./discord/... ./internal/gatewayws/...` -> PASS.
+  - `env GOCACHE=/tmp/go-build-cache go build ./...` -> exit 0; same non-fatal read-only module stat-cache warning.
+- Known risk or unresolved issue: none for this cleanup. The branch remains locally ahead/behind its upstream because the upstream branch has the same subject at a different commit SHA; no push was performed.

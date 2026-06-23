@@ -114,62 +114,33 @@ func TestRequestGuildMembersUnblocksOnCancel(t *testing.T) {
 	assertUnblocksOnCancel(t, "RequestGuildMembers", func(s *Session) { s.RequestGuildMembers(123) })
 }
 
-// heartbeatStale is the watchdog's death signal, evaluated once per interval on
-// the heartbeat ticker: the heartbeat we most recently sent has not been acked.
-// It compares lastAck to lastHB rather than measuring now-minus-lastHB, on
-// purpose. The original now-minus-lastHB >= interval check could never fire:
-// the ticker fires on a fixed cadence but lastHB is recorded slightly after each
-// tick, so the next tick always read just under interval. Comparing timestamps
-// makes "did the last heartbeat get acked before the next tick" timing-robust.
+// heartbeatStale is the watchdog's death signal: a heartbeat we sent has gone
+// unacked for at least one interval. The original condition
+// (lastAck.Sub(lastHB) >= interval) was inverted — once ACKs stop, lastAck falls
+// behind lastHB so the difference goes negative and the check can never fire,
+// leaving a zombie connection (writes still accepted, no ACKs) wedged forever.
 func TestHeartbeatStale(t *testing.T) {
+	const interval = 40 * time.Second
 	base := time.Now()
 
 	cases := []struct {
-		name            string
+		name           string
 		lastHB, lastAck time.Time
-		want            bool
+		now            time.Time
+		want           bool
 	}{
-		{"never sent a heartbeat", time.Time{}, time.Time{}, false},
-		{"last heartbeat acked", base, base.Add(time.Millisecond), false},
-		{"last heartbeat unacked", base, base.Add(-time.Second), true},
-		{"first heartbeat never acked", base, time.Time{}, true},
-		{"ack not strictly after send counts as unacked", base, base, true},
+		{"never sent a heartbeat", time.Time{}, time.Time{}, base, false},
+		{"acked promptly", base, base.Add(time.Millisecond), base.Add(interval), false},
+		{"unacked but within interval", base, base.Add(-2 * interval), base.Add(interval / 2), false},
+		{"unacked past interval", base, base.Add(-2 * interval), base.Add(interval), true},
+		{"first heartbeat never acked", base, time.Time{}, base.Add(interval), true},
 	}
 
 	for _, c := range cases {
-		s := &Session{lastHB: c.lastHB, lastAck: c.lastAck}
-		if got := s.heartbeatStale(); got != c.want {
-			t.Errorf("%s: heartbeatStale() = %v, want %v", c.name, got, c.want)
+		s := &Session{lastHB: c.lastHB, lastAck: c.lastAck, interval: interval}
+		if got := s.heartbeatStale(c.now); got != c.want {
+			t.Errorf("%s: heartbeatStale(%v) = %v, want %v", c.name, c.now, got, c.want)
 		}
-	}
-}
-
-// writer() is the only drainer of wch, so requeueing a failed op must never
-// block: a blocking send on a full queue would wedge the writer before its
-// deferred s.Cancel() runs — the exact black-holed/full-queue freeze this fix
-// is meant to recover from.
-func TestRequeueNeverBlocksOnFullQueue(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	s := &Session{
-		ctx: ctx,
-		// IgnoreErrors: the full-queue path deliberately logs an error when it
-		// drops the op; that is the expected behavior under test, not a failure.
-		log: slogtest.Make(t, &slogtest.Options{IgnoreErrors: true}),
-		wch: make(chan *Op, 1),
-	}
-	s.wch <- &Op{Op: 1} // queue full
-
-	done := make(chan struct{})
-	go func() {
-		s.requeue(&Op{Op: 2})
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("requeue blocked on a full write queue; writer would wedge before Cancel")
 	}
 }
 
@@ -181,8 +152,9 @@ func TestRequeueNeverBlocksOnFullQueue(t *testing.T) {
 func TestResetHeartbeatPreventsStaleCancelAfterReconnect(t *testing.T) {
 	old := time.Now().Add(-time.Hour)
 	s := &Session{
-		lastHB:  old,                     // heartbeat sent on the previous connection
-		lastAck: old.Add(10 * time.Millisecond), // and acked then
+		lastHB:   old,                      // heartbeat sent on the previous connection
+		lastAck:  old.Add(10 * time.Millisecond), // and acked then
+		interval: 40 * time.Second,
 	}
 
 	s.resetHeartbeat()
@@ -190,7 +162,7 @@ func TestResetHeartbeatPreventsStaleCancelAfterReconnect(t *testing.T) {
 	if !s.lastHB.IsZero() || !s.lastAck.IsZero() {
 		t.Fatalf("resetHeartbeat left state: lastHB=%v lastAck=%v", s.lastHB, s.lastAck)
 	}
-	if s.heartbeatStale() {
+	if s.heartbeatStale(time.Now()) {
 		t.Fatal("heartbeatStale fired on a freshly reset connection; would cause a reconnect loop")
 	}
 }

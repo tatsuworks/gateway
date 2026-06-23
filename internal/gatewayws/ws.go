@@ -298,6 +298,16 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		return xerrors.Errorf("handle hello message: %w", err)
 	}
 
+	// On a fresh session (identify, not resume) discard any ops queued on the
+	// previous connection so we don't replay a pre-identify backlog. This must
+	// happen BEFORE go s.writer(), because writer() captures wch/prioch into
+	// locals — swapping the channels after it starts orphans the writer from all
+	// new sends (heartbeats wedge, guild-member requests are silently dropped).
+	if !s.shouldResume() && len(s.wch)+len(s.prioch) > 0 {
+		s.wch = make(chan *Op, 2000)
+		s.prioch = make(chan *Op)
+	}
+
 	go s.writer()
 	if s.shouldResume() {
 		s.log.Info(s.ctx, "sending resume")
@@ -306,10 +316,6 @@ func (s *Session) Open(ctx context.Context, token string) error {
 		s.last = 0
 		s.log.Info(s.ctx, "sending identify")
 		s.writeIdentify()
-		if len(s.wch)+len(s.prioch) > 0 {
-			s.wch = make(chan *Op, 2000)
-			s.prioch = make(chan *Op)
-		}
 		s.lastIdentify = time.Now()
 	}
 

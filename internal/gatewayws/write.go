@@ -84,11 +84,17 @@ func (s *Session) writeOp(op *Op) error {
 	if err != nil {
 		return xerrors.Errorf("get writer: %w", err)
 	}
-	defer w.Close()
 
-	_, err = w.Write(raw)
-	if err != nil {
+	if _, err = w.Write(raw); err != nil {
+		w.Close()
 		return xerrors.Errorf("write payload: %w", err)
+	}
+
+	// Close flushes the final frame. Check its error rather than deferring it:
+	// nhooyr surfaces a black-holed/timed-out write here, and swallowing it would
+	// let writeOp return nil on a failed send so the writer never exits or cancels.
+	if err = w.Close(); err != nil {
+		return xerrors.Errorf("flush payload: %w", err)
 	}
 
 	return nil

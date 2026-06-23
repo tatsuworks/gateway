@@ -12,28 +12,28 @@ import (
 
 const connectionTimeout = 30
 
-// readMessage populates buf on *Session with the next message.
-func (s *Session) readMessage() error {
+// readMessage populates buf on *conn with the next message.
+func (c *conn) readMessage() error {
 	start := time.Now()
 	defer func() {
 		took := time.Since(start)
 		if took > connectionTimeout*time.Second {
-			s.log.Error(s.ctx, "took too long to get reader", slog.F("took", time.Since(start).String()))
+			c.s.log.Error(c.ctx, "took too long to get reader", slog.F("took", time.Since(start).String()))
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(s.ctx, connectionTimeout*time.Second)
+	ctx, cancel := context.WithTimeout(c.ctx, connectionTimeout*time.Second)
 	defer cancel()
 
-	_, r, err := s.wsConn.Reader(ctx)
+	_, r, err := c.wsConn.Reader(ctx)
 	if err != nil {
 		return xerrors.Errorf("get ws reader: %w", err)
 	}
 
-	s.zr.(czlib.Resetter).Reset(r)
-	defer s.zr.Close()
+	c.zr.(czlib.Resetter).Reset(r)
+	defer c.zr.Close()
 
-	_, err = s.buf.ReadFrom(s.zr)
+	_, err = c.buf.ReadFrom(c.zr)
 	if err != nil {
 		return xerrors.Errorf("copy message: %w", err)
 	}

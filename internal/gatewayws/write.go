@@ -16,18 +16,18 @@ type Op struct {
 	D  interface{} `json:"d"`
 }
 
-func (s *Session) writer() {
+func (c *conn) writer() {
 	var (
-		ctx    = s.ctx
-		wch    = s.wch
-		prioch = s.prioch
+		ctx    = c.ctx
+		wch    = c.wch
+		prioch = c.prioch
 		isPrio bool
 	)
 
 	// A dead writer means the connection is unusable. Cancel it on exit so the
 	// read loop and sendHeartbeats can't block forever on the unbuffered
 	// prioch/wch sends (nothing else drains them once writer is gone).
-	defer s.Cancel()
+	defer c.cancel()
 
 	for {
 		var msg *Op
@@ -39,24 +39,24 @@ func (s *Session) writer() {
 		case msg = <-prioch:
 			isPrio = true
 		case msg = <-wch:
-			if !s.authed {
+			if !c.authed.Load() {
 				wch <- msg
 				time.Sleep(25 * time.Millisecond)
 				continue
 			}
 		}
 
-		err := s.rl.Wait(ctx)
+		err := c.s.rl.Wait(ctx)
 		if err != nil {
 			return
 		}
 
-		err = s.writeOp(msg)
+		err = c.writeOp(msg)
 		if err != nil {
 			if !isPrio {
 				wch <- msg
 			}
-			s.log.Error(s.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
+			c.s.log.Error(c.ctx, "write ws message", slog.Error(err), slog.F("op", msg.Op))
 			return
 		}
 		isPrio = false
@@ -64,8 +64,8 @@ func (s *Session) writer() {
 	}
 }
 
-func (s *Session) writeOp(op *Op) error {
-	raw, err := s.enc.Write(*op)
+func (c *conn) writeOp(op *Op) error {
+	raw, err := c.s.enc.Write(*op)
 	if err != nil {
 		return xerrors.Errorf("encode op: %w", err)
 	}
@@ -73,22 +73,28 @@ func (s *Session) writeOp(op *Op) error {
 	// Bound the write the same way readMessage bounds the read. Without a
 	// deadline a black-holed socket (remote stopped reading, send buffer full)
 	// blocks here indefinitely: the writer never returns, never reaches its
-	// defer s.Cancel(), and the read loop wedges on the unbuffered prioch send
+	// defer c.cancel(), and the read loop wedges on the unbuffered prioch send
 	// inside writeHeartbeat — the "handle internal event " freeze seen in prod.
 	// With the deadline a stuck write fails, the writer exits and cancels the
 	// connection, and the read loop unwinds and reconnects.
-	ctx, cancel := context.WithTimeout(s.ctx, connectionTimeout*time.Second)
+	ctx, cancel := context.WithTimeout(c.ctx, connectionTimeout*time.Second)
 	defer cancel()
 
-	w, err := s.wsConn.Writer(ctx, websocket.MessageBinary)
+	w, err := c.wsConn.Writer(ctx, websocket.MessageBinary)
 	if err != nil {
 		return xerrors.Errorf("get writer: %w", err)
 	}
-	defer w.Close()
 
-	_, err = w.Write(raw)
-	if err != nil {
+	if _, err = w.Write(raw); err != nil {
+		w.Close()
 		return xerrors.Errorf("write payload: %w", err)
+	}
+
+	// Close flushes the final frame. Check its error rather than deferring it:
+	// nhooyr surfaces a black-holed/timed-out write here, and swallowing it would
+	// let writeOp return nil on a failed send so the writer never exits or cancels.
+	if err = w.Close(); err != nil {
+		return xerrors.Errorf("flush payload: %w", err)
 	}
 
 	return nil
@@ -115,14 +121,14 @@ type updatePresence struct {
 	AFK        bool        `json:"afk"`
 }
 
-func (s *Session) writeIdentify() {
+func (c *conn) writeIdentify() {
 	select {
-	case <-s.ctx.Done():
+	case <-c.ctx.Done():
 		return
-	case s.prioch <- &Op{
+	case c.prioch <- &Op{
 		Op: 2,
 		D: Identify{
-			Token: s.token,
+			Token: c.s.token,
 			Properties: Props{
 				Os:      runtime.GOOS,
 				Browser: "https://github.com/tatsuworks/gateway",
@@ -130,8 +136,8 @@ func (s *Session) writeIdentify() {
 			},
 			Compress:       false,
 			LargeThreshold: LargeThreshold,
-			Shard:          []int{s.shardID, s.shardCount},
-			Intents:        s.intents.Collect(),
+			Shard:          []int{c.s.shardID, c.s.shardCount},
+			Intents:        c.s.intents.Collect(),
 			Presence: updatePresence{
 				Activities: []*activity{
 					{
@@ -152,40 +158,30 @@ type Resume struct {
 	Sequence  int64  `json:"seq"`
 }
 
-func (s *Session) writeResume() {
+func (c *conn) writeResume() {
 	select {
-	case <-s.ctx.Done():
-	case s.prioch <- &Op{
+	case <-c.ctx.Done():
+	case c.prioch <- &Op{
 		Op: 6,
 		D: Resume{
-			Token:     s.token,
-			SessionID: s.sessID,
-			Sequence:  atomic.LoadInt64(&s.seq),
+			Token:     c.s.token,
+			SessionID: c.s.sessID,
+			Sequence:  atomic.LoadInt64(&c.s.seq),
 		},
 	}:
 	}
 }
 
-func (s *Session) writeHeartbeat() {
+func (c *conn) writeHeartbeat() {
 	// Abort if the connection is being torn down. prioch is unbuffered, so a bare
 	// send wedges the read loop forever once writer() has exited.
 	select {
-	case s.prioch <- &Op{
+	case c.prioch <- &Op{
 		Op: 1,
-		D:  atomic.LoadInt64(&s.seq),
+		D:  atomic.LoadInt64(&c.s.seq),
 	}:
-	case <-s.ctx.Done():
+	case <-c.ctx.Done():
 	}
-}
-
-// resetHeartbeat clears heartbeat tracking for a new connection. Both timestamps
-// must be cleared together: a Session is reused across reconnects, so a lastHB
-// left over from the previous connection (while lastAck is reset to zero) would
-// make heartbeatStale fire on the first tick and cancel the fresh connection
-// before it ever heartbeats — a reconnect loop.
-func (s *Session) resetHeartbeat() {
-	s.lastHB = time.Time{}
-	s.lastAck = time.Time{}
 }
 
 // heartbeatStale reports whether the most recent heartbeat we sent has gone
@@ -195,18 +191,20 @@ func (s *Session) resetHeartbeat() {
 // after lastHB). Measuring "time since the unacked send" rather than
 // lastAck.Sub(lastHB) is deliberate: once ACKs stop, lastAck falls behind lastHB
 // and the old difference went negative, so the watchdog could never fire.
-func (s *Session) heartbeatStale(now time.Time) bool {
-	if s.lastHB.IsZero() {
+func (c *conn) heartbeatStale(now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lastHB.IsZero() {
 		return false
 	}
-	return s.lastHB.After(s.lastAck) && now.Sub(s.lastHB) >= s.interval
+	return c.lastHB.After(c.lastAck) && now.Sub(c.lastHB) >= c.interval
 }
 
-func (s *Session) sendHeartbeats() {
+func (c *conn) sendHeartbeats() {
 	var (
-		t      = time.NewTicker(s.interval)
-		ctx    = s.ctx
-		cancel = s.cancel
+		t      = time.NewTicker(c.interval)
+		ctx    = c.ctx
+		cancel = c.cancel
 	)
 	defer t.Stop()
 
@@ -217,15 +215,16 @@ func (s *Session) sendHeartbeats() {
 		case <-t.C:
 		}
 
-		if s.heartbeatStale(time.Now()) {
-			s.log.Warn(s.ctx, "no response to heartbeat; tearing down connection",
-				slog.F("last_hb", s.lastHB), slog.F("last_ack", s.lastAck))
+		if c.heartbeatStale(time.Now()) {
+			_, lastHB, lastAck, _ := c.snapshot()
+			c.s.log.Warn(c.ctx, "no response to heartbeat; tearing down connection",
+				slog.F("last_hb", lastHB), slog.F("last_ack", lastAck))
 			cancel()
 			return
 		}
 
-		s.writeHeartbeat()
-		s.lastHB = time.Now()
+		c.writeHeartbeat()
+		c.markHB(time.Now())
 	}
 }
 
@@ -235,16 +234,27 @@ type RequestGuildMembers struct {
 	Limit   int    `json:"limit"`
 }
 
-func (s *Session) requestGuildMembers(guild int64) {
+func (c *conn) requestGuildMembers(guild int64) {
+	// If the connection is torn down the writer has already exited and the next
+	// Open allocates a fresh wch, so a send here (this path is non-blocking and
+	// the buffer usually has room) is silently orphaned. This path runs under
+	// the parent ctx, so a disconnect mid-GUILD_CREATE still reaches here with a
+	// dead conn. Drop + log instead. The guild is re-requested on the next
+	// IDENTIFY (which replays GUILD_CREATE); a RESUME does not replay it, so
+	// recovery there is via the staleness sweep or a manual RequestGuildMembers.
+	if c.ctx.Err() != nil {
+		c.s.log.Info(c.ctx, "drop guild member backfill: connection closed", slog.F("guild", guild))
+		return
+	}
 	select {
-	case s.wch <- &Op{
+	case c.wch <- &Op{
 		Op: 8,
 		D: RequestGuildMembers{
 			GuildID: guild,
 		},
 	}:
 	default:
-		s.log.Error(s.ctx, "write channel full")
+		c.s.log.Error(c.ctx, "write channel full", slog.F("guild", guild))
 	}
 
 }
@@ -254,9 +264,9 @@ type activity struct {
 	Type int    `json:"type"`
 }
 
-func (s *Session) rotateStatuses() {
+func (c *conn) rotateStatuses() {
 	var (
-		ctx      = s.ctx
+		ctx      = c.ctx
 		statuses = []string{
 			"Use t!help",
 			"https://tatsu.gg",
@@ -273,9 +283,9 @@ func (s *Session) rotateStatuses() {
 			default:
 			}
 
-			s.log.Debug(s.ctx, "writing status", slog.F("status", e))
+			c.s.log.Debug(c.ctx, "writing status", slog.F("status", e))
 
-			s.wch <- &Op{
+			c.wch <- &Op{
 				Op: 3,
 				D: updatePresence{
 					Activities: []*activity{
@@ -292,7 +302,10 @@ func (s *Session) rotateStatuses() {
 	}
 }
 
-func (s *Session) RequestGuildMembers(guildID int64) {
+// requestGuildMembersExternal is the management-RPC path (gRPC). Unlike the
+// internal default-drop variant it blocks on the send, aborting only if the
+// connection is torn down.
+func (c *conn) requestGuildMembersExternal(guildID int64) {
 	op := &Op{
 		Op: 8,
 		D: RequestGuildMembers{
@@ -300,9 +313,9 @@ func (s *Session) RequestGuildMembers(guildID int64) {
 		},
 	}
 
-	s.log.Info(s.ctx, "sending members request", slog.F("guild", guildID))
+	c.s.log.Info(c.ctx, "sending members request", slog.F("guild", guildID))
 	select {
-	case s.wch <- op:
-	case <-s.ctx.Done():
+	case c.wch <- op:
+	case <-c.ctx.Done():
 	}
 }

@@ -7,24 +7,24 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func (s *Session) readHello() error {
-	s.buf = s.bufferPool.Get().(*bytes.Buffer)
-	defer s.cleanupBuffer()
+func (c *conn) readHello() error {
+	c.buf = c.s.bufferPool.Get().(*bytes.Buffer)
+	defer c.cleanupBuffer()
 
-	err := s.readMessage()
+	err := c.readMessage()
 	if err != nil {
 		return xerrors.Errorf("read message: %w", err)
 	}
 
-	interval, trace, err := s.enc.DecodeHello(s.buf.Bytes())
+	interval, trace, err := c.s.enc.DecodeHello(c.buf.Bytes())
 	if err != nil {
 		return xerrors.Errorf("decode hello message: %w", err)
 	}
 	if interval <= 0 {
 		return xerrors.Errorf("invalid interval received: %d", interval)
 	}
-	s.interval = time.Duration(interval) * time.Millisecond
-	s.trace = trace
+	c.interval = time.Duration(interval) * time.Millisecond
+	c.trace = trace
 
 	return nil
 }

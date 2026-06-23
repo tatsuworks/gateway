@@ -18,20 +18,23 @@ import (
 func TestWriterCancelsConnectionWhenItExits(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
-		ctx:    ctx,
-		cancel: cancel,
-		log:    slogtest.Make(t, nil),
+		log: slogtest.Make(t, nil),
 		// burst 0 => rl.Wait(ctx) returns an error immediately, driving writer()
 		// down its abnormal-exit path without needing a real websocket.
-		rl:     rate.NewLimiter(rate.Every(time.Hour), 0),
+		rl: rate.NewLimiter(rate.Every(time.Hour), 0),
+	}
+	c := &conn{
+		s:      s,
+		ctx:    ctx,
+		cancel: cancel,
 		wch:    make(chan *Op, 1),
 		prioch: make(chan *Op, 1),
-		authed: true,
 	}
-	s.prioch <- &Op{Op: 1} // give writer a message so it advances to rl.Wait and exits
+	c.authed.Store(true)
+	c.prioch <- &Op{Op: 1} // give writer a message so it advances to rl.Wait and exits
 
 	done := make(chan struct{})
-	go func() { s.writer(); close(done) }()
+	go func() { c.writer(); close(done) }()
 
 	select {
 	case <-done:
@@ -40,7 +43,7 @@ func TestWriterCancelsConnectionWhenItExits(t *testing.T) {
 	}
 
 	select {
-	case <-s.ctx.Done():
+	case <-c.ctx.Done():
 	case <-time.After(time.Second):
 		t.Fatal("writer exited without cancelling the connection context; the read loop can deadlock on prioch")
 	}
@@ -52,17 +55,18 @@ func TestWriterCancelsConnectionWhenItExits(t *testing.T) {
 // reconnect.
 func TestWriteHeartbeatUnblocksWhenContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Session{log: slogtest.Make(t, nil)}
+	c := &conn{
+		s:      s,
 		ctx:    ctx,
 		cancel: cancel,
-		log:    slogtest.Make(t, nil),
 		prioch: make(chan *Op), // unbuffered, no receiver: a bare send would wedge
 	}
 	cancel() // connection is being torn down
 
 	done := make(chan struct{})
 	go func() {
-		s.writeHeartbeat()
+		c.writeHeartbeat()
 		close(done)
 	}()
 
@@ -73,17 +77,18 @@ func TestWriteHeartbeatUnblocksWhenContextCancelled(t *testing.T) {
 	}
 }
 
-// assertUnblocksOnCancel runs a Session send method with no receiver draining
+// assertUnblocksOnCancel runs a conn send method with no receiver draining
 // prioch/wch and a cancelled connection context, and fails if it doesn't return
 // promptly. A bare channel send would deadlock here exactly as writeHeartbeat
 // did; every gateway-initiated send must abort on ctx.Done instead.
-func assertUnblocksOnCancel(t *testing.T, name string, run func(*Session)) {
+func assertUnblocksOnCancel(t *testing.T, name string, run func(*conn)) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Session{log: slogtest.Make(t, nil)}
+	c := &conn{
+		s:      s,
 		ctx:    ctx,
 		cancel: cancel,
-		log:    slogtest.Make(t, nil),
 		prioch: make(chan *Op),
 		wch:    make(chan *Op),
 	}
@@ -91,7 +96,7 @@ func assertUnblocksOnCancel(t *testing.T, name string, run func(*Session)) {
 
 	done := make(chan struct{})
 	go func() {
-		run(s)
+		run(c)
 		close(done)
 	}()
 
@@ -103,15 +108,15 @@ func assertUnblocksOnCancel(t *testing.T, name string, run func(*Session)) {
 }
 
 func TestWriteIdentifyUnblocksOnCancel(t *testing.T) {
-	assertUnblocksOnCancel(t, "writeIdentify", (*Session).writeIdentify)
+	assertUnblocksOnCancel(t, "writeIdentify", (*conn).writeIdentify)
 }
 
 func TestWriteResumeUnblocksOnCancel(t *testing.T) {
-	assertUnblocksOnCancel(t, "writeResume", (*Session).writeResume)
+	assertUnblocksOnCancel(t, "writeResume", (*conn).writeResume)
 }
 
 func TestRequestGuildMembersUnblocksOnCancel(t *testing.T) {
-	assertUnblocksOnCancel(t, "RequestGuildMembers", func(s *Session) { s.RequestGuildMembers(123) })
+	assertUnblocksOnCancel(t, "requestGuildMembersExternal", func(c *conn) { c.requestGuildMembersExternal(123) })
 }
 
 // heartbeatStale is the watchdog's death signal: a heartbeat we sent has gone
@@ -124,10 +129,10 @@ func TestHeartbeatStale(t *testing.T) {
 	base := time.Now()
 
 	cases := []struct {
-		name           string
+		name            string
 		lastHB, lastAck time.Time
-		now            time.Time
-		want           bool
+		now             time.Time
+		want            bool
 	}{
 		{"never sent a heartbeat", time.Time{}, time.Time{}, base, false},
 		{"acked promptly", base, base.Add(time.Millisecond), base.Add(interval), false},
@@ -136,34 +141,29 @@ func TestHeartbeatStale(t *testing.T) {
 		{"first heartbeat never acked", base, time.Time{}, base.Add(interval), true},
 	}
 
-	for _, c := range cases {
-		s := &Session{lastHB: c.lastHB, lastAck: c.lastAck, interval: interval}
-		if got := s.heartbeatStale(c.now); got != c.want {
-			t.Errorf("%s: heartbeatStale(%v) = %v, want %v", c.name, c.now, got, c.want)
+	for _, tc := range cases {
+		c := &conn{lastHB: tc.lastHB, lastAck: tc.lastAck, interval: interval}
+		if got := c.heartbeatStale(tc.now); got != tc.want {
+			t.Errorf("%s: heartbeatStale(%v) = %v, want %v", tc.name, tc.now, got, tc.want)
 		}
 	}
 }
 
-// A Session is reused across reconnects, so heartbeat state from the previous
-// connection must be cleared when a new one starts. If lastHB carried over while
-// lastAck is reset to zero, heartbeatStale would read that old heartbeat as
-// unacked and cancel the fresh connection on its first tick — a reconnect loop.
-// resetHeartbeat must clear both timestamps together.
-func TestResetHeartbeatPreventsStaleCancelAfterReconnect(t *testing.T) {
-	old := time.Now().Add(-time.Hour)
-	s := &Session{
-		lastHB:   old,                      // heartbeat sent on the previous connection
-		lastAck:  old.Add(10 * time.Millisecond), // and acked then
-		interval: 40 * time.Second,
+// A fresh conn must start with zero heartbeat state so the watchdog cannot fire
+// on its first tick. This replaces the old resetHeartbeat test: where a reused
+// Session needed an explicit reset to avoid a reconnect loop, a per-Open conn
+// gets zero-valued lastHB/lastAck for free from newConn.
+func TestFreshConnHasZeroHeartbeatState(t *testing.T) {
+	s := &Session{log: slogtest.Make(t, nil)}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := s.newConn(ctx, cancel)
+	c.interval = 40 * time.Second
+	if !c.lastHB.IsZero() || !c.lastAck.IsZero() {
+		t.Fatalf("fresh conn carried heartbeat state: lastHB=%v lastAck=%v", c.lastHB, c.lastAck)
 	}
-
-	s.resetHeartbeat()
-
-	if !s.lastHB.IsZero() || !s.lastAck.IsZero() {
-		t.Fatalf("resetHeartbeat left state: lastHB=%v lastAck=%v", s.lastHB, s.lastAck)
-	}
-	if s.heartbeatStale(time.Now()) {
-		t.Fatal("heartbeatStale fired on a freshly reset connection; would cause a reconnect loop")
+	if c.heartbeatStale(time.Now()) {
+		t.Fatal("heartbeatStale fired on a fresh connection; would cause a reconnect loop")
 	}
 }
 
@@ -172,17 +172,18 @@ func TestResetHeartbeatPreventsStaleCancelAfterReconnect(t *testing.T) {
 func TestWriteHeartbeatDeliversWhenDrained(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s := &Session{
+	s := &Session{log: slogtest.Make(t, nil)}
+	c := &conn{
+		s:      s,
 		ctx:    ctx,
 		cancel: cancel,
-		log:    slogtest.Make(t, nil),
 		prioch: make(chan *Op),
 	}
 
-	go s.writeHeartbeat()
+	go c.writeHeartbeat()
 
 	select {
-	case op := <-s.prioch:
+	case op := <-c.prioch:
 		if op.Op != 1 {
 			t.Fatalf("heartbeat op = %d, want 1", op.Op)
 		}

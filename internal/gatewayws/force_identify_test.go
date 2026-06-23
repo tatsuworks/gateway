@@ -34,11 +34,11 @@ func (r *shardInfoRecorder) SetShardInfo(ctx context.Context, shard int, name st
 	return nil
 }
 
-func newResumableSession(t *testing.T, db state.DB) (*Session, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
+// newResumableSession builds a resumable Session with a live connection
+// published to cur, so ForceIdentify/Cancel route to it. Returns the conn so a
+// test can observe its context being cancelled.
+func newResumableSession(t *testing.T, db state.DB) (*Session, *conn) {
 	s := &Session{
-		ctx:       ctx,
-		cancel:    cancel,
 		log:       slogtest.Make(t, nil),
 		stateDB:   db,
 		shardID:   42,
@@ -50,7 +50,11 @@ func newResumableSession(t *testing.T, db state.DB) (*Session, context.CancelFun
 	if !s.shouldResume() {
 		t.Fatal("test setup must start with a resumable session")
 	}
-	return s, cancel
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	c := s.newConn(ctx, cancel)
+	s.cur.Store(c)
+	return s, c
 }
 
 // ForceIdentify only signals: it sets the flag and cancels the active
@@ -59,7 +63,7 @@ func newResumableSession(t *testing.T, db state.DB) (*Session, context.CancelFun
 // persist directly — persistShardInfo is flag-aware instead.
 func TestForceIdentifySignalsWithoutMutatingResumeState(t *testing.T) {
 	db := &shardInfoRecorder{}
-	s, _ := newResumableSession(t, db)
+	s, c := newResumableSession(t, db)
 
 	s.ForceIdentify()
 
@@ -74,7 +78,7 @@ func TestForceIdentifySignalsWithoutMutatingResumeState(t *testing.T) {
 		t.Fatalf("ForceIdentify persisted directly (calls=%d); persistence must go through the read loop", db.calls)
 	}
 	select {
-	case <-s.ctx.Done():
+	case <-c.ctx.Done():
 	default:
 		t.Fatal("ForceIdentify did not cancel the active shard context")
 	}

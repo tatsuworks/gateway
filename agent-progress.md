@@ -137,3 +137,16 @@
   - `env GOCACHE=/tmp/go-build-cache go test ./discord/... ./internal/gatewayws/...` -> PASS.
   - `env GOCACHE=/tmp/go-build-cache go build ./...` -> exit 0; same non-fatal read-only module stat-cache warning.
 - Known risk or unresolved issue: none for this cleanup. The branch remains locally ahead/behind its upstream because the upstream branch has the same subject at a different commit SHA; no push was performed.
+
+### Session 006 — conn-lifecycle refactor (Session → Session + per-Open conn) (2026-06-23)
+
+- Goal: retire the bug class behind the WS-deadlock fixes by restructuring, rather than patching, `internal/gatewayws`. Split the reused-across-reconnects `Session` god-object into a durable `Session` (identity, shared deps, resume tuple) and a fresh-per-`Open()` `conn` (ctx/cancel, wch/prioch, websocket, buffers, heartbeat timing). Branch `refactor/conn-lifecycle` off `fix/ws-send-deadlock-on-writer-exit` HEAD (`778d772`, which includes the bounded-write + writeOp flush-error check).
+- Plan: `docs/superpowers/plans/2026-06-23-conn-lifecycle-refactor.md` (written, codex-reviewed; all 8 must-fix items folded in before execution).
+- Completed (commits `93e1585`, `d0a090d`, `1bea7f8` + plan `89731fb`):
+  - New `conn` type owns per-connection state; `Session` keeps a `cur atomic.Pointer[conn]` that management RPCs (`Cancel`/`ForceIdentify`/`RequestGuildMembers`/`Status`/`LongLastAck`) route through.
+  - Deleted the three reconnect-reset hacks a fresh conn makes unnecessary: `resetHeartbeat`, the identify-path `wch`/`prioch` swap, and the INVALID_SESSION `s.wch = make(...)` rebuild.
+  - Preserved behavior deliberately: `guilds`/`backfilled` stay on `Session` (read-loop single-owner, survive RESUME so the backfill-skip optimization holds); `last` atomic on `Session`; `run(parent)` keeps the two-context split so `state.HandleEvent`/`maybeRequestGuildMembers` still run under the parent ctx (in-flight DB work survives a disconnect); `Open` cancels the connection before clearing `cur`.
+  - Closed the pre-existing `lastAck`/`curState` data race: `lastHB`/`lastAck`/`ready`/`curState` are now behind a `conn.mu` (setState/markHB/markAck/markReady/snapshot); `authed` is `atomic.Bool`.
+  - Two blessed, documented behavior changes: `RequestGuildMembers` is dropped+logged when no connection is active; `Status`/`LongLastAck` report `<disconnected>`/`true` on nil `cur`.
+- Verification: `go build ./...` clean; `go vet ./...` clean; `go test -race ./internal/gatewayws/ ./internal/manager/ ./gatewaypb/` PASS (19 gatewayws tests incl. new channel-independence, nil-cur, and Status-race tests). External API signatures (`go doc Session`) unchanged. Greps confirm no reset-hacks and no stale `s.<conn-field>` access remain.
+- Known risk / next step: not deployed (per AGENTS.md, shipping is a separate helm staging-deploy). Branch not pushed (awaiting maintainer go-ahead). NOTE: the agent-progress Session 005 entry describes the deadlock branch with `defer w.Close()` and no flush-error surfacing, but this refactor was based on `778d772` which *does* surface the writeOp flush error — the two narratives diverge; reconcile when the deadlock PR and this refactor are sequenced for merge.

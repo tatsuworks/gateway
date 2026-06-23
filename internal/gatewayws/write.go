@@ -235,6 +235,17 @@ type RequestGuildMembers struct {
 }
 
 func (c *conn) requestGuildMembers(guild int64) {
+	// If the connection is torn down the writer has already exited and the next
+	// Open allocates a fresh wch, so a send here (this path is non-blocking and
+	// the buffer usually has room) is silently orphaned. This path runs under
+	// the parent ctx, so a disconnect mid-GUILD_CREATE still reaches here with a
+	// dead conn. Drop + log instead. The guild is re-requested on the next
+	// IDENTIFY (which replays GUILD_CREATE); a RESUME does not replay it, so
+	// recovery there is via the staleness sweep or a manual RequestGuildMembers.
+	if c.ctx.Err() != nil {
+		c.s.log.Info(c.ctx, "drop guild member backfill: connection closed", slog.F("guild", guild))
+		return
+	}
 	select {
 	case c.wch <- &Op{
 		Op: 8,
@@ -243,7 +254,7 @@ func (c *conn) requestGuildMembers(guild int64) {
 		},
 	}:
 	default:
-		c.s.log.Error(c.ctx, "write channel full")
+		c.s.log.Error(c.ctx, "write channel full", slog.F("guild", guild))
 	}
 
 }

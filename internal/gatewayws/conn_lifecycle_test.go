@@ -47,6 +47,24 @@ func TestRequestGuildMembersDroppedWhenDisconnected(t *testing.T) {
 	}
 }
 
+// The automatic GUILD_CREATE backfill path runs under the parent ctx, so a
+// disconnect mid-event can reach requestGuildMembers with a torn-down conn
+// whose writer has already exited. It must drop the request (and log), not
+// silently enqueue it into a dead wch the next Open replaces — that orphaned
+// op would never be sent and the large guild would never get a member backfill.
+func TestAutoRequestGuildMembersDroppedOnTornDownConn(t *testing.T) {
+	s := &Session{log: slogtest.Make(t, nil)}
+	ctx, cancel := context.WithCancel(context.Background())
+	c := s.newConn(ctx, cancel)
+	cancel() // simulate the connection being torn down before the RGM enqueue
+
+	c.requestGuildMembers(123)
+
+	if n := len(c.wch); n != 0 {
+		t.Fatalf("requestGuildMembers orphaned %d op(s) into a dead wch; want 0 (dropped)", n)
+	}
+}
+
 // Status/LongLastAck report disconnected when there is no active connection.
 func TestStatusWhenDisconnected(t *testing.T) {
 	s := &Session{log: slogtest.Make(t, nil), shardID: 9}

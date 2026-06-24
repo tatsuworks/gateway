@@ -1,7 +1,7 @@
 {
   "project": "gateway",
   "scope": "Seeds with the agent-workspace harness's own bootstrap task. This is not a snapshot of the team backlog \u2014 actual in-flight work is tracked in the team's primary tooling (Linear, etc.). Agents add tasks here as they bootstrap their own sessions in this repo.",
-  "last_updated": "2026-06-18",
+  "last_updated": "2026-06-23",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -57,6 +57,27 @@
         "Design: docs/superpowers/specs/2026-06-12-backfill-marker-rgm-skip-design.md; Plan: docs/superpowers/plans/2026-06-18-backfill-marker-rgm-skip.md"
       ],
       "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). 2026-06-18 pivot: skip is now NO-EXPIRY (skip if backfilled_at IS NOT NULL, any age) because reconnect-storm speed is the priority — a jittered staleness skip gave no relief for the storm-after-long-uptime case it most needs to help. Drift is bounded by the reconciliation delete on real backfills + cold re-backfills on UNLOGGED cache reset; it only accrues during disconnect windows, so good uptime keeps it small. A Phase 3b background sweep is DEFERRED/OPTIONAL (build only if roster staleness becomes a real complaint), not required. 2026-06-18 force-identify control: RestartShardRequest.force_identify signals the shard (atomic flag) and cancels it; the next Open clears+persists the resume tuple on the read-loop goroutine (rewritten in commit 58195f2 from the original racy in-gRPC-goroutine clear), avoiding DB-delete/pod-shutdown races and a 64-shard pod restart. Status flipped to 'passing' 2026-06-18 after staging validation ran (agent-progress.md Session 002d): no-RGM-storm small-guild reconcile, large-guild auto-RGM + multi-chunk decode, and the skip gate were all confirmed on staging. Observability caveat: the AUTOMATIC RGM path (write.go:187) logs nothing on success (only the manual gRPC path logs 'sending members request') - verify auto-RGM via the DB, not logs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the state DB before deploy; after prod deploy, seed the baseline via one full re-IDENTIFY."
+    },
+    {
+      "id": "ws-send-deadlock-hook-cleanup",
+      "priority": 1,
+      "area": "gatewayws",
+      "title": "Remove local write-path hook additions",
+      "user_visible_behavior": "The ws-send-deadlock branch keeps the upstream dead-writer and heartbeat watchdog fix without the local-only requeue helper or explicit websocket flush-error hook.",
+      "status": "passing",
+      "verification": [
+        "./init.sh (exit 0; baseline go build ./... ran, with a non-fatal read-only module stat-cache warning in this sandbox)",
+        "go test ./discord/... ./internal/gatewayws/... (PASS before edits)",
+        "env GOCACHE=/tmp/go-build-cache go test ./internal/gatewayws (PASS)",
+        "env GOCACHE=/tmp/go-build-cache go test ./discord/... ./internal/gatewayws/... (PASS)",
+        "env GOCACHE=/tmp/go-build-cache go build ./... (exit 0; same non-fatal read-only module stat-cache warning)"
+      ],
+      "evidence": [
+        "2026-06-23: removed the local-only nonblocking requeue helper/path and TestRequeueNeverBlocksOnFullQueue.",
+        "2026-06-23: restored writeOp to defer w.Close() without separately surfacing flush errors.",
+        "2026-06-23: internal/gatewayws/write.go and internal/gatewayws/heartbeat_deadlock_test.go have no diff versus origin/fix/ws-send-deadlock-on-writer-exit after the cleanup."
+      ],
+      "notes": "The branch remains locally ahead/behind origin/fix/ws-send-deadlock-on-writer-exit because the upstream branch has the same fix subject at a different commit SHA. No unresolved blocker."
     }
   ]
 }

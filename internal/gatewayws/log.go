@@ -12,11 +12,11 @@ const (
 	StatusInterval = 1 * time.Minute
 )
 
-func (s *Session) logTotalEvents() {
+func (c *conn) logTotalEvents() {
 	var (
 		logT    = time.NewTicker(LogInterval)
 		statusT = time.NewTicker(StatusInterval)
-		ctx     = s.ctx
+		ctx     = c.ctx
 	)
 	defer logT.Stop()
 	defer statusT.Stop()
@@ -26,23 +26,25 @@ func (s *Session) logTotalEvents() {
 		case <-ctx.Done():
 			return
 		case <-logT.C:
-			seq := atomic.LoadInt64(&s.seq)
-			since := seq - s.last
+			seq := atomic.LoadInt64(&c.s.seq)
+			since := seq - atomic.LoadInt64(&c.s.last)
+			curState, _, _, _ := c.snapshot()
 
-			s.log.Info(
-				s.ctx,
+			c.s.log.Info(
+				c.ctx,
 				"event report",
 				slog.F("seq", seq),
 				slog.F("events", since),
 				slog.F("/sec", float64(since)/LogInterval.Seconds()),
-				slog.F("write_queue", len(s.wch)),
-				slog.F("waiting", s.state.WaitingQueries()),
-				slog.F("state", s.curState),
+				slog.F("write_queue", len(c.wch)),
+				slog.F("waiting", c.s.state.WaitingQueries()),
+				slog.F("state", curState),
 			)
-			s.persistStatus()
-			s.last = seq
+			c.s.persistStatus(curState)
+			atomic.StoreInt64(&c.s.last, seq)
 		case <-statusT.C:
-			s.persistStatus()
+			curState, _, _, _ := c.snapshot()
+			c.s.persistStatus(curState)
 		}
 	}
 }

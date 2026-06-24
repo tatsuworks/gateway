@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"sync"
@@ -35,10 +34,12 @@ const (
 
 var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
 
+// Session is the durable, reused-across-reconnects identity of a shard. It owns
+// shared dependencies and the resume tuple, but NOT the live connection: each
+// Open builds a fresh conn (see conn.go) and publishes it to cur so management
+// calls (Cancel/ForceIdentify/RequestGuildMembers/Status/LongLastAck) reach it.
 type Session struct {
-	ctx    context.Context
-	cancel func()
-	wg     *sync.WaitGroup
+	wg *sync.WaitGroup
 
 	name string
 	log  slog.Logger
@@ -48,11 +49,10 @@ type Session struct {
 	shardID    int
 	shardCount int
 
-	authed    bool
 	seq       int64
 	sessID    string
 	resumeURL string
-	last      int64
+	last      int64 // event-rate baseline; accessed atomically (logTotalEvents goroutine)
 
 	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
 	// request that the next Open discard the resume tuple and IDENTIFY. It is
@@ -60,32 +60,21 @@ type Session struct {
 	// are only ever mutated there, never from the caller of ForceIdentify.
 	forceIdentify int32
 
-	wsConn *websocket.Conn
-	zr     io.ReadCloser
-
-	interval time.Duration
-	trace    string
-
-	rl     *rate.Limiter
-	wch    chan *Op
-	prioch chan *Op
-
-	lastHB       time.Time
-	lastAck      time.Time
-	ready        time.Time
 	lastIdentify time.Time
 
+	rl *rate.Limiter
+
+	// guilds/backfilled are mutated and read only on the read-loop goroutine
+	// (READY repopulates them, GUILD_CREATE reads them) and deliberately survive
+	// a RESUME, so the backfill-skip optimization keeps working across resumes.
+	// They stay on Session for that reason, not on the per-Open conn.
 	guilds     map[int64]struct{}
 	backfilled map[int64]struct{}
-	curState   string
 
 	bufferPool *sync.Pool
-	buf        *bytes.Buffer
 	enc        discord.Encoding
 
-	etcd       *clientv3.Client
-	etcdSess   *concurrency.Session
-	identifyMu *concurrency.Mutex
+	etcd *clientv3.Client
 
 	state   *handler.Client
 	stateDB state.DB
@@ -94,34 +83,49 @@ type Session struct {
 	whitelistedEvents map[string]map[string]struct{}
 
 	hasGuildMembersIntent bool
+
+	// cur is the current connection, published by Open and cleared on return.
+	// nil before the first Open and briefly between reconnects.
+	cur atomic.Pointer[conn]
 }
 
 func (s *Session) Status() string {
-	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, s.curState, s.lastAck.Format(time.RFC3339))
+	c := s.cur.Load()
+	if c == nil {
+		return fmt.Sprintf("%v: <disconnected>", s.shardID)
+	}
+	curState, _, lastAck, _ := c.snapshot()
+	return fmt.Sprintf("%v: %s [LastAck: %v]", s.shardID, curState, lastAck.Format(time.RFC3339))
 }
 
 func (s *Session) LongLastAck(threshold time.Duration) bool {
+	c := s.cur.Load()
+	if c == nil {
+		// no active connection => definitionally not acking
+		return true
+	}
+	_, _, lastAck, ready := c.snapshot()
 	cutoff := time.Now().Add(-threshold)
-	return s.lastAck.Before(cutoff) && s.ready.Before(cutoff)
+	return lastAck.Before(cutoff) && ready.Before(cutoff)
 }
 
-func (s *Session) cleanupBuffer() {
-	if s.buf != nil {
-		if s.buf.Cap() < (1 << 24) {
-			s.buf.Reset()
-			s.bufferPool.Put(s.buf)
+func (c *conn) cleanupBuffer() {
+	if c.buf != nil {
+		if c.buf.Cap() < (1 << 24) {
+			c.buf.Reset()
+			c.s.bufferPool.Put(c.buf)
 		} else {
-			s.log.Debug(s.ctx, "buffer evicted", slog.F("size", s.buf.Cap()))
+			c.s.log.Debug(c.ctx, "buffer evicted", slog.F("size", c.buf.Cap()))
 		}
 	}
-	s.buf = nil
+	c.buf = nil
 }
 
-func (s *Session) GatewayURL() string {
-	wsOpts := "?v=10&encoding=" + s.enc.Name() + "&compress=zlib-stream"
+func (c *conn) GatewayURL() string {
+	wsOpts := "?v=10&encoding=" + c.s.enc.Name() + "&compress=zlib-stream"
 
-	if s.resumeURL != "" && s.sessID != "" {
-		return s.resumeURL + wsOpts
+	if c.s.resumeURL != "" && c.s.sessID != "" {
+		return c.s.resumeURL + wsOpts
 	}
 
 	return "wss://gateway.discord.gg/" + wsOpts
@@ -144,7 +148,6 @@ type SessionConfig struct {
 
 func NewSession(cfg *SessionConfig) (*Session, error) {
 	sess := &Session{
-		ctx:        context.Background(),
 		name:       cfg.Name,
 		wg:         cfg.WorkGroup,
 		log:        cfg.Logger.With(slog.F("name", cfg.Name), slog.F("shard", cfg.ShardID)),
@@ -153,10 +156,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		shardCount: cfg.ShardCount,
 		intents:    cfg.Intents,
 
-		// start with a 1kb buffer
-		rl:     rate.NewLimiter(1.75, 2),
-		wch:    make(chan *Op, 2000),
-		prioch: make(chan *Op),
+		rl: rate.NewLimiter(1.75, 2),
 
 		etcd: cfg.Etcd,
 
@@ -194,16 +194,16 @@ func (s *Session) calcIdentifyWait() time.Duration {
 	return totalWaitTime
 }
 
-func (s *Session) initEtcd() error {
-	timeoutDuration := s.calcIdentifyWait() + TimeoutAllowance
+func (c *conn) initEtcd() error {
+	timeoutDuration := c.s.calcIdentifyWait() + TimeoutAllowance
 
-	sess, err := concurrency.NewSession(s.etcd, concurrency.WithContext(s.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
+	sess, err := concurrency.NewSession(c.s.etcd, concurrency.WithContext(c.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
 	if err != nil {
 		return xerrors.Errorf("get etcd session: %w", err)
 	}
 
-	s.etcdSess = sess
-	s.identifyMu = concurrency.NewMutex(sess, IdentifyMutexRootName+strconv.Itoa(s.shardID%16))
+	c.etcdSess = sess
+	c.identifyMu = concurrency.NewMutex(sess, IdentifyMutexRootName+strconv.Itoa(c.s.shardID%16))
 	return nil
 }
 
@@ -218,7 +218,8 @@ func (s *Session) shouldResume() bool {
 // the read-loop goroutine via applyForceIdentify, so sessID/resumeURL are never
 // written concurrently. persistShardInfo is flag-aware, so the moment the flag
 // is set the cleared tuple is what gets persisted — a crash before reconnect
-// cannot leave a resumable row behind.
+// cannot leave a resumable row behind. If no connection is active the flag still
+// persists and the next Open's applyForceIdentify consumes it.
 func (s *Session) ForceIdentify() {
 	atomic.StoreInt32(&s.forceIdentify, 1)
 	s.Cancel()
@@ -226,12 +227,12 @@ func (s *Session) ForceIdentify() {
 
 // applyForceIdentify clears the resume tuple if a force-identify is pending.
 // It must run on the read-loop goroutine (it mutates sessID/resumeURL) and is
-// called at the top of Open before the resume decision.
+// called at the top of run before the resume decision.
 func (s *Session) applyForceIdentify() {
 	if atomic.SwapInt32(&s.forceIdentify, 0) == 0 {
 		return
 	}
-	s.log.Info(s.ctx, "force identify requested, discarding resume state", slog.F("shard", s.shardID))
+	s.log.Info(context.Background(), "force identify requested, discarding resume state", slog.F("shard", s.shardID))
 	atomic.StoreInt64(&s.seq, 0)
 	s.sessID = ""
 	s.resumeURL = ""
@@ -242,190 +243,200 @@ func (s *Session) Open(ctx context.Context, token string) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
+	cctx, cancel := context.WithCancel(ctx)
+
+	c := s.newConn(cctx, cancel)
+	s.cur.Store(c)
+	// Cancel the connection's goroutines BEFORE retracting it from cur, so a
+	// concurrent Cancel/ForceIdentify never sees a nil cur while this
+	// connection's context is still live.
 	defer func() {
-		s.authed = false
+		cancel()
+		s.cur.Store(nil)
 	}()
 
-	s.curState = "begin"
-	s.ctx, s.cancel = context.WithCancel(ctx)
-	defer s.cancel()
+	// parent ctx is threaded into run so state-handling work survives a
+	// disconnect (see run); c.ctx is the connection-scoped context.
+	return c.run(ctx)
+}
 
-	s.log.Info(ctx, "encoding", slog.F("name", s.enc.Name()))
+func (c *conn) run(parent context.Context) error {
+	defer c.authed.Store(false)
 
-	s.lastAck = time.Time{}
+	c.setState("begin")
+
+	c.s.log.Info(parent, "encoding", slog.F("name", c.s.enc.Name()))
 
 	// Consume any pending force-identify before deciding whether to resume, so a
 	// forced shard discards its resume tuple and IDENTIFYs this connect.
-	s.applyForceIdentify()
+	c.s.applyForceIdentify()
 
 	var err error
-	err = s.initEtcd()
+	err = c.initEtcd()
 	if err != nil {
 		return err
 	}
 
 	// only acquire the identify lock if we know we won't send a resume
-	if !s.shouldResume() {
-		s.log.Debug(s.ctx, "acquiring lock, no ability to resume")
-		err = s.acquireIdentifyLock()
+	if !c.s.shouldResume() {
+		c.s.log.Debug(c.ctx, "acquiring lock, no ability to resume")
+		err = c.acquireIdentifyLock()
 		if err != nil {
 			return xerrors.Errorf("grab identify lock: %w", err)
 		}
-		s.log.Debug(s.ctx, "lock acquired")
+		c.s.log.Debug(c.ctx, "lock acquired")
 
 	} else {
-		s.log.Debug(s.ctx, "skipping lock, attempting resume", slog.F("sess", s.sessID), slog.F("seq", atomic.LoadInt64(&s.seq)))
+		c.s.log.Debug(c.ctx, "skipping lock, attempting resume", slog.F("sess", c.s.sessID), slog.F("seq", atomic.LoadInt64(&c.s.seq)))
 	}
 
 	r, err := czlib.NewReader(bytes.NewReader(nil))
 	if err != nil {
 		return xerrors.Errorf("initialize zlib: %w", err)
 	}
-	s.zr = r
+	c.zr = r
 	defer r.Close()
 
-	s.curState = "connecting"
-	c, _, err := websocket.Dial(s.ctx, s.GatewayURL(), nil)
+	c.setState("connecting")
+	ws, _, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
 	if err != nil {
 		return xerrors.Errorf("dial gateway: %w", err)
 	}
-	s.wsConn = c
-	s.wsConn.SetReadLimit(512 << 20)
+	c.wsConn = ws
+	c.wsConn.SetReadLimit(512 << 20)
 
-	s.curState = "read hello"
-	err = s.readHello()
+	c.setState("read hello")
+	err = c.readHello()
 	if err != nil {
 		return xerrors.Errorf("handle hello message: %w", err)
 	}
 
-	go s.writer()
-	if s.shouldResume() {
-		s.log.Info(s.ctx, "sending resume")
-		s.writeResume()
+	go c.writer()
+	if c.s.shouldResume() {
+		c.s.log.Info(c.ctx, "sending resume")
+		c.writeResume()
 	} else {
-		s.last = 0
-		s.log.Info(s.ctx, "sending identify")
-		s.writeIdentify()
-		if len(s.wch)+len(s.prioch) > 0 {
-			s.wch = make(chan *Op, 2000)
-			s.prioch = make(chan *Op)
-		}
-		s.lastIdentify = time.Now()
+		atomic.StoreInt64(&c.s.last, 0)
+		c.s.log.Info(c.ctx, "sending identify")
+		c.writeIdentify()
+		c.s.lastIdentify = time.Now()
 	}
 
-	go s.sendHeartbeats()
-	go s.logTotalEvents()
-	// go s.rotateStatuses()
+	go c.sendHeartbeats()
+	go c.logTotalEvents()
+	// go c.rotateStatuses()
 
-	s.log.Info(s.ctx, "websocket connected, waiting for events")
-	defer s.persistShardInfo()
+	c.s.log.Info(c.ctx, "websocket connected, waiting for events")
+	defer c.s.persistShardInfo()
 
 	for {
-		s.log.Debug(s.ctx, "received event", slog.F("last_ack", s.lastAck), slog.F("last_hb", s.lastHB), slog.F("seq", atomic.LoadInt64(&s.seq)))
+		_, lastHB, lastAck, _ := c.snapshot()
+		c.s.log.Debug(c.ctx, "received event", slog.F("last_ack", lastAck), slog.F("last_hb", lastHB), slog.F("seq", atomic.LoadInt64(&c.s.seq)))
 
-		ev, err := s.readAndDecodeEvent()
+		ev, err := c.readAndDecodeEvent()
 		if err != nil {
-			s.log.Error(ctx, "read and decode event", slog.Error(err))
+			c.s.log.Error(c.ctx, "read and decode event", slog.Error(err))
 			break
 		}
 		if ev.S != 0 {
-			atomic.StoreInt64(&s.seq, ev.S)
+			atomic.StoreInt64(&c.s.seq, ev.S)
 		}
-		s.log.Debug(s.ctx, "decoded event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
+		c.s.log.Debug(c.ctx, "decoded event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 
-		s.curState = "handle internal event " + ev.T
-		s.log.Debug(s.ctx, "handling internal event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
+		c.setState("handle internal event " + ev.T)
+		c.s.log.Debug(c.ctx, "handling internal event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		var handled bool
-		if handled, err = s.handleInternalEvent(ev); handled {
+		if handled, err = c.handleInternalEvent(ev); handled {
 			if err != nil {
 				break
 			}
 			continue
 		}
 
-		s.curState = "handle state event " + ev.T
-		s.log.Debug(s.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
-		evtPayload, err := s.state.HandleEvent(ctx, ev)
+		c.setState("handle state event " + ev.T)
+		c.s.log.Debug(c.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
+		// parent ctx: in-flight state/DB work must NOT be aborted by a disconnect.
+		evtPayload, err := c.s.state.HandleEvent(parent, ev)
 		if err != nil {
-			s.log.Error(s.ctx, "handle state event", slog.Error(err))
+			c.s.log.Error(c.ctx, "handle state event", slog.Error(err))
 			continue
 		}
 
-		s.curState = "push event to redis"
-		s.log.Debug(s.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
-		s.pushEventToRedis(ev)
+		c.setState("push event to redis")
+		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
+		c.pushEventToRedis(ev)
 
 		// request guild members on GUILD_CREATE, gated by the backfill marker
-		if s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
-			s.curState = "maybe request guild members"
-			s.maybeRequestGuildMembers(ctx, evtPayload)
+		if c.s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
+			c.setState("maybe request guild members")
+			// parent ctx: same rationale as HandleEvent above.
+			c.maybeRequestGuildMembers(parent, evtPayload)
 		}
 
 	}
 
-	s.curState = "close"
-	_ = c.Close(4000, "")
-	s.log.Info(s.ctx, "closed")
+	c.setState("close")
+	_ = ws.Close(4000, "")
+	c.s.log.Info(c.ctx, "closed")
 	return err
 }
 
-func (s *Session) pushEventToRedis(ev *discord.Event) {
+func (c *conn) pushEventToRedis(ev *discord.Event) {
 	if ev.T == "GUILD_MEMBER_CHUNK" {
 		return
 	}
 	push := func(addr string, rc *redis.Client) {
-		if whitelist, exists := s.whitelistedEvents[addr]; exists {
-			s.log.Debug(s.ctx, "checking whitelist", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+		if whitelist, exists := c.s.whitelistedEvents[addr]; exists {
+			c.s.log.Debug(c.ctx, "checking whitelist", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 			if _, ok := whitelist[ev.T]; !ok {
-				s.log.Debug(s.ctx, "not whitelisted", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+				c.s.log.Debug(c.ctx, "not whitelisted", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 				return
 			}
 		}
 
-		s.log.Debug(s.ctx, "pushing event to redis", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
-		if err := rc.RPush(s.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
-			s.log.Error(s.ctx, "push event to redis", slog.Error(err), slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+		if err := rc.RPush(c.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
+			c.s.log.Error(c.ctx, "push event to redis", slog.Error(err), slog.F("event_type", ev.T), slog.F("redis_addr", addr))
 		}
 	}
 
-	for _, rc := range s.rc {
+	for _, rc := range c.s.rc {
 		push(rc.Options().Addr, rc)
 	}
 }
 
-func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
+func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 	switch ev.Op {
 	case 1:
-		s.writeHeartbeat()
+		c.writeHeartbeat()
 		return true, nil
 
 	// RESUME
 	case 6:
-		s.log.Info(s.ctx, "resumed")
-		s.authed = true
-		s.ready = time.Now()
+		c.s.log.Info(c.ctx, "resumed")
+		c.authed.Store(true)
+		c.markReady(time.Now())
 
 		return true, nil
 
 	// RECONNECT
 	case 7:
-		s.log.Info(s.ctx, "reconnect requested")
+		c.s.log.Info(c.ctx, "reconnect requested")
 
 		return true, xerrors.New("reconnect")
 
 	// INVALID_SESSION
 	case 9:
-		s.log.Info(s.ctx, "invalid session, reconnecting")
-		s.sessID = ""
-		atomic.StoreInt64(&s.seq, 0)
-		s.resumeURL = ""
-		s.persistShardInfo()
-		s.wch = make(chan *Op, 2000)
+		c.s.log.Info(c.ctx, "invalid session, reconnecting")
+		c.s.sessID = ""
+		atomic.StoreInt64(&c.s.seq, 0)
+		c.s.resumeURL = ""
+		c.s.persistShardInfo()
 
-		if s.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
-			err := s.releaseIdentifyLock()
+		if c.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
+			err := c.releaseIdentifyLock()
 			if err != nil {
-				s.log.Error(s.ctx, "release held identify lock after invalid session", slog.Error(err))
+				c.s.log.Error(c.ctx, "release held identify lock after invalid session", slog.Error(err))
 			}
 		}
 
@@ -433,20 +444,20 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	// HEARTBEAT_ACK
 	case 11:
-		s.lastAck = time.Now()
+		c.markAck(time.Now())
 		return true, nil
 	}
 
 	switch ev.T {
 	case "READY":
-		s.guilds = map[int64]struct{}{}
-		guilds, _, sess, resumeURL, err := s.enc.DecodeReady(ev.D)
+		c.s.guilds = map[int64]struct{}{}
+		guilds, _, sess, resumeURL, err := c.s.enc.DecodeReady(ev.D)
 		if err != nil {
 			return true, xerrors.Errorf("decode ready: %w", err)
 		}
 
 		for i := range guilds {
-			s.guilds[i] = struct{}{}
+			c.s.guilds[i] = struct{}{}
 		}
 
 		// No-expiry skip (reconnect-storm speed is the priority): skip RGM for any
@@ -462,42 +473,41 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 		// unclean PG restart (forcing a cold re-backfill). An optional Phase 3b
 		// background sweep can bound it further if staleness ever becomes a real
 		// problem; it is not required for this skip to be correct.
-		s.backfilled = map[int64]struct{}{}
-		ids := make([]int64, 0, len(s.guilds))
-		for id := range s.guilds {
+		c.s.backfilled = map[int64]struct{}{}
+		ids := make([]int64, 0, len(c.s.guilds))
+		for id := range c.s.guilds {
 			ids = append(ids, id)
 		}
-		if times, terr := s.stateDB.GetGuildBackfillTimes(s.ctx, ids); terr != nil {
-			s.log.Error(s.ctx, "preload guild backfill times", slog.Error(terr))
+		if times, terr := c.s.stateDB.GetGuildBackfillTimes(c.ctx, ids); terr != nil {
+			c.s.log.Error(c.ctx, "preload guild backfill times", slog.Error(terr))
 		} else {
 			for id := range times {
-				s.backfilled[id] = struct{}{}
+				c.s.backfilled[id] = struct{}{}
 			}
 		}
 
-		s.sessID = sess
-		s.resumeURL = resumeURL
-		s.log.Info(s.ctx, "ready", slog.F("sess", sess), slog.F("resume_gateway_url", resumeURL),
-			slog.F("guild_count", len(s.guilds)))
-		s.persistShardInfo()
-		s.authed = true
-		s.ready = time.Now()
+		c.s.sessID = sess
+		c.s.resumeURL = resumeURL
+		c.s.log.Info(c.ctx, "ready", slog.F("sess", sess), slog.F("resume_gateway_url", resumeURL),
+			slog.F("guild_count", len(c.s.guilds)))
+		c.s.persistShardInfo()
+		c.authed.Store(true)
+		c.markReady(time.Now())
 
 		go func() {
-			totalWaitTime := s.calcIdentifyWait()
+			totalWaitTime := c.s.calcIdentifyWait()
 			time.Sleep(totalWaitTime)
-			err = s.releaseIdentifyLock()
-			if err != nil {
-				s.log.Error(s.ctx, "release identify lock after ready", slog.Error(err))
+			if err := c.releaseIdentifyLock(); err != nil {
+				c.s.log.Error(c.ctx, "release identify lock after ready", slog.Error(err))
 			}
 		}()
 
 		return true, nil
 
 	case "RESUMED":
-		s.log.Info(s.ctx, "resumed")
-		s.authed = true
-		s.ready = time.Now()
+		c.s.log.Info(c.ctx, "resumed")
+		c.authed.Store(true)
+		c.markReady(time.Now())
 
 		return true, nil
 	}
@@ -505,11 +515,11 @@ func (s *Session) handleInternalEvent(ev *discord.Event) (bool, error) {
 	return false, nil
 }
 
-func (s *Session) acquireIdentifyLock() error {
-	timeoutLock, cancel := context.WithTimeout(s.ctx, time.Second*160)
+func (c *conn) acquireIdentifyLock() error {
+	timeoutLock, cancel := context.WithTimeout(c.ctx, time.Second*160)
 	defer cancel()
 
-	err := s.identifyMu.Lock(timeoutLock)
+	err := c.identifyMu.Lock(timeoutLock)
 	if err != nil {
 		return xerrors.Errorf("acquire identify lock: %w", err)
 	}
@@ -517,11 +527,20 @@ func (s *Session) acquireIdentifyLock() error {
 	return nil
 }
 
-func (s *Session) releaseIdentifyLock() error {
-	s.log.Info(s.ctx, "release identify lock", slog.F("key", s.identifyMu.Key()))
-	if s.identifyMu.Key() != "" {
-		err := s.identifyMu.Unlock(s.ctx)
-		if err != nil {
+func (c *conn) releaseIdentifyLock() error {
+	c.s.log.Info(c.ctx, "release identify lock", slog.F("key", c.identifyMu.Key()))
+	if c.identifyMu.Key() != "" {
+		// Unlock on a fresh background context, NOT c.ctx. The post-READY release
+		// runs only after the rate-limit hold (calcIdentifyWait, up to ~70s), by
+		// which point a reconnecting shard's c.ctx is already cancelled; the
+		// INVALID_SESSION release runs mid-teardown for the same reason. The
+		// pre-refactor code unlocked with the durable Session context — c.ctx here
+		// fails the Unlock with "context canceled" and leaks the cross-shard
+		// identify lock until its lease TTL. The etcd client is Session-durable, so
+		// a background context completes the key delete regardless of conn state.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := c.identifyMu.Unlock(ctx); err != nil {
 			return xerrors.Errorf("release identify lock: %w", err)
 		}
 	}
@@ -529,19 +548,32 @@ func (s *Session) releaseIdentifyLock() error {
 }
 
 func (s *Session) Cancel() {
-	// cancel is nil until the first Open; a management call (Cancel /
-	// ForceIdentify) can land before the shard has connected, so guard it.
-	if s.cancel != nil {
-		s.cancel()
+	if c := s.cur.Load(); c != nil {
+		c.cancel()
 	}
 }
 
-func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
-	s.curState = "read message"
-	s.buf = s.bufferPool.Get().(*bytes.Buffer)
-	defer s.cleanupBuffer()
+func (s *Session) RequestGuildMembers(guildID int64) {
+	c := s.cur.Load()
+	// cur is published at the top of Open, before the etcd lock / dial / hello /
+	// writer startup / auth complete, so a non-nil cur is not yet a usable
+	// connection. Gate on authed: enqueueing into a pre-auth (or never-started)
+	// conn's wch would return RPC success while the op sits undrained until the
+	// conn dies and the next Open allocates a fresh wch — a silent orphan. Drop
+	// + log instead, matching the documented no-active-connection behavior.
+	if c == nil || !c.authed.Load() {
+		s.log.Info(context.Background(), "drop members request: no active connection", slog.F("guild", guildID))
+		return
+	}
+	c.requestGuildMembersExternal(guildID)
+}
 
-	err := s.readMessage()
+func (c *conn) readAndDecodeEvent() (*discord.Event, error) {
+	c.setState("read message")
+	c.buf = c.s.bufferPool.Get().(*bytes.Buffer)
+	defer c.cleanupBuffer()
+
+	err := c.readMessage()
 	if err != nil {
 		var werr websocket.CloseError
 		if xerrors.As(err, &werr) {
@@ -549,18 +581,18 @@ func (s *Session) readAndDecodeEvent() (*discord.Event, error) {
 			// valid session associated with a different
 			// token.
 			if werr.Code == 4006 {
-				atomic.StoreInt64(&s.seq, 0)
-				s.sessID = ""
-				s.resumeURL = ""
-				s.persistShardInfo()
+				atomic.StoreInt64(&c.s.seq, 0)
+				c.s.sessID = ""
+				c.s.resumeURL = ""
+				c.s.persistShardInfo()
 			}
 		}
 		return nil, xerrors.Errorf("read message: %w", err)
 	}
 
-	s.curState = "decode event"
+	c.setState("decode event")
 	var ev *discord.Event
-	ev, err = s.enc.DecodeT(s.buf.Bytes())
+	ev, err = c.s.enc.DecodeT(c.buf.Bytes())
 	if err != nil {
 		return nil, xerrors.Errorf("decode event: %w", err)
 	}

@@ -125,3 +125,45 @@
 - **Production** (helm rev 2327, deployed by maintainer): gateway StatefulSet 16/16 + state 16/16 ready on `67d0133-release`. **All 1024 shards RESUMED** on the rolling restart — fleet-wide log scan: 0 `sending identify`, 0 `x509`, 0 fatal/panic across every pod; ~64 `resumed`/pod. The graceful-persist→load-on-startup→`shouldResume` path carried the whole fleet; **no RGM storm** (resume replays the stream rather than re-backfilling).
 - Verification (prod): `helm history` rev 2327 `deployed`; pod images + `kubectl get statefulset/deploy` 16/16 ready; per-pod `kubectl logs` grep for x509/fatal/identify = 0. `guild_backfills` confirmed present in prod `state` DB; READY-preload (`ws.go:470`) + marker stamping (`handler/member.go:22-30`, `backfill.go:70`) all log-and-continue on a table error → no fleet-outage path.
 - Known risk / next step: because every shard resumed, **no backfill markers were stamped and the RGM-skip path never fired** — the feature is live but unexercised in prod. To seed the baseline (so a future mass re-identify skips RGM), run one controlled full re-IDENTIFY into the now-present `guild_backfills` table. Rollback: re-pin gateway/state → `9c68d57`/`1f814af-release` (or `helm rollback tatsu 2326`).
+
+### Session 005 — remove local write-hook additions (2026-06-23)
+
+- Goal: Remove the two local-only write-path hook additions from `fix/ws-send-deadlock-on-writer-exit` while preserving the upstream heartbeat/dead-writer fix.
+- Completed: removed the nonblocking `requeue` helper/path and its test; restored `writeOp` to defer `w.Close()` without separately surfacing flush errors; restored the upstream `heartbeatStale(now time.Time)` test shape. `internal/gatewayws/write.go` and `internal/gatewayws/heartbeat_deadlock_test.go` now have no diff versus `origin/fix/ws-send-deadlock-on-writer-exit`.
+- Verification run:
+  - `./init.sh` -> exit 0; ran dependency sync and baseline `go build ./...` (Go emitted a non-fatal read-only module stat-cache warning in this sandbox).
+  - `go test ./discord/... ./internal/gatewayws/...` -> PASS before edits.
+  - `env GOCACHE=/tmp/go-build-cache go test ./internal/gatewayws` -> PASS.
+  - `env GOCACHE=/tmp/go-build-cache go test ./discord/... ./internal/gatewayws/...` -> PASS.
+  - `env GOCACHE=/tmp/go-build-cache go build ./...` -> exit 0; same non-fatal read-only module stat-cache warning.
+- Known risk or unresolved issue: none for this cleanup. The branch remains locally ahead/behind its upstream because the upstream branch has the same subject at a different commit SHA; no push was performed.
+
+### Session 006 — conn-lifecycle refactor (Session → Session + per-Open conn) (2026-06-23)
+
+- Goal: retire the bug class behind the WS-deadlock fixes by restructuring, rather than patching, `internal/gatewayws`. Split the reused-across-reconnects `Session` god-object into a durable `Session` (identity, shared deps, resume tuple) and a fresh-per-`Open()` `conn` (ctx/cancel, wch/prioch, websocket, buffers, heartbeat timing). Branch `refactor/conn-lifecycle` off `fix/ws-send-deadlock-on-writer-exit` HEAD (`778d772`, which includes the bounded-write + writeOp flush-error check).
+- Plan: `docs/superpowers/plans/2026-06-23-conn-lifecycle-refactor.md` (written, codex-reviewed; all 8 must-fix items folded in before execution).
+- Completed (commits `93e1585`, `d0a090d`, `1bea7f8` + plan `89731fb`):
+  - New `conn` type owns per-connection state; `Session` keeps a `cur atomic.Pointer[conn]` that management RPCs (`Cancel`/`ForceIdentify`/`RequestGuildMembers`/`Status`/`LongLastAck`) route through.
+  - Deleted the three reconnect-reset hacks a fresh conn makes unnecessary: `resetHeartbeat`, the identify-path `wch`/`prioch` swap, and the INVALID_SESSION `s.wch = make(...)` rebuild.
+  - Preserved behavior deliberately: `guilds`/`backfilled` stay on `Session` (read-loop single-owner, survive RESUME so the backfill-skip optimization holds); `last` atomic on `Session`; `run(parent)` keeps the two-context split so `state.HandleEvent`/`maybeRequestGuildMembers` still run under the parent ctx (in-flight DB work survives a disconnect); `Open` cancels the connection before clearing `cur`.
+  - Closed the pre-existing `lastAck`/`curState` data race: `lastHB`/`lastAck`/`ready`/`curState` are now behind a `conn.mu` (setState/markHB/markAck/markReady/snapshot); `authed` is `atomic.Bool`.
+  - Two blessed, documented behavior changes: `RequestGuildMembers` is dropped+logged when no connection is active; `Status`/`LongLastAck` report `<disconnected>`/`true` on nil `cur`.
+- Verification: `go build ./...` clean; `go vet ./...` clean; `go test -race ./internal/gatewayws/ ./internal/manager/ ./gatewaypb/` PASS (19 gatewayws tests incl. new channel-independence, nil-cur, and Status-race tests). External API signatures (`go doc Session`) unchanged. Greps confirm no reset-hacks and no stale `s.<conn-field>` access remain.
+- Known risk / next step: not deployed (per AGENTS.md, shipping is a separate helm staging-deploy). Branch not pushed (awaiting maintainer go-ahead). NOTE: the agent-progress Session 005 entry describes the deadlock branch with `defer w.Close()` and no flush-error surfacing, but this refactor was based on `778d772` which *does* surface the writeOp flush error — the two narratives diverge; reconcile when the deadlock PR and this refactor are sequenced for merge.
+
+### Session 007 — staging validation + code review + fixes for PR #81 (2026-06-23)
+
+- Goal: assess prod-readiness of PR #81 (WS send-deadlock fix + conn-lifecycle refactor; the only delta over the already-shipped `origin/master`), run the missing staging IDENTIFY validation, then review and fix.
+- **Staging validation** (deployed `gateway:2b2ecb7-release` = branch HEAD; `SHARDS=1`, all guilds on shard 0):
+  - Baseline: shard reconnect-loops every ~31s — `sending resume` → `resumed`, then a 30s `readMessage` deadline (`connectionTimeout=30`, read.go:13) trips between sparse events on the quiet 34-guild staging shard → `took too long to get reader` → reconnect. Confirmed **expected/known** for low-traffic staging (prod shards are busy, never trip it). Side benefit: the resume/persist path is exercised ~113×/hr, every cycle succeeding — the refactored RESUME path is well-proven.
+  - **Force-identify** (gRPC `RestartShard{shard:0, force_identify:true}` via port-forward + `-proto`): `force identifying shard` → `force identify requested, discarding resume state` (applyForceIdentify on the read-loop goroutine) → `sending identify` (not resume) → `ready` with fresh session `214fcd…`. IDENTIFY path confirmed.
+  - **Post-identify**: next cycles RESUMED the *new* session, 0 stray identifies → IDENTIFY→persist→`shouldResume`→RESUME loop confirmed on the refactored code.
+  - Health: 0 restarts, 61 MiB after ~280 reconnects (no conn/goroutine leak), 0 panics.
+- **Code review** (8 finder angles + read-the-code verification on `origin/master...HEAD`): deadlock genuinely fixed (writer `defer cancel()` + ctx-guarded sends + bounded `writeOp` w/ flush-error check); removed-behavior audit clean (all invariants re-established by the per-conn lifecycle). Findings were secondary.
+- **Fixes applied (this session, commit below):**
+  1. **Identify-lock release regression (the one observed live as `release identify lock after ready: context canceled`)**: `releaseIdentifyLock` (ws.go) unlocked on the per-conn `c.ctx`; the refactor regressed this from origin/master's durable `s.ctx`. The post-READY release waits `calcIdentifyWait` (up to ~70s) and the INVALID_SESSION release runs mid-teardown, so `c.ctx` is cancelled by then → unlock failed → the cross-shard identify mutex leaked to lease TTL (worst during the reconnect storms this PR targets). Now unlocks on a `context.Background()`+10s ctx (etcd client is Session-durable). Fixes both release sites (post-READY ws.go:500, INVALID_SESSION ws.go:436).
+  2. **Comment accuracy**: `requestGuildMembers` (write.go) no longer claims recovery "via the staleness sweep" (deferred/unbuilt) — states next full IDENTIFY or manual RGM.
+  3. **`rotateStatuses` landmine**: bare `wch` send → ctx-guarded `select` so re-enabling the (commented-out) caller can't reintroduce the writer-exit wedge.
+- **Deliberately deferred** (rationale): #2 etcd-session prompt-revoke (with #1 fixed, only an idle lease lingers ~80s to TTL; no goroutine leak; a prompt-revoke touches the rate-limiter and Session.Close hits the same `c.ctx` cancellation) — accepted as-is; `persistence.go` `context.Background()` DB calls (bounded ctx is a real behavior change, needs deliberate sizing); dead `backfill.go` Phase-3b scaffolding (intentionally retained).
+- Verification: `go build ./...`, `go vet ./internal/gatewayws/...`, `go test -race ./internal/gatewayws/...` all clean post-fix.
+- Next best step: rebuild the gateway image, redeploy to staging, force-identify shard 0, and confirm the `release identify lock after ready: context canceled` log is GONE (the conn reconnects at 30s while the ~70s release goroutine later unlocks on a live context). Then get a review pass on PR #81 and merge.

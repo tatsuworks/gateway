@@ -20,11 +20,11 @@ func newTestDB(t *testing.T) *db {
 }
 
 // seedMember inserts a members row, setting last_updated DB-side relative to
-// the Postgres clock (now() + the given interval). It must use the DB clock,
-// not Go's: started_at is stamped by now(), and the reconciliation delete
-// compares the two — seeding from the app clock would introduce exactly the
-// skew the design forbids. Rows use random IDs, so the INSERT never conflicts
-// (and the BEFORE UPDATE trigger never fires to clobber last_updated).
+// the Postgres clock (now() + the given interval). It uses the DB clock, not
+// Go's, so a row can be placed deterministically before or after a backfill's
+// started_at (also stamped by now()) without app/DB clock skew. Rows use random
+// IDs, so the INSERT never conflicts (and the BEFORE UPDATE trigger never fires
+// to clobber the seeded last_updated).
 func seedMember(t *testing.T, d *db, guild, user int64, interval string) {
 	_, err := d.sql.Exec(
 		`INSERT INTO members (guild_id, user_id, data, last_updated)
@@ -79,25 +79,37 @@ func TestGetGuildBackfillTimesExcludesIncomplete(t *testing.T) {
 	}
 }
 
-func TestCompleteReconciliationDelete(t *testing.T) {
+// CompleteGuildBackfill must NOT delete members. The reconcile DELETE was removed:
+// it could not tell a member genuinely absent from the roster apart from one whose
+// upsert was silently dropped by the async batcher (logged, never retried) or that
+// arrived via an out-of-order / incomplete chunk stream — so it turned a transient
+// refresh gap into permanent member loss. Observed in prod: a manual RGM marked the
+// backfill complete while live members vanished from `members`. Completion now only
+// stamps backfilled_at; stale rows self-heal on the next member event or backfill.
+func TestCompleteStampsMarkerWithoutDeleting(t *testing.T) {
 	d := newTestDB(t)
 	ctx := context.Background()
 	guild := rand.Int63()
-	ghost := rand.Int63()
-	fresh := rand.Int63()
+	stale := rand.Int63() // last_updated before started_at (formerly a deleted "ghost")
+	fresh := rand.Int63() // last_updated after started_at
 
-	// ghost predates this backfill; fresh is updated during the drain.
 	assert.Success(t, "begin", d.BeginGuildBackfill(ctx, guild))
-	seedMember(t, d, guild, ghost, "-1 hour") // last_updated before started_at
-	seedMember(t, d, guild, fresh, "1 hour")  // last_updated after started_at
+	seedMember(t, d, guild, stale, "-1 hour")
+	seedMember(t, d, guild, fresh, "1 hour")
 
 	assert.Success(t, "complete", d.CompleteGuildBackfill(ctx, guild))
 
-	if memberExists(t, d, guild, ghost) {
-		t.Fatalf("ghost member (untouched since started_at) should be deleted")
+	if !memberExists(t, d, guild, stale) {
+		t.Fatalf("completion must not delete a member, even one untouched since started_at")
 	}
 	if !memberExists(t, d, guild, fresh) {
-		t.Fatalf("member updated during drain should survive")
+		t.Fatalf("completion must not delete a member updated during the drain")
+	}
+
+	times, err := d.GetGuildBackfillTimes(ctx, []int64{guild})
+	assert.Success(t, "get times", err)
+	if _, ok := times[guild]; !ok {
+		t.Fatalf("completion must stamp backfilled_at")
 	}
 }
 

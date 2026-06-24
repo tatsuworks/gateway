@@ -24,40 +24,23 @@ DO UPDATE SET started_at = now()
 	return nil
 }
 
-// CompleteGuildBackfill removes members untouched since this backfill's
-// started_at (departed ghosts) and stamps backfilled_at, in one transaction.
+// CompleteGuildBackfill stamps backfilled_at to mark the guild's roster fetched.
+//
+// It deliberately does NOT prune members absent from the backfill. The previous
+// reconcile DELETE (members untouched since started_at) could not distinguish a
+// genuinely-departed member from one whose upsert was dropped by the async member
+// batcher (failed batches are logged, never retried) or that arrived via an
+// out-of-order / interrupted chunk stream — so a transient refresh gap became
+// permanent member loss (observed in prod: a manual RGM marked the backfill
+// complete while live members vanished from `members`). Stale rows are left to
+// self-heal instead: live GUILD_MEMBER_REMOVE events prune departures while
+// connected, and the UNLOGGED members table is reset wholesale on an unclean PG
+// restart. The bounded drift this leaves is the same drift the no-expiry backfill
+// skip already accepts.
 func (db *db) CompleteGuildBackfill(ctx context.Context, guild int64) error {
-	// Flush pending member upserts for this guild so members queued by
-	// SetGuildMembers are persisted (with a fresh last_updated) before the
-	// reconcile DELETE below. Otherwise a current member whose row still
-	// carries an old last_updated could be deleted here and only re-inserted
-	// by the batcher moments later — a window where a live member is absent.
-	if err := db.memberBatcher.FlushForShard(ctx, uint64(guild)); err != nil {
-		return xerrors.Errorf("flush member batcher: %w", err)
-	}
-
-	tx, err := db.sql.BeginTx(ctx, nil)
-	if err != nil {
-		return xerrors.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
-
-	const del = `
-DELETE FROM members
-WHERE guild_id = $1
-  AND last_updated < (SELECT started_at FROM guild_backfills WHERE guild_id = $1)
-`
-	if _, err := tx.ExecContext(ctx, del, guild); err != nil {
-		return xerrors.Errorf("reconcile delete: %w", err)
-	}
-
 	const upd = `UPDATE guild_backfills SET backfilled_at = now() WHERE guild_id = $1`
-	if _, err := tx.ExecContext(ctx, upd, guild); err != nil {
+	if _, err := db.sql.ExecContext(ctx, upd, guild); err != nil {
 		return xerrors.Errorf("stamp backfilled_at: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return xerrors.Errorf("commit: %w", err)
 	}
 	return nil
 }

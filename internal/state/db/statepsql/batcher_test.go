@@ -161,10 +161,48 @@ func TestShardedBatcherFlushForShardSurfacesAsyncError(t *testing.T) {
 		t.Fatal("FlushForShard swallowed the dropped async flush error")
 	}
 
-	// The latched error is cleared on read: a later successful flush is clean.
+	// The recorded error is cleared on read: a later successful flush is clean.
 	_ = b.Send(ctx, testEvent{route: 1, dedup: 3})
 	if err := b.FlushForShard(ctx, 1); err != nil {
 		t.Fatalf("FlushForShard should be clean after the error was consumed, got %v", err)
+	}
+}
+
+func TestShardedBatcherFlushForShardErrorIsPerRouteKey(t *testing.T) {
+	ctx := t.Context()
+
+	wantErr := errors.New("batch write failed")
+	var calls atomic.Int64
+	flushed := make(chan struct{}, 1)
+	process := func(_ context.Context, _ []testEvent) error {
+		if calls.Add(1) == 1 {
+			flushed <- struct{}{} // route-1's size-triggered flush ran...
+			return wantErr        // ...and failed transiently
+		}
+		return nil
+	}
+	// Single worker so routes 1 and 2 share it (as ~all guilds share one of
+	// maxConns=4 workers in prod). maxBatchSize 2 so two route-1 events flush.
+	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
+
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 2})
+	select {
+	case <-flushed:
+	case <-time.After(time.Second):
+		t.Fatal("size-triggered async flush never ran")
+	}
+
+	// Route 2 shares the worker but was not in the failed batch. It must NOT
+	// consume route 1's dropped-flush error — otherwise route 1 would later
+	// flush clean and stamp its backfill complete over its missing members.
+	if err := b.FlushForShard(ctx, 2); err != nil {
+		t.Fatalf("route 2 must not see route 1's dropped async error, got %v", err)
+	}
+
+	// Route 1 must still surface its own dropped-flush error.
+	if err := b.FlushForShard(ctx, 1); err == nil {
+		t.Fatal("route 1's FlushForShard must surface its own dropped async error")
 	}
 }
 

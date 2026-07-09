@@ -46,10 +46,8 @@ func NewDB(ctx context.Context, addr string, logger slog.Logger) (state.DB, erro
 		return nil, xerrors.Errorf("ping postgres: %w", err)
 	}
 	dbInstance := &db{sql: sqlx, logger: logger}
-	// Only the member batcher's FlushForShard result is consumed (by
-	// CompleteGuildBackfill), so only it retains per-key flush errors.
 	dbInstance.memberBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
-		dbInstance.processMemberBatch, logger, WithFlushErrorTracking())
+		dbInstance.processMemberBatch, logger)
 	dbInstance.presenceBatcher = NewShardedBatcher(ctx, maxConns, 1000, 100*time.Millisecond,
 		dbInstance.processPresenceBatch, logger)
 	dbInstance.guildBatcher = NewShardedBatcher(ctx, maxConns, 500, 100*time.Millisecond,

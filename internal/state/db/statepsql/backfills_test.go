@@ -113,6 +113,33 @@ func TestCompleteStampsMarkerWithoutDeleting(t *testing.T) {
 	}
 }
 
+func TestCompleteFlushesQueuedMembers(t *testing.T) {
+	d := newTestDB(t)
+	ctx := context.Background()
+	guild := rand.Int63()
+	user := rand.Int63()
+
+	assert.Success(t, "begin", d.BeginGuildBackfill(ctx, guild))
+
+	// SetGuildMembers only enqueues on the async batcher; the row is not durable
+	// until the batcher drains. CompleteGuildBackfill must flush that queue before
+	// stamping, so the member is guaranteed present the instant Complete returns
+	// (without the flush this races the batcher's flush interval).
+	assert.Success(t, "queue member",
+		d.SetGuildMembers(ctx, guild, map[int64][]byte{user: []byte(`{}`)}))
+	assert.Success(t, "complete", d.CompleteGuildBackfill(ctx, guild))
+
+	if !memberExists(t, d, guild, user) {
+		t.Fatalf("completion must flush queued member upserts before stamping the marker")
+	}
+
+	times, err := d.GetGuildBackfillTimes(ctx, []int64{guild})
+	assert.Success(t, "get times", err)
+	if _, ok := times[guild]; !ok {
+		t.Fatalf("completion must stamp backfilled_at")
+	}
+}
+
 func TestReconcileGuildMembers(t *testing.T) {
 	d := newTestDB(t)
 	ctx := context.Background()

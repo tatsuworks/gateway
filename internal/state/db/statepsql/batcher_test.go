@@ -130,19 +130,32 @@ func TestShardedBatcherFlushForShardSurfacesAsyncError(t *testing.T) {
 
 	wantErr := errors.New("batch write failed")
 	var calls atomic.Int64
+	flushed := make(chan struct{}, 1)
 	process := func(_ context.Context, _ []testEvent) error {
 		if calls.Add(1) == 1 {
-			return wantErr // the first (size-triggered) flush fails transiently
+			flushed <- struct{}{} // the size-triggered async flush ran...
+			return wantErr        // ...and failed transiently
 		}
 		return nil
 	}
 	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
 
-	// Two events hit maxBatchSize and trigger a flush whose error the worker
-	// logs and drops. FlushForShard must still surface it — otherwise
+	// Two events hit maxBatchSize and trigger an async flush whose error the
+	// worker logs and drops. FlushForShard must still surface it — otherwise
 	// CompleteGuildBackfill would stamp the guild complete over lost members.
 	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
 	_ = b.Send(ctx, testEvent{route: 1, dedup: 2})
+
+	// Wait until that size-triggered flush has actually run before flushing, so
+	// the batch is already drained and FlushForShard can only report the error
+	// via the async latch — not by re-flushing the events synchronously itself.
+	// Without this the flushReq could win the select race and pass even if the
+	// latch were broken.
+	select {
+	case <-flushed:
+	case <-time.After(time.Second):
+		t.Fatal("size-triggered async flush never ran")
+	}
 
 	if err := b.FlushForShard(ctx, 1); err == nil {
 		t.Fatal("FlushForShard swallowed the dropped async flush error")

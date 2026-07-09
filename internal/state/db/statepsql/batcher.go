@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"cdr.dev/slog"
@@ -65,10 +66,13 @@ func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
 
 // FlushForShard synchronously flushes every event currently queued for the
 // worker that owns routeKey, blocking until those rows are persisted. Callers
-// use it to close the window where a just-queued upsert has not yet been
-// written before a dependent read/delete on the same key (e.g. the backfill
-// ghost-reconciliation DELETE). It flushes only events whose Send has already
-// returned, so the caller must Send before calling this.
+// use it as a durability barrier — e.g. before stamping a backfill complete —
+// so a just-queued upsert is guaranteed written before a dependent action on
+// the same key. It also surfaces any error dropped by an earlier async
+// (ticker- or size-triggered) flush for that worker, so a transient
+// intermediate write failure cannot be silently stamped over. It flushes only
+// events whose Send has already returned, so the caller must Send before
+// calling this.
 func (s *ShardedBatcher[T]) FlushForShard(ctx context.Context, routeKey uint64) error {
 	req := make(chan error, 1)
 	fc := s.flushChans[routeKey%uint64(len(s.flushChans))]
@@ -121,6 +125,17 @@ func runBatcher[T BatchEvent](
 	inFlight := make(chan struct{}, 1)
 	batch := make(map[any]T)
 
+	// asyncErr latches the first error from an async (ticker- or size-triggered)
+	// flush so the next FlushForShard can surface it instead of silently
+	// returning nil. Without this, a transient write failure on an intermediate
+	// backfill flush is logged and dropped, and CompleteGuildBackfill stamps the
+	// guild complete over the missing members. Guarded by asyncMu because the
+	// spawned flush goroutine writes it while the batcher loop reads it.
+	var (
+		asyncMu  sync.Mutex
+		asyncErr error
+	)
+
 	flush := func() {
 		if len(batch) == 0 {
 			return
@@ -135,6 +150,11 @@ func runBatcher[T BatchEvent](
 			defer func() { <-inFlight }()
 			if err := process(ctx, events); err != nil {
 				logger.Error(ctx, "processing batch", slog.F("err", err))
+				asyncMu.Lock()
+				if asyncErr == nil {
+					asyncErr = err
+				}
+				asyncMu.Unlock()
 			}
 		}()
 	}
@@ -196,6 +216,15 @@ func runBatcher[T BatchEvent](
 				ferr = process(ctx, events)
 			}
 			<-inFlight
+			// Fold in (and clear) any error from an earlier async flush in this
+			// window. The inFlight barrier above guarantees that goroutine has
+			// finished, so asyncErr reflects its final result.
+			asyncMu.Lock()
+			if ferr == nil {
+				ferr = asyncErr
+			}
+			asyncErr = nil
+			asyncMu.Unlock()
 			req <- ferr
 		}
 	}

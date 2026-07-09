@@ -2,7 +2,9 @@ package statepsql
 
 import (
 	"context"
+	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -120,6 +122,36 @@ func TestShardedBatcherFlushForShardIsSynchronous(t *testing.T) {
 		}
 	default:
 		t.Fatal("FlushForShard returned before the batch was processed")
+	}
+}
+
+func TestShardedBatcherFlushForShardSurfacesAsyncError(t *testing.T) {
+	ctx := t.Context()
+
+	wantErr := errors.New("batch write failed")
+	var calls atomic.Int64
+	process := func(_ context.Context, _ []testEvent) error {
+		if calls.Add(1) == 1 {
+			return wantErr // the first (size-triggered) flush fails transiently
+		}
+		return nil
+	}
+	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
+
+	// Two events hit maxBatchSize and trigger a flush whose error the worker
+	// logs and drops. FlushForShard must still surface it — otherwise
+	// CompleteGuildBackfill would stamp the guild complete over lost members.
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 2})
+
+	if err := b.FlushForShard(ctx, 1); err == nil {
+		t.Fatal("FlushForShard swallowed the dropped async flush error")
+	}
+
+	// The latched error is cleared on read: a later successful flush is clean.
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 3})
+	if err := b.FlushForShard(ctx, 1); err != nil {
+		t.Fatalf("FlushForShard should be clean after the error was consumed, got %v", err)
 	}
 }
 

@@ -98,6 +98,23 @@ func (s *ShardedBatcher[T]) FlushForShard(ctx context.Context, routeKey uint64) 
 	}
 }
 
+// BatcherOption configures optional ShardedBatcher behavior.
+type BatcherOption func(*batcherConfig)
+
+type batcherConfig struct {
+	trackFlushErrors bool
+}
+
+// WithFlushErrorTracking makes workers retain per-route-key errors from dropped
+// (async, or synchronous flushReq) flushes so a later FlushForShard for that key
+// surfaces them. Enable it only for batchers whose FlushForShard results are
+// consumed — i.e. the member batcher backing CompleteGuildBackfill. Without a
+// consumer the retained entries are never read and would accumulate for the life
+// of the process during a write outage, so it stays off by default.
+func WithFlushErrorTracking() BatcherOption {
+	return func(c *batcherConfig) { c.trackFlushErrors = true }
+}
+
 func NewShardedBatcher[T BatchEvent](
 	ctx context.Context,
 	shards int,
@@ -105,16 +122,21 @@ func NewShardedBatcher[T BatchEvent](
 	flushInterval time.Duration,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
+	opts ...BatcherOption,
 ) *ShardedBatcher[T] {
 	if shards < 1 {
 		shards = 1
+	}
+	var cfg batcherConfig
+	for _, opt := range opts {
+		opt(&cfg)
 	}
 	chans := make([]chan T, shards)
 	flushChans := make([]chan flushRequest, shards)
 	for i := range chans {
 		chans[i] = make(chan T, 4000)
 		flushChans[i] = make(chan flushRequest)
-		go runBatcher(ctx, chans[i], flushChans[i], maxBatchSize, flushInterval, process, logger)
+		go runBatcher(ctx, chans[i], flushChans[i], maxBatchSize, flushInterval, process, logger, cfg)
 	}
 	return &ShardedBatcher[T]{chans: chans, flushChans: flushChans}
 }
@@ -127,6 +149,7 @@ func runBatcher[T BatchEvent](
 	flushInterval time.Duration,
 	process func(context.Context, []T) error,
 	logger slog.Logger,
+	cfg batcherConfig,
 ) {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
@@ -144,11 +167,16 @@ func runBatcher[T BatchEvent](
 	// the missing rows. Guarded by failedMu because the async flush goroutine
 	// writes it while the batcher loop reads it. FlushForShard clears a key on
 	// read; the entry is re-created if a later flush for that key fails again.
+	// Only populated when trackFlushErrors is set (batchers with a FlushForShard
+	// consumer); otherwise entries would never be read and would accumulate.
 	var (
 		failedMu sync.Mutex
 		failed   = make(map[uint64]error)
 	)
 	markFailed := func(events []T, err error) {
+		if !cfg.trackFlushErrors {
+			return
+		}
 		failedMu.Lock()
 		for _, ev := range events {
 			failed[ev.RouteKey()] = err

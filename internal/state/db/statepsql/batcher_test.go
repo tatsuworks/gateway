@@ -138,7 +138,7 @@ func TestShardedBatcherFlushForShardSurfacesAsyncError(t *testing.T) {
 		}
 		return nil
 	}
-	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
+	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr), WithFlushErrorTracking())
 
 	// Two events hit maxBatchSize and trigger an async flush whose error the
 	// worker logs and drops. FlushForShard must still surface it — otherwise
@@ -183,7 +183,7 @@ func TestShardedBatcherFlushForShardErrorIsPerRouteKey(t *testing.T) {
 	}
 	// Single worker so routes 1 and 2 share it (as ~all guilds share one of
 	// maxConns=4 workers in prod). maxBatchSize 2 so two route-1 events flush.
-	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
+	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr), WithFlushErrorTracking())
 
 	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
 	_ = b.Send(ctx, testEvent{route: 1, dedup: 2})
@@ -203,6 +203,37 @@ func TestShardedBatcherFlushForShardErrorIsPerRouteKey(t *testing.T) {
 	// Route 1 must still surface its own dropped-flush error.
 	if err := b.FlushForShard(ctx, 1); err == nil {
 		t.Fatal("route 1's FlushForShard must surface its own dropped async error")
+	}
+}
+
+func TestShardedBatcherFlushErrorTrackingOffByDefault(t *testing.T) {
+	ctx := t.Context()
+
+	wantErr := errors.New("batch write failed")
+	var calls atomic.Int64
+	flushed := make(chan struct{}, 1)
+	process := func(_ context.Context, _ []testEvent) error {
+		if calls.Add(1) == 1 {
+			flushed <- struct{}{}
+			return wantErr
+		}
+		return nil
+	}
+	// No WithFlushErrorTracking (the presence/guild batchers, which never call
+	// FlushForShard): a dropped async flush must not be retained, else entries
+	// would accumulate for the life of the process with nothing to consume them.
+	b := NewShardedBatcher(ctx, 1, 2, 10*time.Second, process, sloghuman.Make(os.Stderr))
+
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 2})
+	select {
+	case <-flushed:
+	case <-time.After(time.Second):
+		t.Fatal("size-triggered async flush never ran")
+	}
+
+	if err := b.FlushForShard(ctx, 1); err != nil {
+		t.Fatalf("without tracking, FlushForShard must not retain the dropped error, got %v", err)
 	}
 }
 

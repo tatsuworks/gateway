@@ -24,40 +24,39 @@ DO UPDATE SET started_at = now()
 	return nil
 }
 
-// CompleteGuildBackfill removes members untouched since this backfill's
-// started_at (departed ghosts) and stamps backfilled_at, in one transaction.
+// CompleteGuildBackfill flushes this guild's queued member upserts, then stamps
+// backfilled_at to mark the roster fetched.
+//
+// It deliberately does NOT prune members absent from the backfill. The previous
+// reconcile DELETE (members untouched since started_at) could not distinguish a
+// genuinely-departed member from one whose upsert was dropped by the async member
+// batcher (failed batches are logged, never retried) or that arrived via an
+// out-of-order / interrupted chunk stream — so a transient refresh gap became
+// permanent member loss (observed in prod: a manual RGM marked the backfill
+// complete while live members vanished from `members`). Extra/stale rows are left
+// to self-heal instead: live GUILD_MEMBER_REMOVE events prune departures while
+// connected, and the UNLOGGED members table is reset wholesale on an unclean PG
+// restart. The bounded drift this leaves is the same drift the no-expiry backfill
+// skip already accepts.
+//
+// The flush before the stamp is a durability barrier, not the old DELETE guard:
+// SetGuildMembers only enqueues the final chunk on the async batcher, so stamping
+// the marker first would let a gateway crash or a dropped batch (the batcher
+// never retries) leave members unwritten while ws.go preloads the marker and
+// skips future RGM for the guild — a gap that would NOT self-heal, since
+// GUILD_MEMBER_REMOVE only prunes departures and cannot re-add a missing member
+// (guild_backfills is UNLOGGED too, so a PG crash clears the marker alongside the
+// members, but a gateway crash does not). FlushForShard blocks until the queued
+// rows persist; if it errors we return without stamping, leaving backfilled_at
+// NULL so the next GUILD_CREATE re-issues RGM.
 func (db *db) CompleteGuildBackfill(ctx context.Context, guild int64) error {
-	// Flush pending member upserts for this guild so members queued by
-	// SetGuildMembers are persisted (with a fresh last_updated) before the
-	// reconcile DELETE below. Otherwise a current member whose row still
-	// carries an old last_updated could be deleted here and only re-inserted
-	// by the batcher moments later — a window where a live member is absent.
 	if err := db.memberBatcher.FlushForShard(ctx, uint64(guild)); err != nil {
 		return xerrors.Errorf("flush member batcher: %w", err)
 	}
 
-	tx, err := db.sql.BeginTx(ctx, nil)
-	if err != nil {
-		return xerrors.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
-
-	const del = `
-DELETE FROM members
-WHERE guild_id = $1
-  AND last_updated < (SELECT started_at FROM guild_backfills WHERE guild_id = $1)
-`
-	if _, err := tx.ExecContext(ctx, del, guild); err != nil {
-		return xerrors.Errorf("reconcile delete: %w", err)
-	}
-
 	const upd = `UPDATE guild_backfills SET backfilled_at = now() WHERE guild_id = $1`
-	if _, err := tx.ExecContext(ctx, upd, guild); err != nil {
+	if _, err := db.sql.ExecContext(ctx, upd, guild); err != nil {
 		return xerrors.Errorf("stamp backfilled_at: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return xerrors.Errorf("commit: %w", err)
 	}
 	return nil
 }

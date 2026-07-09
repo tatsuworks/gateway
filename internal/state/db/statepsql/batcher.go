@@ -45,12 +45,20 @@ type GuildEvent struct {
 func (e GuildEvent) RouteKey() uint64 { return uint64(e.GuildID) }
 func (e GuildEvent) DedupKey() any    { return e.GuildID }
 
+// flushRequest asks a worker to synchronously flush the events for a single
+// route key and report that flush's error. The route key is carried so the
+// worker flushes only that key's events, not the whole (multi-guild) batch.
+type flushRequest struct {
+	routeKey uint64
+	reply    chan error
+}
+
 // ShardedBatcher fans events across N independent batch workers, routed by
 // RouteKey() % N. Events for the same guild cluster on one worker for better
 // batch locality; dedup within a batch uses DedupKey().
 type ShardedBatcher[T BatchEvent] struct {
 	chans      []chan T
-	flushChans []chan chan error
+	flushChans []chan flushRequest
 }
 
 func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
@@ -63,15 +71,17 @@ func (s *ShardedBatcher[T]) Send(ctx context.Context, ev T) error {
 	}
 }
 
-// FlushForShard synchronously flushes every event currently queued for the
-// worker that owns routeKey, blocking until those rows are persisted, and
-// returns the flush error. Callers use it as a durability barrier — e.g.
-// CompleteGuildBackfill flushes before stamping backfilled_at, so a just-queued
-// member upsert is durable (and a failed flush aborts the stamp) rather than
-// the marker being written over un-persisted rows. It flushes only events whose
-// Send has already returned, so the caller must Send before calling this.
+// FlushForShard synchronously flushes the events currently queued for routeKey,
+// blocking until those rows are persisted, and returns that flush's error.
+// Callers use it as a durability barrier — e.g. CompleteGuildBackfill flushes
+// before stamping backfilled_at, so a just-queued member upsert is durable (and
+// a failed flush aborts the stamp) rather than the marker being written over
+// un-persisted rows. It flushes only routeKey's events (other guilds sharing the
+// worker keep their queued rows), so one guild's flush failure never drops
+// another's. It flushes only events whose Send has already returned, so the
+// caller must Send before calling this.
 func (s *ShardedBatcher[T]) FlushForShard(ctx context.Context, routeKey uint64) error {
-	req := make(chan error, 1)
+	req := flushRequest{routeKey: routeKey, reply: make(chan error, 1)}
 	fc := s.flushChans[routeKey%uint64(len(s.flushChans))]
 	select {
 	case fc <- req:
@@ -79,7 +89,7 @@ func (s *ShardedBatcher[T]) FlushForShard(ctx context.Context, routeKey uint64) 
 		return ctx.Err()
 	}
 	select {
-	case err := <-req:
+	case err := <-req.reply:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
@@ -98,10 +108,10 @@ func NewShardedBatcher[T BatchEvent](
 		shards = 1
 	}
 	chans := make([]chan T, shards)
-	flushChans := make([]chan chan error, shards)
+	flushChans := make([]chan flushRequest, shards)
 	for i := range chans {
 		chans[i] = make(chan T, 4000)
-		flushChans[i] = make(chan chan error)
+		flushChans[i] = make(chan flushRequest)
 		go runBatcher(ctx, chans[i], flushChans[i], maxBatchSize, flushInterval, process, logger)
 	}
 	return &ShardedBatcher[T]{chans: chans, flushChans: flushChans}
@@ -110,7 +120,7 @@ func NewShardedBatcher[T BatchEvent](
 func runBatcher[T BatchEvent](
 	ctx context.Context,
 	ch <-chan T,
-	flushReq <-chan chan error,
+	flushReq <-chan flushRequest,
 	maxBatchSize int,
 	flushInterval time.Duration,
 	process func(context.Context, []T) error,
@@ -171,9 +181,9 @@ func runBatcher[T BatchEvent](
 		case <-ticker.C:
 			flush()
 		case req := <-flushReq:
-			// Pull everything currently buffered for this worker into the
-			// batch so the synchronous flush covers all events queued before
-			// the request arrived (their Send has already returned).
+			// Pull everything currently buffered for this worker into the batch
+			// so the flush sees every event queued before the request arrived
+			// (their Send has already returned).
 		drainBuffered:
 			for {
 				select {
@@ -183,21 +193,25 @@ func runBatcher[T BatchEvent](
 					break drainBuffered
 				}
 			}
-			// Wait for any in-flight async write to finish, then write the
-			// current batch synchronously so the rows are durable before
-			// FlushForShard returns to the caller.
+			// Wait for any in-flight async write to finish, then synchronously
+			// write only THIS route key's events, leaving other guilds' rows
+			// queued. Flushing the whole worker here would let a failure while
+			// completing one guild drop another guild's co-queued members, which
+			// its later completion would then stamp over.
 			inFlight <- struct{}{}
-			var ferr error
-			if len(batch) > 0 {
-				events := make([]T, 0, len(batch))
-				for _, ev := range batch {
+			var events []T
+			for k, ev := range batch {
+				if ev.RouteKey() == req.routeKey {
 					events = append(events, ev)
+					delete(batch, k)
 				}
-				batch = make(map[any]T)
+			}
+			var ferr error
+			if len(events) > 0 {
 				ferr = process(ctx, events)
 			}
 			<-inFlight
-			req <- ferr
+			req.reply <- ferr
 		}
 	}
 }

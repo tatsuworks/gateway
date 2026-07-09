@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -120,6 +121,49 @@ func TestShardedBatcherFlushForShardIsSynchronous(t *testing.T) {
 		}
 	default:
 		t.Fatal("FlushForShard returned before the batch was processed")
+	}
+}
+
+func TestShardedBatcherFlushForShardIsPerRouteKey(t *testing.T) {
+	ctx := t.Context()
+
+	flushes := make(chan []testEvent, 8)
+	process := func(_ context.Context, events []testEvent) error {
+		flushes <- append([]testEvent(nil), events...)
+		for _, ev := range events {
+			if ev.route == 1 {
+				return errors.New("route 1 write failed")
+			}
+		}
+		return nil
+	}
+	// Single worker so routes 1 and 2 share it; long interval + high maxBatch so
+	// nothing flushes until FlushForShard is called.
+	b := NewShardedBatcher(ctx, 1, 1000, 10*time.Second, process, sloghuman.Make(os.Stderr))
+
+	_ = b.Send(ctx, testEvent{route: 1, dedup: 1})
+	_ = b.Send(ctx, testEvent{route: 2, dedup: 2})
+
+	// Completing guild 1 flushes only route-1 events; its failure surfaces.
+	if err := b.FlushForShard(ctx, 1); err == nil {
+		t.Fatal("FlushForShard(1) should surface route 1's flush error")
+	}
+	// Guild 2's event must NOT have been dropped by guild 1's failed flush — it
+	// stays queued, so completing guild 2 flushes it cleanly.
+	if err := b.FlushForShard(ctx, 2); err != nil {
+		t.Fatalf("FlushForShard(2) should be clean; got %v", err)
+	}
+
+	// Each route was flushed exactly once, on its own (route 2 was never swept
+	// into route 1's failing batch).
+	got := map[uint64]int{}
+	for len(flushes) > 0 {
+		for _, ev := range <-flushes {
+			got[ev.route]++
+		}
+	}
+	if got[1] != 1 || got[2] != 1 {
+		t.Fatalf("expected each route flushed once on its own, got %+v", got)
 	}
 }
 

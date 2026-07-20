@@ -69,7 +69,10 @@ func main() {
 		ServiceVersion: "1.0.0",
 	}
 
-	// Profiler initialization, best done as early as possible.
+	// Profiler initialization, best done as early as possible. A failure here is
+	// the normal case off GCP (e.g. OVH): profiler.Start doubles as a GCP probe,
+	// so we fall back to the json/human logger and carry on. Logged at INFO — an
+	// expected condition on non-GCP infra, not an error.
 	err = profiler.Start(cfg)
 	if err != nil {
 		if os.Getenv("PROD") != "" {
@@ -77,7 +80,7 @@ func main() {
 		} else {
 			logger = sloghuman.Make(os.Stderr)
 		}
-		logger.Error(ctx, "profiler could not start", slog.F("err", err))
+		logger.Info(ctx, "cloud profiler not started (not running on GCP)", slog.F("err", err))
 	} else {
 		// running on gcp, so use slogstackdriver instead
 		logger = slogstackdriver.Make(os.Stderr)

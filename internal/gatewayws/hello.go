@@ -11,7 +11,9 @@ func (c *conn) readHello() error {
 	c.buf = c.s.bufferPool.Get().(*bytes.Buffer)
 	defer c.cleanupBuffer()
 
-	err := c.readMessage()
+	// The handshake runs before the heartbeat watchdog starts, so it always uses
+	// the fixed connectionTimeout to fail fast on a broken connect.
+	err := c.readMessage(connectionTimeout * time.Second)
 	if err != nil {
 		return xerrors.Errorf("read message: %w", err)
 	}

@@ -49,6 +49,11 @@ type Session struct {
 	shardID    int
 	shardCount int
 
+	// eventReadTimeout bounds the main event loop's wait for a message; 0 means
+	// no per-read deadline (rely on the heartbeat-ACK watchdog). Set once from
+	// EVENT_READ_TIMEOUT in NewSession. See parseEventReadTimeout.
+	eventReadTimeout time.Duration
+
 	seq       int64
 	sessID    string
 	resumeURL string
@@ -166,6 +171,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		rc:                cfg.Redis,
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
+		eventReadTimeout:  parseEventReadTimeout(os.Getenv("EVENT_READ_TIMEOUT")),
 	}
 
 	// Set hasGuildMembersIntent
@@ -573,7 +579,7 @@ func (c *conn) readAndDecodeEvent() (*discord.Event, error) {
 	c.buf = c.s.bufferPool.Get().(*bytes.Buffer)
 	defer c.cleanupBuffer()
 
-	err := c.readMessage()
+	err := c.readMessage(c.s.eventReadTimeout)
 	if err != nil {
 		var werr websocket.CloseError
 		if xerrors.As(err, &werr) {

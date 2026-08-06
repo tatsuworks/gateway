@@ -14,17 +14,22 @@ fi
 # `docker build` on an Apple Silicon Mac produces an arm64 image that
 # crashloops on k8s with "exec format error" (see the 2026-08-05 whirlwind
 # staging incident, tatsuworks/whirlwind#56).
-# gateway_uri="gcr.io/tatsu-production/gateway:$VERSION"
-gateway_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/gateway:$VERSION"
-docker build --platform linux/amd64 -t "$gateway_uri" -f Dockerfile.gateway .
+readonly BUILD_PLATFORM="linux/amd64"
 
 # Refuse to push an image with the wrong architecture.
-arch="$(docker image inspect "$gateway_uri" --format '{{.Architecture}}')"
-if [[ "$arch" != "amd64" ]]; then
-  echo "Built image architecture is '$arch', expected amd64 — not pushing." >&2
-  exit 1
-fi
+assert_amd64() {
+  local image="$1" arch
+  arch="$(docker image inspect "$image" --format '{{.Architecture}}')"
+  if [[ "$arch" != "amd64" ]]; then
+    echo "Built image architecture for $image is '$arch', expected amd64 — not pushing." >&2
+    exit 1
+  fi
+}
 
+# gateway_uri="gcr.io/tatsu-production/gateway:$VERSION"
+gateway_uri="6222o0k9.gra7.container-registry.ovh.net/tatsu/gateway:$VERSION"
+docker build --platform "$BUILD_PLATFORM" -t "$gateway_uri" -f Dockerfile.gateway .
+assert_amd64 "$gateway_uri"
 docker push "$gateway_uri"
 
 echo "New gateway image URI: $gateway_uri"

@@ -2,9 +2,15 @@ package gatewayws
 
 import (
 	"bytes"
+	"context"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"cdr.dev/slog"
+	"cdr.dev/slog/sloggers/slogtest"
 
 	"github.com/tatsuworks/gateway/discord"
 )
@@ -227,20 +233,24 @@ func TestNoteDialFailureDoesNotDuplicateShardField(t *testing.T) {
 
 // A dial can fail without the resume host ever answering — DNS, TLS, a refused
 // connection, or our own egress being down. Those say nothing about whether the
-// edge still serves this session, and counting them lets one shared network
-// outage clear valid resume tuples across the whole fleet, forcing an IDENTIFY
-// and a full re-backfill per shard once connectivity returns. Only a host that
-// answered and refused the upgrade (the incident's 503) earns a strike.
+// edge still serves this session, and treating them like a refusal lets one
+// shared network outage clear valid resume tuples across the whole fleet,
+// forcing an IDENTIFY and a full re-backfill per shard once connectivity
+// returns. Only a host that answered and refused the upgrade (the incident's
+// 503) spends a strike.
 func TestDialFailuresWithNoResponseDoNotInvalidate(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
-		s.noteDialFailure(true, false)
+	// Deliberately a large NUMBER of failures inside a short SPAN: what matters
+	// is how long the host has been unreachable, not how many times we asked.
+	start := time.Now()
+	for i := 0; i < 200; i++ {
+		s.noteDialFailureAt(start.Add(time.Duration(i)*time.Second), true, false)
 	}
 
 	if !s.shouldResume() {
-		t.Fatal("resume state discarded by dial failures the host never answered")
+		t.Fatal("resume state discarded by 200 unanswered dials spanning only ~3 minutes")
 	}
 	if s.resumeURL == "" {
 		t.Fatal("resumeURL cleared by transport failures with no HTTP response")
@@ -253,66 +263,42 @@ func TestDialFailuresWithNoResponseDoNotInvalidate(t *testing.T) {
 	}
 }
 
-// An unanswered dial is ignored, not forgiving: it neither counts nor clears
-// the strikes already earned from the host itself. A transport blip in the
-// middle of a run of 503s must not reset the escape and strand the shard.
-func TestNoResponseFailuresDoNotResetEarnedStrikes(t *testing.T) {
-	db := &shardInfoRecorder{}
-	s, _ := newResumableSession(t, db)
-
-	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
-	}
-	// A blip the host never answered lands mid-run.
-	s.noteDialFailure(true, false)
-	if !s.shouldResume() {
-		t.Fatal("resume state discarded early by an unanswered dial")
-	}
-
-	// The next answered rejection is the threshold strike.
-	s.noteDialFailure(true, true)
-	if s.shouldResume() {
-		t.Fatal("session still resumable: an unanswered dial reset the earned strikes")
-	}
-	if !s.TakeResumeDiscarded() {
-		t.Fatal("invalidation did not flag the resume tuple as discarded")
-	}
-}
-
 // An edge that is decommissioned rather than retired-but-answering stops
-// resolving (or refuses connections) instead of serving a 503. Requiring an
-// answered rejection to earn a strike would leave such a shard trapped exactly
-// as in the incident, recoverable only by a manual gwForceIdentify — so an
-// unanswered dial still escapes, on its own far higher budget.
+// resolving instead of serving a 503. Requiring an answered rejection would
+// leave such a shard trapped exactly as in the incident, recoverable only by a
+// manual gwForceIdentify — so an unanswered dial still escapes, once the host
+// has been unreachable long enough that the tuple is worthless anyway.
 //
-// The two thresholds are deliberately asymmetric. An answered rejection is the
-// host telling us it will not serve this session, so 3 is enough. An unanswered
-// dial is ambiguous — it looks identical whether one edge died or our own
-// egress did — so it must not fire until holding the tuple has become pointless
-// rather than merely suspicious.
-func TestNoResponseFailuresInvalidateOnlyAtTheirOwnHigherThreshold(t *testing.T) {
-	if MaxResumeNoResponseFailures <= MaxResumeDialFailures {
-		t.Fatalf("no-response threshold (%d) must be far above the answered one (%d): an unanswered dial is much weaker evidence",
-			MaxResumeNoResponseFailures, MaxResumeDialFailures)
+// The bound is a DURATION, not a count. What makes discarding safe is elapsed
+// time (past it, a RESUME draws INVALID_SESSION regardless); a strike count only
+// approximates that through whatever the reconnect ladder happens to be, and
+// would silently mean something different if the ladder were ever retuned.
+func TestNoResponseInvalidatesOnlyAfterTheFullWindow(t *testing.T) {
+	if MaxResumeNoResponseDuration < 10*time.Minute {
+		t.Fatalf("MaxResumeNoResponseDuration = %v: too short to distinguish a dead edge from a shared outage",
+			MaxResumeNoResponseDuration)
 	}
 
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
+	// The discard here logs at ERROR on purpose (see TestDiscardLogLevelsCarryTheAlert);
+	// slogtest fatals the test on an Error line unless told otherwise.
+	s.log = slogtest.Make(t, &slogtest.Options{IgnoreErrors: true})
 
-	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
-		s.noteDialFailure(true, false)
-	}
+	start := time.Now()
+	s.noteDialFailureAt(start, true, false)
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration-time.Second), true, false)
+
 	if !s.shouldResume() {
-		t.Fatalf("resume state discarded after %d unanswered dials; threshold is %d",
-			MaxResumeNoResponseFailures-1, MaxResumeNoResponseFailures)
+		t.Fatal("resume state discarded one second inside the no-response window")
 	}
 	if db.calls != 0 {
-		t.Fatalf("persisted shard info below the no-response threshold (calls=%d), want 0", db.calls)
+		t.Fatalf("persisted shard info inside the window (calls=%d), want 0", db.calls)
 	}
 
-	s.noteDialFailure(true, false)
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, false)
 	if s.shouldResume() {
-		t.Fatal("session still resumable at the no-response threshold")
+		t.Fatal("session still resumable after a full window of unanswered dials")
 	}
 	if s.sessID != "" || s.resumeURL != "" {
 		t.Fatalf("sessID=%q resumeURL=%q, want both empty", s.sessID, s.resumeURL)
@@ -325,24 +311,50 @@ func TestNoResponseFailuresInvalidateOnlyAtTheirOwnHigherThreshold(t *testing.T)
 	}
 }
 
-// A transport outage that clears must not leave the shard part-way to throwing
-// away a tuple that is now working fine.
-func TestSuccessfulDialResetsTheNoResponseCount(t *testing.T) {
+// The window measures one unbroken run of unreachability, not absolute age. A
+// dial that connects means the host is fine, so a later failure starts over
+// rather than inheriting credit from an outage that has since cleared.
+func TestSuccessfulDialRestartsTheNoResponseWindow(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
-		s.noteDialFailure(true, false)
-	}
+	start := time.Now()
+	s.noteDialFailureAt(start, true, false)
 	s.noteDialSuccess()
 
-	// Starting over, one more unanswered dial must be nowhere near the budget.
-	s.noteDialFailure(true, false)
+	// Far past the original window, but the first failure of a fresh run.
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration+time.Hour), true, false)
+
 	if !s.shouldResume() {
-		t.Fatal("resume state discarded: a successful dial did not reset the no-response count")
+		t.Fatal("resume state discarded: a successful dial did not restart the no-response window")
 	}
 	if db.calls != 0 {
 		t.Fatalf("persisted shard info (calls=%d), want 0", db.calls)
+	}
+}
+
+// An unanswered dial is ignored, not forgiving: it leaves the strikes already
+// earned from the host itself intact, so a transport blip landing in the middle
+// of a run of 503s cannot reset the escape and strand the shard.
+func TestNoResponseFailuresDoNotResetEarnedStrikes(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	now := time.Now()
+	for i := 0; i < MaxResumeDialFailures-1; i++ {
+		s.noteDialFailureAt(now, true, true)
+	}
+	s.noteDialFailureAt(now, true, false)
+	if !s.shouldResume() {
+		t.Fatal("resume state discarded early by an unanswered dial")
+	}
+
+	s.noteDialFailureAt(now, true, true)
+	if s.shouldResume() {
+		t.Fatal("session still resumable: an unanswered dial reset the earned strikes")
+	}
+	if !s.TakeResumeDiscarded() {
+		t.Fatal("invalidation did not flag the resume tuple as discarded")
 	}
 }
 
@@ -353,17 +365,84 @@ func TestAnsweredAndUnansweredBudgetsAreIndependent(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
+	now := time.Now()
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
-		s.noteDialFailure(true, false)
+		s.noteDialFailureAt(now, true, true)
+		s.noteDialFailureAt(now, true, false)
 	}
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded below both thresholds")
 	}
 
-	// The answered budget is the one that fills first.
-	s.noteDialFailure(true, true)
+	// The answered budget is the one that fills first here.
+	s.noteDialFailureAt(now, true, true)
 	if s.shouldResume() {
 		t.Fatal("unanswered dials reset the answered strike count")
 	}
+}
+
+// captureSink records log entries so a test can assert the level a line is
+// emitted at, not just that it happened.
+type captureSink struct{ entries []slog.SinkEntry }
+
+func (c *captureSink) LogEntry(_ context.Context, e slog.SinkEntry) { c.entries = append(c.entries, e) }
+func (c *captureSink) Sync()                                        {}
+
+func (c *captureSink) find(msg string) (slog.SinkEntry, bool) {
+	for _, e := range c.entries {
+		if strings.Contains(e.Message, msg) {
+			return e, true
+		}
+	}
+	return slog.SinkEntry{}, false
+}
+
+// The severity of the two discard lines is load-bearing, not cosmetic. Nothing
+// pages on this class of outage today (TATSU-2516), so until a metrics surface
+// exists the log level is the only thing that carries the event anywhere — a
+// silent downgrade to Info would disable an alert without failing anything else.
+//
+//   - Never-answered: reaching it means the shard failed every dial for
+//     MaxResumeNoResponseDuration with nothing on the other end, i.e. it has been
+//     down for about an hour. That is an incident → ERROR.
+//   - Answered-and-refused: worth surfacing, but also what an ordinary Discord
+//     edge retirement looks like → WARN, not ERROR, so it does not cry wolf.
+func TestDiscardLogLevelsCarryTheAlert(t *testing.T) {
+	t.Run("never answered is ERROR", func(t *testing.T) {
+		sink := &captureSink{}
+		db := &shardInfoRecorder{}
+		s, _ := newResumableSession(t, db)
+		s.log = slog.Make(sink)
+
+		start := time.Now()
+		s.noteDialFailureAt(start, true, false)
+		s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, false)
+
+		e, ok := sink.find("never answered")
+		if !ok {
+			t.Fatal("no discard line logged for the never-answered path")
+		}
+		if e.Level != slog.LevelError {
+			t.Fatalf("never-answered discard logged at %v, want ERROR — nothing else surfaces this outage", e.Level)
+		}
+	})
+
+	t.Run("answered and refused is WARN", func(t *testing.T) {
+		sink := &captureSink{}
+		db := &shardInfoRecorder{}
+		s, _ := newResumableSession(t, db)
+		s.log = slog.Make(sink)
+
+		for i := 0; i < MaxResumeDialFailures; i++ {
+			s.noteDialFailure(true, true)
+		}
+
+		e, ok := sink.find("unreachable, discarding")
+		if !ok {
+			t.Fatal("no discard line logged for the answered path")
+		}
+		if e.Level != slog.LevelWarn {
+			t.Fatalf("answered discard logged at %v, want WARN (routine edge retirement must not page)", e.Level)
+		}
+	})
 }

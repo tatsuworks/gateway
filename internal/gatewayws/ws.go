@@ -60,12 +60,13 @@ type Session struct {
 	last      int64 // event-rate baseline; accessed atomically (logTotalEvents goroutine)
 
 	// resumeDialFailures counts consecutive dial-stage failures against
-	// resumeURL that the host answered and refused; resumeNoResponseFailures
-	// counts those it never answered at all. Two budgets because the evidence
-	// differs by orders of magnitude — see noteDialFailure in resume.go.
-	// Read-loop-goroutine-owned, like sessID/resumeURL.
-	resumeDialFailures       int
-	resumeNoResponseFailures int
+	// resumeURL that the host answered and refused. resumeNoResponseSince is
+	// when the current unbroken run of dials it never answered began (zero if
+	// there is no run in progress) — that one is bounded by elapsed time, not by
+	// a count, because the evidence is much weaker. See noteDialFailure in
+	// resume.go. Read-loop-goroutine-owned, like sessID/resumeURL.
+	resumeDialFailures    int
+	resumeNoResponseSince time.Time
 
 	// resumeDiscarded is set when noteDialFailure throws the resume tuple away
 	// and consumed by the manager's reconnect loop via TakeResumeDiscarded.

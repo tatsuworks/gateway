@@ -3,6 +3,7 @@ package gatewayws
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
 	"cdr.dev/slog"
 )
@@ -24,9 +25,9 @@ import (
 // holding a dead one (a permanently down shard).
 const MaxResumeDialFailures = 3
 
-// MaxResumeNoResponseFailures is the separate, far larger budget for dial
-// failures where the resume host never answered at all — DNS, TLS, a refused
-// connection, our own egress being down.
+// MaxResumeNoResponseDuration is how long the resume host may go without
+// answering a dial at all — DNS, TLS, a refused connection, our own egress being
+// down — before the tuple is discarded anyway.
 //
 // An edge that is *decommissioned* rather than retired-but-answering stops
 // resolving instead of serving a 503, so requiring an answered rejection would
@@ -41,22 +42,28 @@ const MaxResumeDialFailures = 3
 // budget must not fire while the tuple is merely suspicious, only once holding
 // it has become pointless.
 //
-// 60 is chosen for that, not for detection speed. Against the reconnect ladder
-// (1s doubling to a 60s cap) the waits before strike N total 62s + (N-6)*60s,
-// so 60 strikes is ~55 minutes of continuous failure, or ~62 with average
-// jitter. A Discord session does not survive an hour of disconnection: the
-// RESUME would draw INVALID_SESSION, which clears the tuple anyway (see the
-// op-9 branch in handleInternalEvent). Firing here pre-empts a re-IDENTIFY that
-// was already coming rather than causing one. And escaping a genuinely dead
-// edge in ~55 minutes is indistinguishable from escaping it in 15 when the
-// alternative is never.
+// An hour is chosen for safety, not detection speed. A Discord session does not
+// survive that long disconnected: the RESUME would draw INVALID_SESSION, which
+// clears the tuple anyway (see the op-9 branch in handleInternalEvent), so
+// firing here pre-empts a re-IDENTIFY that was already coming rather than
+// causing one. And escaping a genuinely dead edge in an hour is
+// indistinguishable from escaping it in fifteen minutes when the alternative is
+// never. Note the retention figure is reasoned, not measured — but the error is
+// one-sided: too long merely delays an escape that previously never happened,
+// while too short is what mass-invalidates during a shared outage.
+//
+// This is deliberately a DURATION rather than a failure count. Elapsed time is
+// what actually makes discarding safe; a count only approximates it through
+// whatever the reconnect ladder happens to be, so retuning the ladder would
+// silently change what the threshold means while its justification still read
+// the same.
 //
 // Worst case is bounded by more than the threshold: a shard holding a resume
 // tuple skips the identify lock, so discarding moves it back into the gated
 // path, and initEtcd buckets that lock by shardID%16. A fleet-wide
 // re-IDENTIFY therefore drains serially through 16 buckets rather than
 // bursting at Discord.
-const MaxResumeNoResponseFailures = 60
+const MaxResumeNoResponseDuration = time.Hour
 
 // usingResumeURL reports whether the next dial will target the persisted resume
 // URL rather than the main gateway URL. It is the same condition GatewayURL
@@ -72,7 +79,7 @@ func (s *Session) usingResumeURL() bool {
 // Read-loop goroutine only (it is called from conn.run).
 func (s *Session) noteDialSuccess() {
 	s.resumeDialFailures = 0
-	s.resumeNoResponseFailures = 0
+	s.resumeNoResponseSince = time.Time{}
 }
 
 // noteDialFailure records a failed dial. On reaching MaxResumeDialFailures the
@@ -94,19 +101,27 @@ func (s *Session) noteDialSuccess() {
 //   - Unanswered: websocket.Dial returns a nil response for every failure where
 //     nothing replied — DNS, TLS, a refused connection, our own egress being
 //     down. One dead edge and a fleet-wide outage are indistinguishable from
-//     here, so counting these on the small budget would let a shared outage
-//     lasting three attempts clear valid resume tuples across the whole fleet.
-//     They get MaxResumeNoResponseFailures instead: enough that the tuple is
-//     worthless by the time it fires, but still finite, so a decommissioned
-//     edge that stopped resolving cannot trap the shard forever.
+//     here, so spending a strike on these would let a shared outage lasting
+//     three attempts clear valid resume tuples across the whole fleet. They are
+//     bounded by elapsed time instead (MaxResumeNoResponseDuration): long
+//     enough that the tuple is worthless by the time it fires, but still finite,
+//     so a decommissioned edge that stopped resolving cannot trap the shard
+//     forever.
 //
-// The budgets are independent and neither clears the other, so a host that
+// The two bounds are independent and neither clears the other, so a host that
 // alternates between refusing the upgrade and not answering still escapes, and
-// a transport blip landing mid-run of 503s cannot reset that escape.
+// a transport blip landing mid-run of 503s cannot reset that escape. Only a
+// successful dial clears both.
 //
 // Read-loop goroutine only: it mutates seq/sessID/resumeURL, which are owned by
 // that goroutine (see applyForceIdentify).
 func (s *Session) noteDialFailure(usedResumeURL, hostResponded bool) {
+	s.noteDialFailureAt(time.Now(), usedResumeURL, hostResponded)
+}
+
+// noteDialFailureAt is noteDialFailure with the clock injected, so the
+// no-response window can be tested without waiting out a real hour.
+func (s *Session) noteDialFailureAt(now time.Time, usedResumeURL, hostResponded bool) {
 	if !usedResumeURL {
 		return
 	}
@@ -114,34 +129,44 @@ func (s *Session) noteDialFailure(usedResumeURL, hostResponded bool) {
 	if hostResponded {
 		s.resumeDialFailures++
 		if s.resumeDialFailures >= MaxResumeDialFailures {
-			s.discardResumeState("resume gateway url unreachable, discarding resume state",
+			// Warn, not Info: an edge refusing us three times running is worth
+			// surfacing, but it is also what an ordinary edge retirement looks
+			// like, so it is not on its own an incident.
+			s.log.Warn(context.Background(), "resume gateway url unreachable, discarding resume state",
+				slog.F("resume_gateway_url", s.resumeURL),
 				slog.F("consecutive_dial_failures", s.resumeDialFailures))
+			s.clearResumeState()
 		}
 		return
 	}
 
-	s.resumeNoResponseFailures++
-	if s.resumeNoResponseFailures >= MaxResumeNoResponseFailures {
-		// Distinct message: during an incident it matters whether the edge
-		// refused us or vanished, and the two have very different blast radii.
-		s.discardResumeState("resume gateway url unreachable and never answered, discarding resume state",
-			slog.F("consecutive_no_response_failures", s.resumeNoResponseFailures))
+	if s.resumeNoResponseSince.IsZero() {
+		s.resumeNoResponseSince = now
+		return
+	}
+	if unreachableFor := now.Sub(s.resumeNoResponseSince); unreachableFor >= MaxResumeNoResponseDuration {
+		// Error, and a distinct message from the answered case. Reaching here
+		// means this shard has failed every dial for MaxResumeNoResponseDuration
+		// with nothing on the other end — i.e. it has been down for about an
+		// hour. That is an incident, and the log level is the only thing that
+		// carries it anywhere: nothing pages on this class of outage today
+		// (TATSU-2516). During an incident it also matters whether the edge
+		// refused us or vanished, since the two have very different blast radii.
+		s.log.Error(context.Background(), "resume gateway url never answered, discarding resume state",
+			slog.F("resume_gateway_url", s.resumeURL),
+			slog.F("unreachable_for", unreachableFor))
+		s.clearResumeState()
 	}
 }
 
-// discardResumeState throws the resume tuple away and persists it cleared, so
-// both the next dial and any later pod restart use the main gateway URL. This
-// is the automatic trigger for what ForceIdentify already does by hand.
+// clearResumeState throws the resume tuple away and persists it cleared, so both
+// the next dial and any later pod restart use the main gateway URL. This is the
+// automatic trigger for what ForceIdentify already does by hand.
 //
 // Read-loop goroutine only, same ownership as noteDialFailure.
-func (s *Session) discardResumeState(msg string, count slog.Field) {
-	// s.log already carries name+shard from NewSession; do not re-bind them.
-	s.log.Info(context.Background(), msg,
-		slog.F("resume_gateway_url", s.resumeURL),
-		count)
-
+func (s *Session) clearResumeState() {
 	s.resumeDialFailures = 0
-	s.resumeNoResponseFailures = 0
+	s.resumeNoResponseSince = time.Time{}
 	atomic.StoreInt32(&s.resumeDiscarded, 1)
 	atomic.StoreInt64(&s.seq, 0)
 	s.sessID = ""

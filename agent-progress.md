@@ -193,4 +193,10 @@
 - **Two findings from the validation run, neither blocking:**
   1. **The post-invalidation backoff wait is dead time.** The ladder is not reset when the resume tuple is discarded, so attempt 4 waited `retry_in=9.003s` even though it was about to dial a *different* host (the main gateway URL) where the previous failures predict nothing. 9.0s of the 15.8s total was this wait. Resetting the failure count inside `noteDialFailure`'s invalidation branch would cut escape time to ~7s. Worth doing; needs a rebuild + redeploy + re-validate.
   2. **Duplicate `shard` field in the new log line** — `s.log` is already `.With(slog.F("shard", ...))` in `NewSession`, so `noteDialFailure`'s own `slog.F("shard", ...)` renders `{"shard":0,"shard":0}`. Cosmetic; `applyForceIdentify` has the same pre-existing duplication.
-- Next best step: decide on finding 1 (reset the ladder on invalidation) — if taken, rebuild/redeploy/re-validate staging, then land the PR and deploy to prod. Note the 41 shards stuck at filing time still need `gwForceIdentify` or the prod deploy.
+- **Both findings fixed and RE-VALIDATED on staging (2026-09-01, image `gateway:8374671`, helm revision 960).** Same repro, second run:
+  - `08:41:50.785` attempt 1 → `consecutive_failures=1`, `retry_in=2.098s`
+  - `08:41:52.892` attempt 2 → `consecutive_failures=2`, `retry_in=4.593s`
+  - `08:41:57.494` attempt 3 → `resume gateway url unreachable, discarding resume state` — now a **single** `shard` field, and the close line reports **`consecutive_failures=0`, `retry_in=1.056s`** (the ladder reset firing)
+  - `08:41:58.608` attempt 4 → `sending identify` → `08:41:58.800` `ready`, `sess=d85df104c1b28af06bdb265bf9782ad0`, `resume_gateway_url=wss://gateway-us-east1-d.discord.gg`, `guild_count=39`
+  - **Escape time 8.13s** (was 15.83s on `3a2e5ae`). `gateway-0` 1/1 Running, 0 restarts; shards row repaired.
+- Next best step: merge PR #87 and deploy to prod. (Superseded: — done.) Note the 41 shards stuck at filing time still need `gwForceIdentify` or the prod deploy.

@@ -21,10 +21,12 @@ const (
 	// to each wait so a fleet of 1024 shards knocked offline together does not
 	// retry in lockstep.
 	reconnectJitterDivisor = 4
-	// reconnectHealthyUptime is how long a connection must last to count as
-	// healthy. Anything shorter is treated as a failed attempt and escalates the
-	// backoff; anything longer resets it, so a shard that ran for hours before a
-	// single drop reconnects immediately rather than inheriting a stale delay.
+	// reconnectHealthyUptime is how long a connection must stay authenticated to
+	// count as healthy. Anything shorter is treated as a failed attempt and
+	// escalates the backoff; anything longer resets it, so a shard that ran for
+	// hours before a single drop reconnects immediately rather than inheriting a
+	// stale delay. Measured from the READY/RESUMED milestone, not from the start
+	// of the connect attempt -- see nextFailureCount.
 	reconnectHealthyUptime = time.Minute
 )
 
@@ -51,13 +53,20 @@ func reconnectDelay(failures int) time.Duration {
 // nextFailureCount folds one connection's outcome into the consecutive-failure
 // count driving reconnectDelay.
 //
+// connected is time spent authenticated (see Session.Open), never the duration
+// of the attempt as a whole. Open covers etcd setup and an identify-lock wait of
+// up to 160s before any websocket exists, so an attempt that waits out the lock
+// and then fails its first dial takes minutes while connecting for none of it;
+// scoring that as healthy reset the ladder to base on every attempt, in exactly
+// the fleet-wide identify contention it is meant to damp.
+//
 // resumeDiscarded restarts the ladder because the attempt threw away the resume
 // tuple: the next dial goes to the main gateway URL, a different host from the
 // one these failures came from, so the delay they earned says nothing about it.
 // Without the reset the escape from a dead resume host pays for a wait it no
 // longer needs -- 9.0s of a 15.8s recovery, measured on staging.
-func nextFailureCount(failures int, uptime time.Duration, resumeDiscarded bool) int {
-	if resumeDiscarded || uptime >= reconnectHealthyUptime {
+func nextFailureCount(failures int, connected time.Duration, resumeDiscarded bool) int {
+	if resumeDiscarded || connected >= reconnectHealthyUptime {
 		return 0
 	}
 	return failures + 1

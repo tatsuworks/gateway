@@ -85,6 +85,22 @@ func (c *conn) markReady(t time.Time) {
 	c.mu.Unlock()
 }
 
+// readyFor returns how long this connection had been authenticated as of now,
+// or 0 if it never got there. It is the connection-health measure the reconnect
+// backoff scores an attempt on: Session.Open also covers etcd setup and
+// acquireIdentifyLock (up to 160s), so the duration of the attempt as a whole
+// says nothing about whether a usable connection was ever established.
+func (c *conn) readyFor(now time.Time) time.Duration {
+	c.mu.Lock()
+	ready := c.ready
+	c.mu.Unlock()
+
+	if ready.IsZero() {
+		return 0
+	}
+	return now.Sub(ready)
+}
+
 // snapshot returns the guarded state fields in one locked read.
 func (c *conn) snapshot() (curState string, lastHB, lastAck, ready time.Time) {
 	c.mu.Lock()

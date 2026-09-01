@@ -255,7 +255,13 @@ func (s *Session) applyForceIdentify() {
 	s.persistShardInfo()
 }
 
-func (s *Session) Open(ctx context.Context, token string) error {
+// Open runs one connection to completion and reports how long that connection
+// was authenticated (READY/RESUMED) before it dropped — 0 if it never got
+// there. That connected time, not the wall-clock duration of the call, is what
+// the manager's reconnect backoff scores the attempt on: Open also covers etcd
+// setup and an identify-lock wait of up to 160s, so an attempt can take minutes
+// and still never have established a usable connection.
+func (s *Session) Open(ctx context.Context, token string) (time.Duration, error) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -273,7 +279,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	// parent ctx is threaded into run so state-handling work survives a
 	// disconnect (see run); c.ctx is the connection-scoped context.
-	return c.run(ctx)
+	err := c.run(ctx)
+	return c.readyFor(time.Now()), err
 }
 
 func (c *conn) run(parent context.Context) error {
@@ -319,12 +326,17 @@ func (c *conn) run(parent context.Context) error {
 	// next connect falls back to wss://gateway.discord.gg/ instead of redialing
 	// a retired edge forever.
 	usedResumeURL := c.s.usingResumeURL()
-	ws, _, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
+	ws, resp, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
 	if err != nil {
 		// A cancelled connection context is our own teardown (shutdown, Cancel,
 		// ForceIdentify) and says nothing about the resume host.
+		//
+		// resp is non-nil only when the host answered and refused the upgrade
+		// (the incident's 503); websocket.Dial reports a nil response for every
+		// failure where nothing replied. See noteDialFailure for why those must
+		// not consume the strike budget.
 		if c.ctx.Err() == nil {
-			c.s.noteDialFailure(usedResumeURL)
+			c.s.noteDialFailure(usedResumeURL, resp != nil)
 		}
 		return xerrors.Errorf("dial gateway: %w", err)
 	}

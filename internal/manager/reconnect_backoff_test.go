@@ -192,3 +192,18 @@ func TestNextFailureCountResetsWhenResumeDiscarded(t *testing.T) {
 		t.Fatalf("delay after a discard = %v, want ~%v (the base rung)", got, reconnectBackoffBase)
 	}
 }
+
+// The ladder's healthy-reset contract is about *connected* time. Session.Open
+// can spend up to 160s in acquireIdentifyLock before a websocket exists, so an
+// attempt that waits out the lock and then fails its first dial must still
+// escalate: it never connected, and scoring it healthy would reset the backoff
+// to base on every attempt in precisely the fleet-wide identify contention the
+// ladder was built to damp.
+func TestAttemptThatNeverConnectedEscalatesRegardlessOfHowLongItTook(t *testing.T) {
+	if got := nextFailureCount(2, 0, false); got != 3 {
+		t.Fatalf("nextFailureCount(2, never connected) = %d, want 3", got)
+	}
+	if got := reconnectDelay(nextFailureCount(2, 0, false)); got < 8*reconnectBackoffBase {
+		t.Fatalf("reconnectDelay after a never-connected attempt = %v, want the escalated rung", got)
+	}
+}

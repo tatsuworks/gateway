@@ -200,17 +200,25 @@ func (m *Manager) startShard(shard int) {
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
 			start := time.Now()
-			err := s.Open(m.ctx, m.token)
-			uptime := time.Since(start)
+			// connected is time spent authenticated, which is what the ladder
+			// scores health on. It is NOT the duration of the attempt: Open also
+			// covers etcd setup and an identify-lock wait of up to 160s, so
+			// scoring on the latter marked any attempt that merely waited out
+			// the lock as healthy and reset the backoff to base — worst of all
+			// during the fleet-wide identify contention the ladder damps. Both
+			// are logged: the gap between them is the pre-connect cost.
+			connected, err := s.Open(m.ctx, m.token)
+			attempt := time.Since(start)
 
-			failures = nextFailureCount(failures, uptime, s.TakeResumeDiscarded())
+			failures = nextFailureCount(failures, connected, s.TakeResumeDiscarded())
 			delay := reconnectDelay(failures)
 
 			if err != nil {
 				// if !xerrors.Is(err, context.Canceled) {
 				m.log.Error(m.ctx, "websocket closed",
 					slog.F("shard", shard),
-					slog.F("uptime", uptime),
+					slog.F("connected_for", connected),
+					slog.F("attempt_took", attempt),
 					slog.F("consecutive_failures", failures),
 					slog.F("retry_in", delay),
 					slog.Error(err))

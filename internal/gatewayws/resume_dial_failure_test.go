@@ -36,7 +36,7 @@ func TestResumeDialFailuresBelowThresholdKeepResumeState(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 
 	if !s.shouldResume() {
@@ -59,7 +59,7 @@ func TestResumeDialFailuresAtThresholdDiscardResumeState(t *testing.T) {
 	s, c := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 
 	if s.shouldResume() {
@@ -90,11 +90,11 @@ func TestDialSuccessResetsResumeDialFailures(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 	s.noteDialSuccess()
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 
 	if !s.shouldResume() {
@@ -113,7 +113,7 @@ func TestDialFailuresAgainstMainURLDoNotInvalidate(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures*3; i++ {
-		s.noteDialFailure(false)
+		s.noteDialFailure(false, true)
 	}
 
 	if !s.shouldResume() {
@@ -131,7 +131,7 @@ func TestResumeDialFailuresResetAfterInvalidation(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 	if db.calls != 1 {
 		t.Fatalf("SetShardInfo calls = %d after invalidation, want 1", db.calls)
@@ -140,7 +140,7 @@ func TestResumeDialFailuresResetAfterInvalidation(t *testing.T) {
 	// The tuple is empty now, so subsequent dials use the main URL and report
 	// usedResumeURL=false; nothing further should be persisted.
 	for i := 0; i < MaxResumeDialFailures*2; i++ {
-		s.noteDialFailure(false)
+		s.noteDialFailure(false, true)
 	}
 	if db.calls != 1 {
 		t.Fatalf("SetShardInfo calls = %d, want 1 (no repeat persists of an empty tuple)", db.calls)
@@ -179,13 +179,13 @@ func TestInvalidationFlagsResumeDiscarded(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true)
+		s.noteDialFailure(true, true)
 	}
 	if s.TakeResumeDiscarded() {
 		t.Fatal("reported a discard below the failure threshold")
 	}
 
-	s.noteDialFailure(true)
+	s.noteDialFailure(true, true)
 	if !s.TakeResumeDiscarded() {
 		t.Fatal("invalidation did not flag the resume tuple as discarded")
 	}
@@ -201,7 +201,7 @@ func TestNoResumeDiscardedWithoutInvalidation(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	for i := 0; i < MaxResumeDialFailures*2; i++ {
-		s.noteDialFailure(false)
+		s.noteDialFailure(false, true)
 	}
 	if s.TakeResumeDiscarded() {
 		t.Fatal("reported a discard for failures that did not use the resume URL")
@@ -222,5 +222,59 @@ func TestNoteDialFailureDoesNotDuplicateShardField(t *testing.T) {
 	}
 	if bytes.Contains(src, []byte(`slog.F("shard"`)) {
 		t.Error(`resume.go binds slog.F("shard", ...) but s.log is already .With(shard) in NewSession`)
+	}
+}
+
+// A dial can fail without the resume host ever answering — DNS, TLS, a refused
+// connection, or our own egress being down. Those say nothing about whether the
+// edge still serves this session, and counting them lets one shared network
+// outage clear valid resume tuples across the whole fleet, forcing an IDENTIFY
+// and a full re-backfill per shard once connectivity returns. Only a host that
+// answered and refused the upgrade (the incident's 503) earns a strike.
+func TestDialFailuresWithNoResponseDoNotInvalidate(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeDialFailures*3; i++ {
+		s.noteDialFailure(true, false)
+	}
+
+	if !s.shouldResume() {
+		t.Fatal("resume state discarded by dial failures the host never answered")
+	}
+	if s.resumeURL == "" {
+		t.Fatal("resumeURL cleared by transport failures with no HTTP response")
+	}
+	if db.calls != 0 {
+		t.Fatalf("persisted shard info (calls=%d), want 0", db.calls)
+	}
+	if s.TakeResumeDiscarded() {
+		t.Fatal("reported a discard for failures the host never answered")
+	}
+}
+
+// An unanswered dial is ignored, not forgiving: it neither counts nor clears
+// the strikes already earned from the host itself. A transport blip in the
+// middle of a run of 503s must not reset the escape and strand the shard.
+func TestNoResponseFailuresDoNotResetEarnedStrikes(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeDialFailures-1; i++ {
+		s.noteDialFailure(true, true)
+	}
+	// A blip the host never answered lands mid-run.
+	s.noteDialFailure(true, false)
+	if !s.shouldResume() {
+		t.Fatal("resume state discarded early by an unanswered dial")
+	}
+
+	// The next answered rejection is the threshold strike.
+	s.noteDialFailure(true, true)
+	if s.shouldResume() {
+		t.Fatal("session still resumable: an unanswered dial reset the earned strikes")
+	}
+	if !s.TakeResumeDiscarded() {
+		t.Fatal("invalidation did not flag the resume tuple as discarded")
 	}
 }

@@ -40,18 +40,33 @@ func (s *Session) noteDialSuccess() {
 	s.resumeDialFailures = 0
 }
 
-// noteDialFailure records a failed dial. usedResumeURL says whether that dial
-// targeted the resume host; failures against the main gateway URL are not
-// counted because there is no resume state to blame or discard. On reaching
-// MaxResumeDialFailures the resume tuple is cleared in memory and persisted
-// cleared, so both the next dial and any later pod restart use the main
-// gateway URL. This is the automatic trigger for what ForceIdentify already
-// does by hand.
+// noteDialFailure records a failed dial. On reaching MaxResumeDialFailures the
+// resume tuple is cleared in memory and persisted cleared, so both the next
+// dial and any later pod restart use the main gateway URL. This is the
+// automatic trigger for what ForceIdentify already does by hand.
+//
+// A failure only earns a strike when both of these hold:
+//
+//   - usedResumeURL — the dial targeted the resume host. Failures against the
+//     main gateway URL have no resume state to blame or discard.
+//   - hostResponded — the host actually answered and refused the WebSocket
+//     upgrade, which is what a retired edge does (the incident's 503).
+//     websocket.Dial returns a nil *http.Response for every failure where no
+//     server replied: DNS, TLS, a refused connection, our own egress being
+//     down. Those say nothing about whether this edge still serves the session,
+//     and counting them would let a single shared network outage lasting three
+//     attempts clear otherwise-valid resume tuples across the whole fleet —
+//     buying a re-IDENTIFY and a full re-backfill per shard, the expensive
+//     recovery path, precisely when the fleet is already struggling.
+//
+// An unanswered dial is ignored rather than forgiving: it leaves the strikes
+// already earned from the host itself intact, so a transport blip landing in
+// the middle of a run of 503s cannot reset the escape and strand the shard.
 //
 // Read-loop goroutine only: it mutates seq/sessID/resumeURL, which are owned by
 // that goroutine (see applyForceIdentify).
-func (s *Session) noteDialFailure(usedResumeURL bool) {
-	if !usedResumeURL {
+func (s *Session) noteDialFailure(usedResumeURL, hostResponded bool) {
+	if !usedResumeURL || !hostResponded {
 		return
 	}
 

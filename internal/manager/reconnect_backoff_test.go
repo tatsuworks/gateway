@@ -70,24 +70,92 @@ func TestReconnectDelayIsJittered(t *testing.T) {
 
 // The backoff wait must be abortable: on shutdown the loop has to return
 // immediately rather than hold the process open for up to a minute.
-func TestSleepCtxReturnsEarlyOnCancel(t *testing.T) {
+func TestWaitBeforeReconnectReturnsEarlyOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	start := time.Now()
-	if sleepCtx(ctx, time.Hour) {
-		t.Fatal("sleepCtx returned true for a cancelled context; want false")
+	ok, woken := waitBeforeReconnect(ctx, nil, time.Hour)
+	if ok {
+		t.Fatal("waitBeforeReconnect reported ok for a cancelled context; want false")
+	}
+	if woken {
+		t.Fatal("waitBeforeReconnect reported woken for a cancelled context")
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
-		t.Fatalf("sleepCtx took %v to notice cancellation; want immediate", elapsed)
+		t.Fatalf("waitBeforeReconnect took %v to notice cancellation; want immediate", elapsed)
 	}
 }
 
-// A completed wait reports true so the caller keeps looping.
-func TestSleepCtxReportsCompletion(t *testing.T) {
-	if !sleepCtx(context.Background(), time.Millisecond) {
-		t.Fatal("sleepCtx returned false after the delay elapsed; want true")
+// A completed wait reports ok (keep looping) and not woken (keep the ladder).
+func TestWaitBeforeReconnectReportsCompletion(t *testing.T) {
+	ok, woken := waitBeforeReconnect(context.Background(), nil, time.Millisecond)
+	if !ok {
+		t.Fatal("waitBeforeReconnect reported not-ok after the delay elapsed; want ok")
 	}
+	if woken {
+		t.Fatal("waitBeforeReconnect reported woken with no wake signal")
+	}
+}
+
+// The regression this guards: Open clears Session.cur on return, so for the
+// whole reconnect wait Session.Cancel is a no-op and RestartShard reports
+// success while doing nothing. With a flat 1s retry that dead window was ~1s;
+// under backoff it would be up to ~75s -- squarely on top of gwForceIdentify,
+// the operator workaround for the very incident this backoff was added for. An
+// explicit management request must cut the wait short.
+func TestWaitBeforeReconnectWokenByManagementRequest(t *testing.T) {
+	wake := make(chan struct{}, 1)
+	wake <- struct{}{}
+
+	start := time.Now()
+	ok, woken := waitBeforeReconnect(context.Background(), wake, time.Hour)
+	if !ok {
+		t.Fatal("waitBeforeReconnect reported not-ok after a wake; want ok (keep looping)")
+	}
+	if !woken {
+		t.Fatal("waitBeforeReconnect did not report woken; the caller must restart the failure ladder")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("waitBeforeReconnect waited %v despite a pending wake; want immediate", elapsed)
+	}
+}
+
+// wakeShard is what RestartShard/ForceIdentify call. It must be non-blocking
+// (the gRPC handler must never stall on a shard that is not waiting), must
+// coalesce, and must hold a signal sent while nobody is waiting so an explicit
+// restart is never silently dropped.
+func TestWakeShardIsNonBlockingAndCoalesces(t *testing.T) {
+	m := &Manager{wake: map[int]chan struct{}{7: make(chan struct{}, 1)}}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			m.wakeShard(7)
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("wakeShard blocked; it must never stall the gRPC handler")
+	}
+
+	// The signal was held even though nobody was waiting, and 100 sends
+	// coalesced into one pending token.
+	if _, woken := waitBeforeReconnect(context.Background(), m.wake[7], time.Hour); !woken {
+		t.Fatal("a wake sent while nobody was waiting was dropped")
+	}
+	if _, woken := waitBeforeReconnect(context.Background(), m.wake[7], time.Millisecond); woken {
+		t.Fatal("wake signals did not coalesce; a second token was left pending")
+	}
+}
+
+// A restart aimed at a shard with no reconnect loop registered must be a no-op,
+// not a panic (nil map entry).
+func TestWakeShardUnknownShardIsNoop(t *testing.T) {
+	m := &Manager{wake: map[int]chan struct{}{}}
+	m.wakeShard(1234)
 }
 
 // A connection that stayed up long enough to be doing real work resets the

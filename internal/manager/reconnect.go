@@ -57,16 +57,27 @@ func nextFailureCount(failures int, uptime time.Duration) int {
 	return failures + 1
 }
 
-// sleepCtx waits for d, returning false if ctx is cancelled first so the caller
-// can stop instead of holding shutdown open for a full backoff interval.
-func sleepCtx(ctx context.Context, d time.Duration) bool {
+// waitBeforeReconnect waits out the backoff before the next connect attempt.
+//
+// ok is false only when ctx was cancelled, so the caller stops instead of
+// holding shutdown open for a full backoff interval. woken reports that an
+// explicit management request (see wakeShard) cut the wait short; the caller
+// restarts the failure ladder in that case, because an operator asking for a
+// reconnect should get the prompt first attempt, not the escalated delay.
+//
+// The wake path matters because Open clears Session.cur on return: for the
+// whole of this wait Session.Cancel is a no-op, so without it RestartShard
+// would report success and do nothing until the delay expired.
+func waitBeforeReconnect(ctx context.Context, wake <-chan struct{}, d time.Duration) (ok, woken bool) {
 	t := time.NewTimer(d)
 	defer t.Stop()
 
 	select {
 	case <-ctx.Done():
-		return false
+		return false, false
+	case <-wake:
+		return true, true
 	case <-t.C:
-		return true
+		return true, false
 	}
 }

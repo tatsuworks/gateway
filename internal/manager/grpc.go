@@ -34,6 +34,11 @@ func (m *Manager) RestartShard(ctx context.Context, req *gatewaypb.RestartShardR
 	} else {
 		s.Cancel()
 	}
+	// Cancel only reaches a live connection. If the shard is between attempts it
+	// has no live connection to cancel, so wake its reconnect loop too -- and
+	// with backoff that window is now up to a full delay, not a flat second.
+	m.wakeShard(int(req.Shard))
+
 	return &gatewaypb.EmptyResponse{}, nil
 }
 

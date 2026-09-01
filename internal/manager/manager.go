@@ -29,6 +29,9 @@ type Manager struct {
 
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
+	// wake holds one depth-1 channel per shard, used to interrupt that shard's
+	// reconnect backoff on an explicit management request. Guarded by shardMu.
+	wake map[int]chan struct{}
 
 	rdb  []*redis.Client
 	etcd *clientv3.Client
@@ -125,6 +128,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		shardCount: cfg.Shards,
 
 		shards: map[int]*gatewayws.Session{},
+		wake:   map[int]chan struct{}{},
 
 		rdb:  rdbClients,
 		etcd: etcdc,
@@ -175,8 +179,11 @@ func (m *Manager) startShard(shard int) {
 		return
 	}
 
+	wake := make(chan struct{}, 1)
+
 	m.shardMu.Lock()
 	m.shards[shard] = s
+	m.wake[shard] = wake
 	m.shardMu.Unlock()
 
 	go func() {
@@ -210,11 +217,40 @@ func (m *Manager) startShard(shard int) {
 				// }
 			}
 
-			if !sleepCtx(m.ctx, delay) {
+			ok, woken := waitBeforeReconnect(m.ctx, wake, delay)
+			if !ok {
 				return
+			}
+			if woken {
+				// An operator asked for this reconnect, so give them the prompt
+				// first attempt rather than an escalated delay -- and do not let
+				// their own cancellation of a short-lived connection, counted as
+				// a failure just above, escalate the ladder.
+				m.log.Info(m.ctx, "reconnect wait interrupted by management request", slog.F("shard", shard))
+				failures = 0
 			}
 		}
 	}()
+}
+
+// wakeShard nudges a shard's reconnect loop to attempt now instead of waiting
+// out its backoff. Open clears Session.cur on return, so Session.Cancel is a
+// no-op for the whole of that wait; without this a RestartShard would report
+// success and do nothing for up to a full backoff interval.
+//
+// Non-blocking so the gRPC handler can never stall, and depth-1 buffered so
+// signals coalesce and one sent while the loop is not waiting is held for its
+// next wait rather than lost. An unknown shard is a no-op: a send on a nil
+// channel blocks, so the default arm is taken.
+func (m *Manager) wakeShard(shard int) {
+	m.shardMu.Lock()
+	ch := m.wake[shard]
+	m.shardMu.Unlock()
+
+	select {
+	case ch <- struct{}{}:
+	default:
+	}
 }
 
 const ManagerLogInterval = 5 * time.Minute

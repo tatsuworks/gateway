@@ -203,7 +203,7 @@ func (m *Manager) startShard(shard int) {
 			err := s.Open(m.ctx, m.token)
 			uptime := time.Since(start)
 
-			failures = nextFailureCount(failures, uptime)
+			failures = nextFailureCount(failures, uptime, s.TakeResumeDiscarded())
 			delay := reconnectDelay(failures)
 
 			if err != nil {

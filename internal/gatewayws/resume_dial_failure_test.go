@@ -1,6 +1,8 @@
 package gatewayws
 
 import (
+	"bytes"
+	"os"
 	"sync/atomic"
 	"testing"
 
@@ -165,5 +167,60 @@ func TestUsingResumeURLMatchesGatewayURL(t *testing.T) {
 	}
 	if got := c.GatewayURL(); got[:len(mainGatewayURL)] != mainGatewayURL {
 		t.Fatalf("GatewayURL() = %q, want the main gateway URL", got)
+	}
+}
+
+// Discarding the tuple is a signal the manager needs: the next dial targets the
+// main gateway URL, a different host from the one the failures came from, so
+// the reconnect backoff earned against the dead edge must not be applied to it.
+// Measured on staging before this: 9.0s of a 15.8s escape was that dead wait.
+func TestInvalidationFlagsResumeDiscarded(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeDialFailures-1; i++ {
+		s.noteDialFailure(true)
+	}
+	if s.TakeResumeDiscarded() {
+		t.Fatal("reported a discard below the failure threshold")
+	}
+
+	s.noteDialFailure(true)
+	if !s.TakeResumeDiscarded() {
+		t.Fatal("invalidation did not flag the resume tuple as discarded")
+	}
+	// The flag is consumed, so the manager restarts its ladder exactly once.
+	if s.TakeResumeDiscarded() {
+		t.Fatal("TakeResumeDiscarded did not consume the flag")
+	}
+}
+
+// Failures that invalidate nothing must not claim a discard.
+func TestNoResumeDiscardedWithoutInvalidation(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeDialFailures*2; i++ {
+		s.noteDialFailure(false)
+	}
+	if s.TakeResumeDiscarded() {
+		t.Fatal("reported a discard for failures that did not use the resume URL")
+	}
+
+	s.noteDialSuccess()
+	if s.TakeResumeDiscarded() {
+		t.Fatal("reported a discard after a successful dial")
+	}
+}
+
+// The incident log line is read under pressure; s.log already carries the shard,
+// so noteDialFailure must not bind a second, duplicate "shard" field.
+func TestNoteDialFailureDoesNotDuplicateShardField(t *testing.T) {
+	src, err := os.ReadFile("resume.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(src, []byte(`slog.F("shard"`)) {
+		t.Error(`resume.go binds slog.F("shard", ...) but s.log is already .With(shard) in NewSession`)
 	}
 }

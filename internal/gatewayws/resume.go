@@ -60,14 +60,27 @@ func (s *Session) noteDialFailure(usedResumeURL bool) {
 		return
 	}
 
+	// s.log already carries name+shard from NewSession; do not re-bind them.
 	s.log.Info(context.Background(), "resume gateway url unreachable, discarding resume state",
-		slog.F("shard", s.shardID),
 		slog.F("resume_gateway_url", s.resumeURL),
 		slog.F("consecutive_dial_failures", s.resumeDialFailures))
 
 	s.resumeDialFailures = 0
+	atomic.StoreInt32(&s.resumeDiscarded, 1)
 	atomic.StoreInt64(&s.seq, 0)
 	s.sessID = ""
 	s.resumeURL = ""
 	s.persistShardInfo()
+}
+
+// TakeResumeDiscarded reports whether the resume tuple was discarded since the
+// last call, clearing the flag. The manager's reconnect loop uses it to restart
+// its backoff ladder: once the tuple is gone the next dial targets the main
+// gateway URL, a different host from the one those failures came from, so the
+// delay they earned predicts nothing about it. Without this the escape pays for
+// a wait it no longer needs -- measured on staging as 9.0s of a 15.8s recovery.
+//
+// Set on the read-loop goroutine, read on the manager goroutine, hence atomic.
+func (s *Session) TakeResumeDiscarded() bool {
+	return atomic.SwapInt32(&s.resumeDiscarded, 0) == 1
 }

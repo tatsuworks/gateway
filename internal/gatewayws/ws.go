@@ -64,6 +64,11 @@ type Session struct {
 	// noteDialFailure in resume.go.
 	resumeDialFailures int
 
+	// resumeDiscarded is set when noteDialFailure throws the resume tuple away
+	// and consumed by the manager's reconnect loop via TakeResumeDiscarded.
+	// Written on the read-loop goroutine, read on the manager goroutine.
+	resumeDiscarded int32
+
 	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
 	// request that the next Open discard the resume tuple and IDENTIFY. It is
 	// consumed by the read-loop goroutine in applyForceIdentify; sessID/resumeURL

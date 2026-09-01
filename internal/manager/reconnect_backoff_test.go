@@ -162,16 +162,33 @@ func TestWakeShardUnknownShardIsNoop(t *testing.T) {
 // backoff, so an hours-long healthy session followed by one drop reconnects
 // promptly instead of inheriting a stale minute-long delay.
 func TestNextFailureCountResetsAfterHealthyUptime(t *testing.T) {
-	if got := nextFailureCount(5, reconnectHealthyUptime); got != 0 {
+	if got := nextFailureCount(5, reconnectHealthyUptime, false); got != 0 {
 		t.Fatalf("nextFailureCount(5, healthy) = %d, want 0", got)
 	}
-	if got := nextFailureCount(5, reconnectHealthyUptime+time.Hour); got != 0 {
+	if got := nextFailureCount(5, reconnectHealthyUptime+time.Hour, false); got != 0 {
 		t.Fatalf("nextFailureCount(5, long uptime) = %d, want 0", got)
 	}
-	if got := nextFailureCount(5, time.Millisecond); got != 6 {
+	if got := nextFailureCount(5, time.Millisecond, false); got != 6 {
 		t.Fatalf("nextFailureCount(5, instant failure) = %d, want 6", got)
 	}
-	if got := nextFailureCount(0, time.Millisecond); got != 1 {
+	if got := nextFailureCount(0, time.Millisecond, false); got != 1 {
 		t.Fatalf("nextFailureCount(0, instant failure) = %d, want 1", got)
+	}
+}
+
+// Discarding the resume tuple repoints the next dial at the main gateway URL.
+// The failures were earned against a different host, so the ladder restarts --
+// otherwise the escape waits out a delay that predicts nothing. Measured on
+// staging: 9.0s of a 15.8s escape was exactly this dead wait.
+func TestNextFailureCountResetsWhenResumeDiscarded(t *testing.T) {
+	if got := nextFailureCount(3, time.Millisecond, true); got != 0 {
+		t.Fatalf("nextFailureCount(3, instant failure, discarded) = %d, want 0", got)
+	}
+	if got := nextFailureCount(31, time.Millisecond, true); got != 0 {
+		t.Fatalf("nextFailureCount(31, instant failure, discarded) = %d, want 0", got)
+	}
+	// And the reset actually buys back the time: base delay, not an escalated one.
+	if got := reconnectDelay(nextFailureCount(3, time.Millisecond, true)); got >= 2*reconnectBackoffBase {
+		t.Fatalf("delay after a discard = %v, want ~%v (the base rung)", got, reconnectBackoffBase)
 	}
 }

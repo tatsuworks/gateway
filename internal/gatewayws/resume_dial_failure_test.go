@@ -235,7 +235,7 @@ func TestDialFailuresWithNoResponseDoNotInvalidate(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeDialFailures*3; i++ {
+	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
 		s.noteDialFailure(true, false)
 	}
 
@@ -276,5 +276,94 @@ func TestNoResponseFailuresDoNotResetEarnedStrikes(t *testing.T) {
 	}
 	if !s.TakeResumeDiscarded() {
 		t.Fatal("invalidation did not flag the resume tuple as discarded")
+	}
+}
+
+// An edge that is decommissioned rather than retired-but-answering stops
+// resolving (or refuses connections) instead of serving a 503. Requiring an
+// answered rejection to earn a strike would leave such a shard trapped exactly
+// as in the incident, recoverable only by a manual gwForceIdentify — so an
+// unanswered dial still escapes, on its own far higher budget.
+//
+// The two thresholds are deliberately asymmetric. An answered rejection is the
+// host telling us it will not serve this session, so 3 is enough. An unanswered
+// dial is ambiguous — it looks identical whether one edge died or our own
+// egress did — so it must not fire until holding the tuple has become pointless
+// rather than merely suspicious.
+func TestNoResponseFailuresInvalidateOnlyAtTheirOwnHigherThreshold(t *testing.T) {
+	if MaxResumeNoResponseFailures <= MaxResumeDialFailures {
+		t.Fatalf("no-response threshold (%d) must be far above the answered one (%d): an unanswered dial is much weaker evidence",
+			MaxResumeNoResponseFailures, MaxResumeDialFailures)
+	}
+
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
+		s.noteDialFailure(true, false)
+	}
+	if !s.shouldResume() {
+		t.Fatalf("resume state discarded after %d unanswered dials; threshold is %d",
+			MaxResumeNoResponseFailures-1, MaxResumeNoResponseFailures)
+	}
+	if db.calls != 0 {
+		t.Fatalf("persisted shard info below the no-response threshold (calls=%d), want 0", db.calls)
+	}
+
+	s.noteDialFailure(true, false)
+	if s.shouldResume() {
+		t.Fatal("session still resumable at the no-response threshold")
+	}
+	if s.sessID != "" || s.resumeURL != "" {
+		t.Fatalf("sessID=%q resumeURL=%q, want both empty", s.sessID, s.resumeURL)
+	}
+	if db.calls != 1 {
+		t.Fatalf("SetShardInfo calls = %d, want exactly 1 (persist the cleared tuple once)", db.calls)
+	}
+	if !s.TakeResumeDiscarded() {
+		t.Fatal("no-response invalidation did not flag the resume tuple as discarded")
+	}
+}
+
+// A transport outage that clears must not leave the shard part-way to throwing
+// away a tuple that is now working fine.
+func TestSuccessfulDialResetsTheNoResponseCount(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeNoResponseFailures-1; i++ {
+		s.noteDialFailure(true, false)
+	}
+	s.noteDialSuccess()
+
+	// Starting over, one more unanswered dial must be nowhere near the budget.
+	s.noteDialFailure(true, false)
+	if !s.shouldResume() {
+		t.Fatal("resume state discarded: a successful dial did not reset the no-response count")
+	}
+	if db.calls != 0 {
+		t.Fatalf("persisted shard info (calls=%d), want 0", db.calls)
+	}
+}
+
+// The two budgets are independent evidence and neither clears the other, so a
+// host that alternates between refusing the upgrade and not answering at all
+// still escapes rather than sitting below both thresholds forever.
+func TestAnsweredAndUnansweredBudgetsAreIndependent(t *testing.T) {
+	db := &shardInfoRecorder{}
+	s, _ := newResumableSession(t, db)
+
+	for i := 0; i < MaxResumeDialFailures-1; i++ {
+		s.noteDialFailure(true, true)
+		s.noteDialFailure(true, false)
+	}
+	if !s.shouldResume() {
+		t.Fatal("resume state discarded below both thresholds")
+	}
+
+	// The answered budget is the one that fills first.
+	s.noteDialFailure(true, true)
+	if s.shouldResume() {
+		t.Fatal("unanswered dials reset the answered strike count")
 	}
 }

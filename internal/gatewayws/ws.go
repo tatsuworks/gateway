@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -227,6 +228,44 @@ func (c *conn) initEtcd() error {
 	return nil
 }
 
+// dialGateway opens the WebSocket, bounded so a single dial can never hang
+// forever.
+//
+// Both resume budgets (see resume.go) are driven by noteDialFailure, which is
+// only reached once a dial RETURNS — so a dial that never returns defeats the
+// escape completely: conn.run never finishes, Open never returns, the manager's
+// reconnect loop stays parked inside it, and the shard is stuck exactly as in
+// the incident this file exists to end.
+//
+// That is reachable rather than theoretical. websocket.Dial with nil options
+// uses http.DefaultClient, whose DefaultTransport bounds TCP connect (30s) and
+// the TLS handshake (10s) but leaves ResponseHeaderTimeout unset — so a host
+// that accepts the connection and then never sends response headers blocks
+// indefinitely, and c.ctx carries no deadline of its own.
+//
+// connectionTimeout is reused so the two handshake stages agree: it already
+// bounds the HELLO read on the same reasoning (see readHello).
+func (c *conn) dialGateway() (*websocket.Conn, *http.Response, error) {
+	return c.dialGatewayWithin(connectionTimeout * time.Second)
+}
+
+// dialGatewayWithin is dialGateway with the deadline injected, so the bound can
+// be tested without waiting out the real one.
+//
+// The deadline context is derived from c.ctx, which matters twice over: shutdown
+// / Cancel / ForceIdentify still abort the dial immediately, and a dial that
+// merely times out leaves c.ctx untouched — so the caller's c.ctx.Err() == nil
+// check still tells our deadline (count the failure) apart from our own teardown
+// (do not). A timed-out dial also yields a nil *http.Response, so it lands on
+// the no-response budget, which is the right reading of a host that accepted the
+// connection and then said nothing.
+func (c *conn) dialGatewayWithin(d time.Duration) (*websocket.Conn, *http.Response, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, d)
+	defer cancel()
+
+	return websocket.Dial(ctx, c.GatewayURL(), nil)
+}
+
 func (s *Session) shouldResume() bool {
 	return atomic.LoadInt64(&s.seq) != 0 && s.sessID != ""
 }
@@ -330,7 +369,7 @@ func (c *conn) run(parent context.Context) error {
 	// next connect falls back to wss://gateway.discord.gg/ instead of redialing
 	// a retired edge forever.
 	usedResumeURL := c.s.usingResumeURL()
-	ws, resp, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
+	ws, resp, err := c.dialGateway()
 	if err != nil {
 		// A cancelled connection context is our own teardown (shutdown, Cancel,
 		// ForceIdentify) and says nothing about the resume host.

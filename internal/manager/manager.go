@@ -180,6 +180,10 @@ func (m *Manager) startShard(shard int) {
 	m.shardMu.Unlock()
 
 	go func() {
+		// Consecutive failed connect attempts, driving the reconnect backoff.
+		// Reset by any connection that stays up for reconnectHealthyUptime.
+		var failures int
+
 		for {
 			select {
 			case <-m.ctx.Done():
@@ -188,14 +192,27 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
+			start := time.Now()
 			err := s.Open(m.ctx, m.token)
+			uptime := time.Since(start)
+
+			failures = nextFailureCount(failures, uptime)
+			delay := reconnectDelay(failures)
+
 			if err != nil {
 				// if !xerrors.Is(err, context.Canceled) {
-				m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))
+				m.log.Error(m.ctx, "websocket closed",
+					slog.F("shard", shard),
+					slog.F("uptime", uptime),
+					slog.F("consecutive_failures", failures),
+					slog.F("retry_in", delay),
+					slog.Error(err))
 				// }
 			}
 
-			time.Sleep(time.Second)
+			if !sleepCtx(m.ctx, delay) {
+				return
+			}
 		}
 	}()
 }

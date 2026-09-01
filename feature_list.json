@@ -1,7 +1,7 @@
 {
   "project": "gateway",
   "scope": "Seeds with the agent-workspace harness's own bootstrap task. This is not a snapshot of the team backlog \u2014 actual in-flight work is tracked in the team's primary tooling (Linear, etc.). Agents add tasks here as they bootstrap their own sessions in this repo.",
-  "last_updated": "2026-06-23",
+  "last_updated": "2026-09-01",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -20,14 +20,16 @@
       "area": "harness",
       "title": "Verify init.sh runs cleanly",
       "user_visible_behavior": "Running ./init.sh from a clean checkout installs deps, runs verification, and prints the start command without errors.",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "cd into this repo from a clean checkout",
         "Run ./init.sh",
         "Confirm install, verify, and start-command-print steps all succeed",
         "If anything fails, edit init.sh and re-run"
       ],
-      "evidence": [],
+      "evidence": [
+        "2026-09-01: ./init.sh ran clean from this checkout (go mod download + go build ./..., exit 0) at the start of the TATSU-2514 session."
+      ],
       "notes": "Inferred commands: install='go mod download', verify='go build ./...', start='(cd cmd/gateway && go run .)'. Gateway needs FoundationDB client libs (v6.2.27). Runtime requires Redis + etcd + Discord TOKEN. The verify command runs a build only \u2014 full tests require infra."
     },
     {
@@ -56,7 +58,7 @@
         "2026-06-18: staging end-to-end validation on gateway:58195f2 (see agent-progress.md Session 002d) - force-identify, small-guild reconcile/no-RGM, large-guild auto-RGM + multi-chunk, and the skip gate all confirmed against live Discord.",
         "Design: docs/superpowers/specs/2026-06-12-backfill-marker-rgm-skip-design.md; Plan: docs/superpowers/plans/2026-06-18-backfill-marker-rgm-skip.md"
       ],
-      "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). 2026-06-18 pivot: skip is now NO-EXPIRY (skip if backfilled_at IS NOT NULL, any age) because reconnect-storm speed is the priority — a jittered staleness skip gave no relief for the storm-after-long-uptime case it most needs to help. Drift is bounded by the reconciliation delete on real backfills + cold re-backfills on UNLOGGED cache reset; it only accrues during disconnect windows, so good uptime keeps it small. A Phase 3b background sweep is DEFERRED/OPTIONAL (build only if roster staleness becomes a real complaint), not required. 2026-06-18 force-identify control: RestartShardRequest.force_identify signals the shard (atomic flag) and cancels it; the next Open clears+persists the resume tuple on the read-loop goroutine (rewritten in commit 58195f2 from the original racy in-gRPC-goroutine clear), avoiding DB-delete/pod-shutdown races and a 64-shard pod restart. Status flipped to 'passing' 2026-06-18 after staging validation ran (agent-progress.md Session 002d): no-RGM-storm small-guild reconcile, large-guild auto-RGM + multi-chunk decode, and the skip gate were all confirmed on staging. Observability caveat: the AUTOMATIC RGM path (write.go:187) logs nothing on success (only the manual gRPC path logs 'sending members request') - verify auto-RGM via the DB, not logs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the state DB before deploy; after prod deploy, seed the baseline via one full re-IDENTIFY."
+      "notes": "Implemented on master baseline (not on feat/gate-rgm-on-reidentify, which it supersedes). 2026-06-18 pivot: skip is now NO-EXPIRY (skip if backfilled_at IS NOT NULL, any age) because reconnect-storm speed is the priority \u2014 a jittered staleness skip gave no relief for the storm-after-long-uptime case it most needs to help. Drift is bounded by the reconciliation delete on real backfills + cold re-backfills on UNLOGGED cache reset; it only accrues during disconnect windows, so good uptime keeps it small. A Phase 3b background sweep is DEFERRED/OPTIONAL (build only if roster staleness becomes a real complaint), not required. 2026-06-18 force-identify control: RestartShardRequest.force_identify signals the shard (atomic flag) and cancels it; the next Open clears+persists the resume tuple on the read-loop goroutine (rewritten in commit 58195f2 from the original racy in-gRPC-goroutine clear), avoiding DB-delete/pod-shutdown races and a 64-shard pod restart. Status flipped to 'passing' 2026-06-18 after staging validation ran (agent-progress.md Session 002d): no-RGM-storm small-guild reconcile, large-guild auto-RGM + multi-chunk decode, and the skip gate were all confirmed on staging. Observability caveat: the AUTOMATIC RGM path (write.go:187) logs nothing on success (only the manual gRPC path logs 'sending members request') - verify auto-RGM via the DB, not logs. Apply guild_backfills (init.sql, IF NOT EXISTS) to the state DB before deploy; after prod deploy, seed the baseline via one full re-IDENTIFY."
     },
     {
       "id": "ws-send-deadlock-hook-cleanup",
@@ -78,6 +80,29 @@
         "2026-06-23: internal/gatewayws/write.go and internal/gatewayws/heartbeat_deadlock_test.go have no diff versus origin/fix/ws-send-deadlock-on-writer-exit after the cleanup."
       ],
       "notes": "The branch remains locally ahead/behind origin/fix/ws-send-deadlock-on-writer-exit because the upstream branch has the same fix subject at a different commit SHA. No unresolved blocker."
+    },
+    {
+      "id": "tatsu-2514-stale-resume-url-503-loop",
+      "priority": 1,
+      "area": "gatewayws / manager",
+      "title": "Fall back to the main gateway URL when a stale resume_gateway_url is unreachable",
+      "user_visible_behavior": "A shard whose persisted resume_gateway_url points at a Discord edge that no longer serves it (503 on the WebSocket handshake, before IDENTIFY) discards the resume tuple after 3 consecutive dial-stage failures and reconnects via wss://gateway.discord.gg/, instead of redialing the dead host once per second forever. The cleared tuple is persisted, so a pod restart cannot reload the dead host. The reconnect loop backs off exponentially (1s -> 60s, jittered) instead of retrying flat 1s.",
+      "status": "in_progress",
+      "verification": [
+        "env GOCACHE=/tmp/go-build-cache go build ./... (exit 0)",
+        "env GOCACHE=/tmp/go-build-cache go vet ./internal/... (clean)",
+        "env GOCACHE=/tmp/go-build-cache go test ./... (all packages ok)",
+        "env GOCACHE=/tmp/go-build-cache go test -race -count=2 ./internal/gatewayws/... ./internal/manager/... (PASS)",
+        "./init.sh (exit 0)",
+        "PENDING: staging validation - write a bogus but resolvable resume_gateway_url into the shard's shards row, restart the pod, and confirm the shard logs 'resume gateway url unreachable, discarding resume state' then 'sending identify' -> 'ready' instead of looping on 503."
+      ],
+      "evidence": [
+        "2026-09-01: TDD. internal/gatewayws/resume_dial_failure_test.go (6 tests) and internal/manager/reconnect_backoff_test.go (6 tests) were written first and watched fail (build failure: undefined MaxResumeDialFailures / noteDialFailure / reconnectBackoffBase) before any production code was written.",
+        "2026-09-01: internal/gatewayws/resume.go adds MaxResumeDialFailures=3, usingResumeURL, noteDialSuccess, noteDialFailure; ws.go classifies the dial outcome at the websocket.Dial site and GatewayURL now branches on usingResumeURL.",
+        "2026-09-01: internal/manager/reconnect.go adds reconnectDelay / nextFailureCount / sleepCtx; startShard's retry loop replaces time.Sleep(time.Second) with a ctx-cancellable jittered backoff and logs uptime / consecutive_failures / retry_in.",
+        "2026-09-01: full suite green - go build, go vet, go test ./..., go test -race -count=2 on gatewayws + manager."
+      ],
+      "notes": "TATSU-2514 (prod incident 2026-09-01: 41/1024 shards stuck, zero self-healing, pods stayed 1/1 Running). Only DIAL-stage failures against the resume URL are counted - failures against the main gateway URL have no resume state to blame, and a cancelled connection context (shutdown / Cancel / ForceIdentify) is our own teardown and is not counted. The invalidation reuses the exact mechanism ForceIdentify already proved in production; this PR only gives it an automatic trigger. Recovery costs a full re-IDENTIFY and shard re-backfill (~1,400 guilds), which is why the threshold is 3 and not 1. NOT DONE in this PR (ticket bullet 4, explicitly 'Consider'): a metric/alert on 'shard has not reached ready in N minutes' - this outage class is still invisible to monitoring."
     }
   ]
 }

@@ -10,8 +10,8 @@
 - Standard start command: `(cd cmd/gateway && go run .)`
 - Standard test path (no infra): `go test ./discord/... ./internal/gatewayws/...`
 - Standard DB integration test: `go test ./internal/state/db/statepsql/...` (needs a Postgres with the `state` schema; repo convention DSN is `tatsu@localhost`)
-- Current highest-priority unfinished feature: backfill-marker RGM skip — implemented and verified locally (build/vet/unit + statepsql integration against live PG14); pending push, PR, and staging validation
-- Current blocker: none (staging requires `helm`-based deploy + applying `guild_backfills` to the staging `state` DB)
+- Current highest-priority unfinished feature: TATSU-2514 — stale `resume_gateway_url` 503 redial loop; implemented and verified locally (build/vet/`go test ./...`/`-race`), pending staging validation and a prod deploy
+- Current blocker: none (staging validation requires a `helm`-based deploy)
 
 ## Session Log
 
@@ -167,3 +167,20 @@
 - **Deliberately deferred** (rationale): #2 etcd-session prompt-revoke (with #1 fixed, only an idle lease lingers ~80s to TTL; no goroutine leak; a prompt-revoke touches the rate-limiter and Session.Close hits the same `c.ctx` cancellation) — accepted as-is; `persistence.go` `context.Background()` DB calls (bounded ctx is a real behavior change, needs deliberate sizing); dead `backfill.go` Phase-3b scaffolding (intentionally retained).
 - Verification: `go build ./...`, `go vet ./internal/gatewayws/...`, `go test -race ./internal/gatewayws/...` all clean post-fix.
 - Next best step: rebuild the gateway image, redeploy to staging, force-identify shard 0, and confirm the `release identify lock after ready: context canceled` log is GONE (the conn reconnects at 30s while the ~70s release goroutine later unlocks on a live context). Then get a review pass on PR #81 and merge.
+
+### Session 008 — TATSU-2514: stale `resume_gateway_url` traps a shard in a permanent 503 redial loop (2026-09-01)
+
+- Goal: fix the production incident in [TATSU-2514](https://linear.app/tatsu-works/issue/TATSU-2514) — 41 of 1024 prod shards stuck redialing a dead Discord edge, fully unresponsive, with zero self-healing and no alerting (pods stayed `1/1 Running`).
+- Root cause (confirmed by reading the code, matching the ticket): `GatewayURL()` preferred `resumeURL` unconditionally whenever the tuple was non-empty. When the edge behind that URL stops serving the shard, the failure lands on the **WebSocket handshake** (`503`, before IDENTIFY/RESUME is sent), so Discord never gets to invalidate the session via `INVALID_SESSION` — the signal that would normally demote the resume tuple never arrives. Nothing else in the connect path touched `resumeURL`, and `loadResumeURL` reloads it from the `shards` table on start, so a pod restart walks straight back into the same loop.
+- Implemented (TDD — tests written first and watched fail):
+  1. **`internal/gatewayws/resume.go` (new)**: `MaxResumeDialFailures = 3`, `usingResumeURL`, `noteDialSuccess`, `noteDialFailure`. Three consecutive dial-stage failures against a resume host clear `seq`/`sessID`/`resumeURL` in memory and persist the cleared tuple, so both the next dial and any later pod restart use `wss://gateway.discord.gg/`. This is the automatic trigger for the mechanism `ForceIdentify` already proved in production; the manual `yarn gwForceIdentify` workaround recovered a shard in 4.7s.
+  2. **`internal/gatewayws/ws.go`**: the `websocket.Dial` site captures `usingResumeURL()` before dialing and reports the outcome. Failures on a **cancelled** connection context (shutdown / `Cancel` / `ForceIdentify`) are our own teardown and are not counted. `GatewayURL` now branches on `usingResumeURL` so the dial-site classification and the URL decision cannot drift apart. New `Session.resumeDialFailures` field is read-loop-goroutine-owned, same as `sessID`/`resumeURL`.
+  3. **`internal/manager/reconnect.go` (new) + `manager.go`**: the flat `time.Sleep(time.Second)` retry becomes an exponential, jittered, ctx-cancellable backoff (`reconnectDelay` 1s→60s, `nextFailureCount`, `sleepCtx`). A connection that lasts ≥60s resets the ladder. The flat retry generated ~3,300 error lines in 10 minutes on gateway-14 alone, which rotated the log buffer fast enough to destroy the evidence of when the loop started. The `websocket closed` line now carries `uptime` / `consecutive_failures` / `retry_in`.
+- Threshold rationale: recovery costs a full re-IDENTIFY and shard re-backfill (~1,400 guilds, historically ~40min on prod), so a single transient dial blip must not trigger it — hence 3 consecutive, reset by any successful dial.
+- Verification (all run this session): `./init.sh` exit 0; `go build ./...` exit 0; `go vet ./internal/...` clean; `go test ./...` all packages ok; `go test -race -count=2 ./internal/gatewayws/... ./internal/manager/...` PASS. 12 new tests (6 gatewayws, 6 manager), each watched failing first.
+- Test-harness note: `newResumableSession` (force_identify_test.go) now sets `enc: stubEncoding{}` — `GatewayURL()` dereferences `enc.Name()`, which the helper previously left nil.
+- Known risk / not done:
+  - **No staging validation yet** (needs a `helm` deploy). Repro to run there: write a bogus but resolvable `resume_gateway_url` into the shard's `shards` row, restart the pod, and confirm `resume gateway url unreachable, discarding resume state` → `sending identify` → `ready` rather than a 503 loop.
+  - **Ticket bullet 4 deliberately out of scope** (it is phrased as "Consider"): a metric/alert on "shard has not reached `ready` in N minutes". This class of outage remains invisible to monitoring; `logHealth` does list disconnected shards in its 5-minute `shard report`, but nothing pages.
+  - The 41 shards stuck at time of filing are not recovered by merging this — they need the existing `gwForceIdentify` workaround (batched, per `reidentify`'s settle gating) or a deploy carrying this fix.
+- Next best step: deploy to staging, run the repro above, then flip `tatsu-2514-stale-resume-url-503-loop` to `passing` with the staging evidence.

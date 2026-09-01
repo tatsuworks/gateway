@@ -59,6 +59,11 @@ type Session struct {
 	resumeURL string
 	last      int64 // event-rate baseline; accessed atomically (logTotalEvents goroutine)
 
+	// resumeDialFailures counts consecutive dial-stage failures against
+	// resumeURL. Read-loop-goroutine-owned, like sessID/resumeURL. See
+	// noteDialFailure in resume.go.
+	resumeDialFailures int
+
 	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
 	// request that the next Open discard the resume tuple and IDENTIFY. It is
 	// consumed by the read-loop goroutine in applyForceIdentify; sessID/resumeURL
@@ -129,7 +134,7 @@ func (c *conn) cleanupBuffer() {
 func (c *conn) GatewayURL() string {
 	wsOpts := "?v=10&encoding=" + c.s.enc.Name() + "&compress=zlib-stream"
 
-	if c.s.resumeURL != "" && c.s.sessID != "" {
+	if c.s.usingResumeURL() {
 		return c.s.resumeURL + wsOpts
 	}
 
@@ -304,10 +309,21 @@ func (c *conn) run(parent context.Context) error {
 	defer r.Close()
 
 	c.setState("connecting")
+	// Capture the resume-vs-main decision before dialing: if this dial fails
+	// against a resume host, enough failures in a row discard the tuple so the
+	// next connect falls back to wss://gateway.discord.gg/ instead of redialing
+	// a retired edge forever.
+	usedResumeURL := c.s.usingResumeURL()
 	ws, _, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
 	if err != nil {
+		// A cancelled connection context is our own teardown (shutdown, Cancel,
+		// ForceIdentify) and says nothing about the resume host.
+		if c.ctx.Err() == nil {
+			c.s.noteDialFailure(usedResumeURL)
+		}
 		return xerrors.Errorf("dial gateway: %w", err)
 	}
+	c.s.noteDialSuccess()
 	c.wsConn = ws
 	c.wsConn.SetReadLimit(512 << 20)
 

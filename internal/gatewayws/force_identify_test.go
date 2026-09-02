@@ -41,6 +41,7 @@ func newResumableSession(t *testing.T, db state.DB) (*Session, *conn) {
 	s := &Session{
 		log:       slogtest.Make(t, nil),
 		stateDB:   db,
+		enc:       stubEncoding{},
 		shardID:   42,
 		name:      "gateway",
 		seq:       12345,

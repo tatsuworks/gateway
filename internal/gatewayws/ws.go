@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -58,6 +59,24 @@ type Session struct {
 	sessID    string
 	resumeURL string
 	last      int64 // event-rate baseline; accessed atomically (logTotalEvents goroutine)
+
+	// resumeDialFailures counts consecutive dial-stage failures against
+	// resumeURL that the host answered and refused, and resumeDialFailuresSince
+	// is when that run began — a discard needs both a count and an elapsed span,
+	// because the count alone is spent in seconds at the base of the reconnect
+	// ladder. resumeNoResponseSince is when the current unbroken run of dials the
+	// host never answered began (zero if there is no run in progress) — that one
+	// is bounded by elapsed time only, because the evidence is much weaker. All
+	// three are zeroed by any successful dial. See noteDialFailure in resume.go.
+	// Read-loop-goroutine-owned, like sessID/resumeURL.
+	resumeDialFailures      int
+	resumeDialFailuresSince time.Time
+	resumeNoResponseSince   time.Time
+
+	// resumeDiscarded is set when noteDialFailure throws the resume tuple away
+	// and consumed by the manager's reconnect loop via TakeResumeDiscarded.
+	// Written on the read-loop goroutine, read on the manager goroutine.
+	resumeDiscarded int32
 
 	// forceIdentify is set (atomically) by ForceIdentify from any goroutine to
 	// request that the next Open discard the resume tuple and IDENTIFY. It is
@@ -129,7 +148,7 @@ func (c *conn) cleanupBuffer() {
 func (c *conn) GatewayURL() string {
 	wsOpts := "?v=10&encoding=" + c.s.enc.Name() + "&compress=zlib-stream"
 
-	if c.s.resumeURL != "" && c.s.sessID != "" {
+	if c.s.usingResumeURL() {
 		return c.s.resumeURL + wsOpts
 	}
 
@@ -213,6 +232,44 @@ func (c *conn) initEtcd() error {
 	return nil
 }
 
+// dialGateway opens the WebSocket, bounded so a single dial can never hang
+// forever.
+//
+// Both resume budgets (see resume.go) are driven by noteDialFailure, which is
+// only reached once a dial RETURNS — so a dial that never returns defeats the
+// escape completely: conn.run never finishes, Open never returns, the manager's
+// reconnect loop stays parked inside it, and the shard is stuck exactly as in
+// the incident this file exists to end.
+//
+// That is reachable rather than theoretical. websocket.Dial with nil options
+// uses http.DefaultClient, whose DefaultTransport bounds TCP connect (30s) and
+// the TLS handshake (10s) but leaves ResponseHeaderTimeout unset — so a host
+// that accepts the connection and then never sends response headers blocks
+// indefinitely, and c.ctx carries no deadline of its own.
+//
+// connectionTimeout is reused so the two handshake stages agree: it already
+// bounds the HELLO read on the same reasoning (see readHello).
+func (c *conn) dialGateway() (*websocket.Conn, *http.Response, error) {
+	return c.dialGatewayWithin(connectionTimeout * time.Second)
+}
+
+// dialGatewayWithin is dialGateway with the deadline injected, so the bound can
+// be tested without waiting out the real one.
+//
+// The deadline context is derived from c.ctx, which matters twice over: shutdown
+// / Cancel / ForceIdentify still abort the dial immediately, and a dial that
+// merely times out leaves c.ctx untouched — so the caller's c.ctx.Err() == nil
+// check still tells our deadline (count the failure) apart from our own teardown
+// (do not). A timed-out dial also yields a nil *http.Response, so it lands on
+// the no-response budget, which is the right reading of a host that accepted the
+// connection and then said nothing.
+func (c *conn) dialGatewayWithin(d time.Duration) (*websocket.Conn, *http.Response, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, d)
+	defer cancel()
+
+	return websocket.Dial(ctx, c.GatewayURL(), nil)
+}
+
 func (s *Session) shouldResume() bool {
 	return atomic.LoadInt64(&s.seq) != 0 && s.sessID != ""
 }
@@ -245,7 +302,13 @@ func (s *Session) applyForceIdentify() {
 	s.persistShardInfo()
 }
 
-func (s *Session) Open(ctx context.Context, token string) error {
+// Open runs one connection to completion and reports how long that connection
+// was authenticated (READY/RESUMED) before it dropped — 0 if it never got
+// there. That connected time, not the wall-clock duration of the call, is what
+// the manager's reconnect backoff scores the attempt on: Open also covers etcd
+// setup and an identify-lock wait of up to 160s, so an attempt can take minutes
+// and still never have established a usable connection.
+func (s *Session) Open(ctx context.Context, token string) (time.Duration, error) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -263,7 +326,8 @@ func (s *Session) Open(ctx context.Context, token string) error {
 
 	// parent ctx is threaded into run so state-handling work survives a
 	// disconnect (see run); c.ctx is the connection-scoped context.
-	return c.run(ctx)
+	err := c.run(ctx)
+	return c.readyFor(time.Now()), err
 }
 
 func (c *conn) run(parent context.Context) error {
@@ -304,10 +368,27 @@ func (c *conn) run(parent context.Context) error {
 	defer r.Close()
 
 	c.setState("connecting")
-	ws, _, err := websocket.Dial(c.ctx, c.GatewayURL(), nil)
+	// Capture the resume-vs-main decision before dialing: if this dial fails
+	// against a resume host, enough failures in a row discard the tuple so the
+	// next connect falls back to wss://gateway.discord.gg/ instead of redialing
+	// a retired edge forever.
+	usedResumeURL := c.s.usingResumeURL()
+	ws, resp, err := c.dialGateway()
 	if err != nil {
+		// A cancelled connection context is our own teardown (shutdown, Cancel,
+		// ForceIdentify) and says nothing about the resume host.
+		//
+		// What the far end said decides which budget the failure lands on, and
+		// classifyDialFailure is the single place that reads it: a non-nil resp
+		// is the host answering and refusing the upgrade (the incident's 503),
+		// a nil one is nothing replying at all, and a 429 is an answer that
+		// says nothing about this edge. See noteDialFailure.
+		if c.ctx.Err() == nil {
+			c.s.noteDialFailure(usedResumeURL, classifyDialFailure(resp))
+		}
 		return xerrors.Errorf("dial gateway: %w", err)
 	}
+	c.s.noteDialSuccess()
 	c.wsConn = ws
 	c.wsConn.SetReadLimit(512 << 20)
 
@@ -380,6 +461,12 @@ func (c *conn) run(parent context.Context) error {
 		}
 
 	}
+
+	// The connection stops being usable here, not when run returns: everything
+	// below (and the deferred persistShardInfo) is teardown, and that teardown
+	// is unbounded. Stamping it now is what keeps the manager's ladder scoring
+	// connected time rather than connected time plus a database stall.
+	c.markDisconnected(time.Now())
 
 	c.setState("close")
 	_ = ws.Close(4000, "")

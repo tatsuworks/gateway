@@ -29,6 +29,9 @@ type Manager struct {
 
 	shardMu sync.Mutex
 	shards  map[int]*gatewayws.Session
+	// wake holds one depth-1 channel per shard, used to interrupt that shard's
+	// reconnect backoff on an explicit management request. Guarded by shardMu.
+	wake map[int]chan struct{}
 
 	rdb  []*redis.Client
 	etcd *clientv3.Client
@@ -125,6 +128,7 @@ func New(ctx context.Context, cfg *Config) *Manager {
 		shardCount: cfg.Shards,
 
 		shards: map[int]*gatewayws.Session{},
+		wake:   map[int]chan struct{}{},
 
 		rdb:  rdbClients,
 		etcd: etcdc,
@@ -175,11 +179,18 @@ func (m *Manager) startShard(shard int) {
 		return
 	}
 
+	wake := make(chan struct{}, 1)
+
 	m.shardMu.Lock()
 	m.shards[shard] = s
+	m.wake[shard] = wake
 	m.shardMu.Unlock()
 
 	go func() {
+		// Consecutive failed connect attempts, driving the reconnect backoff.
+		// Reset by any connection that stays up for reconnectHealthyUptime.
+		var failures int
+
 		for {
 			select {
 			case <-m.ctx.Done():
@@ -188,16 +199,66 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
-			err := s.Open(m.ctx, m.token)
+			start := time.Now()
+			// connected is time spent authenticated, which is what the ladder
+			// scores health on. It is NOT the duration of the attempt: Open also
+			// covers etcd setup and an identify-lock wait of up to 160s, so
+			// scoring on the latter marked any attempt that merely waited out
+			// the lock as healthy and reset the backoff to base — worst of all
+			// during the fleet-wide identify contention the ladder damps. Both
+			// are logged: the gap between them is the pre-connect cost.
+			connected, err := s.Open(m.ctx, m.token)
+			attempt := time.Since(start)
+
+			failures = nextFailureCount(failures, connected, s.TakeResumeDiscarded())
+			delay := reconnectDelay(failures)
+
 			if err != nil {
 				// if !xerrors.Is(err, context.Canceled) {
-				m.log.Error(m.ctx, "websocket closed", slog.F("shard", shard), slog.Error(err))
+				m.log.Error(m.ctx, "websocket closed",
+					slog.F("shard", shard),
+					slog.F("connected_for", connected),
+					slog.F("attempt_took", attempt),
+					slog.F("consecutive_failures", failures),
+					slog.F("retry_in", delay),
+					slog.Error(err))
 				// }
 			}
 
-			time.Sleep(time.Second)
+			ok, woken := waitBeforeReconnect(m.ctx, wake, delay)
+			if !ok {
+				return
+			}
+			if woken {
+				// An operator asked for this reconnect, so give them the prompt
+				// first attempt rather than an escalated delay -- and do not let
+				// their own cancellation of a short-lived connection, counted as
+				// a failure just above, escalate the ladder.
+				m.log.Info(m.ctx, "reconnect wait interrupted by management request", slog.F("shard", shard))
+				failures = 0
+			}
 		}
 	}()
+}
+
+// wakeShard nudges a shard's reconnect loop to attempt now instead of waiting
+// out its backoff. Open clears Session.cur on return, so Session.Cancel is a
+// no-op for the whole of that wait; without this a RestartShard would report
+// success and do nothing for up to a full backoff interval.
+//
+// Non-blocking so the gRPC handler can never stall, and depth-1 buffered so
+// signals coalesce and one sent while the loop is not waiting is held for its
+// next wait rather than lost. An unknown shard is a no-op: a send on a nil
+// channel blocks, so the default arm is taken.
+func (m *Manager) wakeShard(shard int) {
+	m.shardMu.Lock()
+	ch := m.wake[shard]
+	m.shardMu.Unlock()
+
+	select {
+	case ch <- struct{}{}:
+	default:
+	}
 }
 
 const ManagerLogInterval = 5 * time.Minute

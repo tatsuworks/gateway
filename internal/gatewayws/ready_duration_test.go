@@ -39,3 +39,52 @@ func TestReadyForMeasuresFromTheReadyMilestone(t *testing.T) {
 		t.Fatalf("readyFor() = %v, want 90s measured from the ready milestone", got)
 	}
 }
+
+// Connected uptime must stop at the disconnect, not at run's return. run defers
+// persistShardInfo, which writes to Postgres on context.Background() with NO
+// deadline, so teardown can outlast the connection by an unbounded amount. If
+// that stall counted as uptime, a connection that lasted seconds would clear
+// reconnectHealthyUptime and reset the manager's backoff ladder — during a
+// database stall, which is exactly when it should be escalating — and the
+// curated `connected_for` incident log line would report the stall as uptime.
+func TestConnectedUptimeExcludesTeardown(t *testing.T) {
+	db := &shardInfoRecorder{}
+	_, c := newResumableSession(t, db)
+
+	ready := time.Now()
+	c.markReady(ready)
+	// The websocket read loop fails five seconds in: an unhealthy connection.
+	c.markDisconnected(ready.Add(5 * time.Second))
+
+	// Teardown then stalls for minutes on the unbounded shard-info write.
+	if got := c.readyFor(ready.Add(10 * time.Minute)); got != 5*time.Second {
+		t.Fatalf("readyFor() = %v, want 5s — teardown time is not connected uptime", got)
+	}
+}
+
+// A connection still running has no disconnect stamp, so uptime is measured to
+// the caller's clock as before.
+func TestConnectedUptimeRunsToNowWhileStillConnected(t *testing.T) {
+	db := &shardInfoRecorder{}
+	_, c := newResumableSession(t, db)
+
+	ready := time.Now()
+	c.markReady(ready)
+
+	if got := c.readyFor(ready.Add(90 * time.Second)); got != 90*time.Second {
+		t.Fatalf("readyFor() = %v, want 90s for a live connection", got)
+	}
+}
+
+// A connection that dropped before ever authenticating reports 0 however long
+// its teardown took, so the ladder escalates rather than resetting.
+func TestNeverAuthenticatedReportsZeroDespiteDisconnectStamp(t *testing.T) {
+	db := &shardInfoRecorder{}
+	_, c := newResumableSession(t, db)
+
+	c.markDisconnected(time.Now())
+
+	if got := c.readyFor(time.Now().Add(3 * time.Minute)); got != 0 {
+		t.Fatalf("readyFor() = %v for a connection that never reached READY, want 0", got)
+	}
+}

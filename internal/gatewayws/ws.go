@@ -462,6 +462,12 @@ func (c *conn) run(parent context.Context) error {
 
 	}
 
+	// The connection stops being usable here, not when run returns: everything
+	// below (and the deferred persistShardInfo) is teardown, and that teardown
+	// is unbounded. Stamping it now is what keeps the manager's ladder scoring
+	// connected time rather than connected time plus a database stall.
+	c.markDisconnected(time.Now())
+
 	c.setState("close")
 	_ = ws.Close(4000, "")
 	c.s.log.Info(c.ctx, "closed")

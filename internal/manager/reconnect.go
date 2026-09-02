@@ -72,6 +72,28 @@ func nextFailureCount(failures int, connected time.Duration, resumeDiscarded boo
 	return failures + 1
 }
 
+// drainWake discards a wake token that was buffered outside any wait, so a
+// signal only ever cuts short the interval it was meant for.
+//
+// wakeShard's channel is depth-1 and buffered on purpose: a signal sent while
+// the loop is not waiting is held rather than lost. That is right for the window
+// between waits, but it also means a RestartShard landing after a wait returns
+// and before Open republishes Session.cur leaves a token behind that nothing
+// consumed — Cancel was a no-op there too. If the connection that follows is
+// healthy and runs for hours, the token outlives it: the next unrelated drop
+// skips its backoff, resets the failure ladder, and logs a management request
+// nobody made. Draining immediately before the connect attempt confines the
+// token to the wait it was sent for.
+//
+// Non-blocking, and a no-op on the nil channel an unknown shard presents, since
+// it runs on every connect attempt.
+func drainWake(wake <-chan struct{}) {
+	select {
+	case <-wake:
+	default:
+	}
+}
+
 // waitBeforeReconnect waits out the backoff before the next connect attempt.
 //
 // ok is false only when ctx was cancelled, so the caller stops instead of

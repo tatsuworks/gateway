@@ -61,13 +61,17 @@ type Session struct {
 	last      int64 // event-rate baseline; accessed atomically (logTotalEvents goroutine)
 
 	// resumeDialFailures counts consecutive dial-stage failures against
-	// resumeURL that the host answered and refused. resumeNoResponseSince is
-	// when the current unbroken run of dials it never answered began (zero if
-	// there is no run in progress) — that one is bounded by elapsed time, not by
-	// a count, because the evidence is much weaker. See noteDialFailure in
-	// resume.go. Read-loop-goroutine-owned, like sessID/resumeURL.
-	resumeDialFailures    int
-	resumeNoResponseSince time.Time
+	// resumeURL that the host answered and refused, and resumeDialFailuresSince
+	// is when that run began — a discard needs both a count and an elapsed span,
+	// because the count alone is spent in seconds at the base of the reconnect
+	// ladder. resumeNoResponseSince is when the current unbroken run of dials the
+	// host never answered began (zero if there is no run in progress) — that one
+	// is bounded by elapsed time only, because the evidence is much weaker. All
+	// three are zeroed by any successful dial. See noteDialFailure in resume.go.
+	// Read-loop-goroutine-owned, like sessID/resumeURL.
+	resumeDialFailures      int
+	resumeDialFailuresSince time.Time
+	resumeNoResponseSince   time.Time
 
 	// resumeDiscarded is set when noteDialFailure throws the resume tuple away
 	// and consumed by the manager's reconnect loop via TakeResumeDiscarded.
@@ -374,12 +378,13 @@ func (c *conn) run(parent context.Context) error {
 		// A cancelled connection context is our own teardown (shutdown, Cancel,
 		// ForceIdentify) and says nothing about the resume host.
 		//
-		// resp is non-nil only when the host answered and refused the upgrade
-		// (the incident's 503); websocket.Dial reports a nil response for every
-		// failure where nothing replied. See noteDialFailure for why those must
-		// not consume the strike budget.
+		// What the far end said decides which budget the failure lands on, and
+		// classifyDialFailure is the single place that reads it: a non-nil resp
+		// is the host answering and refusing the upgrade (the incident's 503),
+		// a nil one is nothing replying at all, and a 429 is an answer that
+		// says nothing about this edge. See noteDialFailure.
 		if c.ctx.Err() == nil {
-			c.s.noteDialFailure(usedResumeURL, resp != nil)
+			c.s.noteDialFailure(usedResumeURL, classifyDialFailure(resp))
 		}
 		return xerrors.Errorf("dial gateway: %w", err)
 	}

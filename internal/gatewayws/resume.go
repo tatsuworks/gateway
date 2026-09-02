@@ -2,15 +2,17 @@ package gatewayws
 
 import (
 	"context"
+	"net/http"
 	"sync/atomic"
 	"time"
 
 	"cdr.dev/slog"
 )
 
-// MaxResumeDialFailures is how many consecutive dial-stage failures against the
-// persisted resume_gateway_url are tolerated before the resume tuple is thrown
-// away and the shard falls back to the main gateway URL.
+// MaxResumeDialFailures is how many consecutive dial-stage refusals from the
+// persisted resume_gateway_url are needed before the resume tuple is thrown away
+// and the shard falls back to the main gateway URL. It is one of two conditions:
+// see MinResumeDialFailureSpan for the other.
 //
 // A resume URL points at one specific Discord edge. When that edge stops
 // serving the shard the failure lands on the WebSocket *handshake* (503) —
@@ -25,6 +27,56 @@ import (
 // holding a dead one (a permanently down shard).
 const MaxResumeDialFailures = 3
 
+// MinResumeDialFailureSpan is how long a run of refusals must have been going
+// on before it may discard the tuple. Both this and MaxResumeDialFailures must
+// be satisfied.
+//
+// The count alone is not a safe trigger, because the reconnect ladder decides
+// how fast it is spent: at reconnectBackoffBase the three strikes land at
+// roughly t=0, t≈2s and t≈6s. That made any shared failure lasting more than
+// about seven seconds — one bad Cloudflare minute in front of every edge at
+// once, or a 429 wave — enough to discard the tuple of every shard holding one,
+// simultaneously.
+//
+// The asymmetry is what makes that unacceptable rather than merely untidy. A
+// blip the shards ride out costs nothing: they redial and RESUME. A fleet-wide
+// discard costs a serialized re-IDENTIFY through the 16 shardID%16 identify
+// buckets, each held for calcIdentifyWait past READY, plus a full guild backfill
+// per shard — minutes at best, the better part of an hour with the members
+// intent — and that identify burst can itself draw the 429s that discard more
+// tuples.
+//
+// On the number. It is deliberately NOT sized to outlast a shared outage: how
+// long an all-edge 5xx can last is not derivable from this repo, and a floor
+// long enough to cover the worst case would delay escape from a genuinely
+// retired edge by that same worst case. It is sized instead to the window in
+// which a RESUME would still have been honoured, which is the only interval
+// where discarding costs anything real:
+//
+//   - Inside it, the tuple still works, so a discard destroys a cheap recovery
+//     and buys a gated re-IDENTIFY. This must not happen for a transient.
+//   - Beyond it, Discord answers the RESUME with INVALID_SESSION, which clears
+//     the tuple anyway (see the op-9 branch in handleInternalEvent) — so
+//     discarding pre-empts a re-IDENTIFY that was already coming rather than
+//     causing one, and the floor buys nothing further.
+//
+// Discord does not document that window; it is short, minutes rather than
+// hours, so this sits at the upper end of plausible. Like
+// MaxResumeNoResponseDuration the figure is reasoned rather than measured, and
+// the error is again one-sided in the direction that matters: too long merely
+// delays an escape that before this branch never happened at all.
+//
+// The cost, stated plainly: escape from a retired edge goes from ~8s (measured
+// on staging) to ~3min. Against never, which is what the incident actually did.
+//
+// One consequence worth knowing during an incident: this clock lives in memory,
+// like the counter it guards, so a pod restart restarts it. Three seconds of
+// strikes always survived any pod that lived longer than three seconds; a
+// three-minute span does not survive a pod crash-looping faster than that. A
+// gateway pod in that state is a larger problem than this, and TATSU-2516 is
+// the net for it.
+const MinResumeDialFailureSpan = 3 * time.Minute
+
 // MaxResumeNoResponseDuration is how long the resume host may go without
 // answering a dial at all — DNS, TLS, a refused connection, our own egress being
 // down — before the tuple is discarded anyway.
@@ -35,28 +87,29 @@ const MaxResumeDialFailures = 3
 // cleared by INVALID_SESSION (which needs a connection we cannot get), a manual
 // ForceIdentify, or this file, so nothing would recover it but an operator.
 //
-// The asymmetry with MaxResumeDialFailures is the whole point. An answered
+// The asymmetry with the refusal budget above is the whole point. An answered
 // rejection is the host telling us it will not serve this session — strong,
-// host-specific evidence, so 3 is enough. An unanswered dial is ambiguous: one
-// dead edge and a fleet-wide egress outage look identical from here. So this
-// budget must not fire while the tuple is merely suspicious, only once holding
-// it has become pointless.
+// host-specific evidence, so a few of them over a few minutes is enough. An
+// unanswered dial is ambiguous: one dead edge and a fleet-wide egress outage
+// look identical from here. So this budget must not fire while the tuple is
+// merely suspicious, only once holding it has become pointless.
 //
 // An hour is chosen for safety, not detection speed. A Discord session does not
 // survive that long disconnected: the RESUME would draw INVALID_SESSION, which
-// clears the tuple anyway (see the op-9 branch in handleInternalEvent), so
-// firing here pre-empts a re-IDENTIFY that was already coming rather than
-// causing one. And escaping a genuinely dead edge in an hour is
-// indistinguishable from escaping it in fifteen minutes when the alternative is
-// never. Note the retention figure is reasoned, not measured — but the error is
-// one-sided: too long merely delays an escape that previously never happened,
-// while too short is what mass-invalidates during a shared outage.
+// clears the tuple anyway, so firing here pre-empts a re-IDENTIFY that was
+// already coming rather than causing one. And escaping a genuinely dead edge in
+// an hour is indistinguishable from escaping it in fifteen minutes when the
+// alternative is never. Note the retention figure is reasoned, not measured —
+// but the error is one-sided: too long merely delays an escape that previously
+// never happened, while too short is what mass-invalidates during a shared
+// outage.
 //
 // This is deliberately a DURATION rather than a failure count. Elapsed time is
 // what actually makes discarding safe; a count only approximates it through
 // whatever the reconnect ladder happens to be, so retuning the ladder would
 // silently change what the threshold means while its justification still read
-// the same.
+// the same. MinResumeDialFailureSpan exists because the refusal budget had that
+// same defect.
 //
 // Worst case is bounded by more than the threshold: a shard holding a resume
 // tuple skips the identify lock, so discarding moves it back into the gated
@@ -65,6 +118,54 @@ const MaxResumeDialFailures = 3
 // bursting at Discord.
 const MaxResumeNoResponseDuration = time.Hour
 
+// dialFailureKind is what the far end said when a dial against the resume host
+// failed. The three carry very different evidence about that host, so they are
+// classified once, at the dial site, and drive different budgets.
+type dialFailureKind int
+
+const (
+	// dialUnanswered: nothing replied. websocket.Dial returns a nil
+	// *http.Response for every failure where HTTPClient.Do itself failed — DNS,
+	// TLS, a refused connection, our own egress being down, our own per-dial
+	// deadline. One dead edge and a fleet-wide outage are indistinguishable from
+	// here.
+	dialUnanswered dialFailureKind = iota
+	// dialRefused: the host answered and refused the upgrade — a non-101 status
+	// erroring out of verifyServerResponse with the response non-nil. This is
+	// the incident's 503 and what a retired edge does.
+	dialRefused
+	// dialThrottled: the host answered 429. An answer, but the one answer that
+	// is never host-specific. See noteDialFailureAt.
+	dialThrottled
+)
+
+func (k dialFailureKind) String() string {
+	switch k {
+	case dialRefused:
+		return "refused"
+	case dialThrottled:
+		return "throttled"
+	default:
+		return "unanswered"
+	}
+}
+
+// classifyDialFailure reads the response websocket.Dial returned alongside its
+// error. It is the single discriminator the whole resume-invalidation policy
+// rests on, so it lives here next to the policy rather than inline at the call
+// site, and is tested against a real answered rejection (see
+// dial_classification_test.go) rather than only through hand-chosen values.
+func classifyDialFailure(resp *http.Response) dialFailureKind {
+	switch {
+	case resp == nil:
+		return dialUnanswered
+	case resp.StatusCode == http.StatusTooManyRequests:
+		return dialThrottled
+	default:
+		return dialRefused
+	}
+}
+
 // usingResumeURL reports whether the next dial will target the persisted resume
 // URL rather than the main gateway URL. It is the same condition GatewayURL
 // branches on, so a dial failure can be attributed to the resume host.
@@ -72,90 +173,118 @@ func (s *Session) usingResumeURL() bool {
 	return s.resumeURL != "" && s.sessID != ""
 }
 
-// noteDialSuccess clears the consecutive dial-failure count. Only failures in a
-// row mean anything: an isolated blip must not accumulate across hours of
-// healthy reconnects into a spurious invalidation.
+// noteDialSuccess clears every suspicion held against the resume host: the
+// refusal count and both elapsed-time clocks. The host is serving us again, so
+// nothing earned before now says anything about it — and only failures in a row
+// mean anything, or isolated blips would accumulate across hours of healthy
+// reconnects into a spurious invalidation.
 //
 // Read-loop goroutine only (it is called from conn.run).
 func (s *Session) noteDialSuccess() {
 	s.resumeDialFailures = 0
+	s.resumeDialFailuresSince = time.Time{}
 	s.resumeNoResponseSince = time.Time{}
 }
 
-// noteDialFailure records a failed dial. On reaching MaxResumeDialFailures the
-// resume tuple is cleared in memory and persisted cleared, so both the next
-// dial and any later pod restart use the main gateway URL. This is the
-// automatic trigger for what ForceIdentify already does by hand.
+// noteDialFailure records a failed dial. When a budget is exhausted the resume
+// tuple is cleared in memory and persisted cleared, so both the next dial and
+// any later pod restart use the main gateway URL. This is the automatic trigger
+// for what ForceIdentify already does by hand.
 //
 // Only failures against the resume host count at all: usedResumeURL false means
 // the dial targeted the main gateway URL, which has no resume state to blame or
 // discard.
 //
-// hostResponded splits the rest into two independent budgets, because the two
-// carry very different evidence:
+// kind splits the rest into two independent budgets and one exemption:
 //
-//   - Answered (hostResponded, i.e. websocket.Dial returned a non-nil
-//     *http.Response): the host replied and refused the upgrade, which is what
-//     a retired edge does — the incident's 503. Host-specific and conclusive,
-//     so MaxResumeDialFailures is small.
-//   - Unanswered: websocket.Dial returns a nil response for every failure where
-//     nothing replied — DNS, TLS, a refused connection, our own egress being
-//     down. One dead edge and a fleet-wide outage are indistinguishable from
-//     here, so spending a strike on these would let a shared outage lasting
-//     three attempts clear valid resume tuples across the whole fleet. They are
-//     bounded by elapsed time instead (MaxResumeNoResponseDuration): long
-//     enough that the tuple is worthless by the time it fires, but still finite,
-//     so a decommissioned edge that stopped resolving cannot trap the shard
-//     forever.
+//   - dialRefused — the host replied and refused the upgrade, which is what a
+//     retired edge does. Host-specific, so the budget is small: it needs
+//     MaxResumeDialFailures refusals AND MinResumeDialFailureSpan elapsed since
+//     the first of them. Both, because the count alone is spent in seconds at
+//     the base of the reconnect ladder, which would let a brief shared 5xx
+//     discard the tuple of every shard at once.
+//   - dialUnanswered — nothing replied, so the failure is ambiguous between one
+//     dead edge and a fleet-wide outage. Bounded by elapsed time only
+//     (MaxResumeNoResponseDuration): long enough that the tuple is worthless by
+//     the time it fires, but still finite, so a decommissioned edge that stopped
+//     resolving cannot trap the shard forever.
+//   - dialThrottled — the host answered 429. Never counted, and never a discard
+//     on its own budget. 429 does not mean "this edge retired", it means "come
+//     back later", and it is precisely what a mass re-IDENTIFY draws: letting it
+//     spend the refusal budget closes a feedback loop where discards cause an
+//     identify burst, the burst draws 429s, and those 429s discard more tuples.
+//     It cannot be answered by discarding either — IDENTIFY is the rate-limited
+//     operation, and a shard holding a resume tuple skips the identify lock
+//     entirely (see the shouldResume branch in conn.run), so discarding under a
+//     429 strictly worsens the shard's odds. Being unbounded here is therefore
+//     correct rather than a gap: a host that answers at all is not the
+//     vanished-edge case MaxResumeNoResponseDuration exists for.
 //
-// The two bounds are independent and neither clears the other, so a host that
+// The budgets are independent and none of them clears another, so a host that
 // alternates between refusing the upgrade and not answering still escapes, and
-// a transport blip landing mid-run of 503s cannot reset that escape. Only a
-// successful dial clears both.
+// neither a transport blip nor a 429 landing mid-run of 503s can reset an escape
+// already earned from the host itself. Only a successful dial clears anything.
 //
 // Read-loop goroutine only: it mutates seq/sessID/resumeURL, which are owned by
 // that goroutine (see applyForceIdentify).
-func (s *Session) noteDialFailure(usedResumeURL, hostResponded bool) {
-	s.noteDialFailureAt(time.Now(), usedResumeURL, hostResponded)
+func (s *Session) noteDialFailure(usedResumeURL bool, kind dialFailureKind) {
+	s.noteDialFailureAt(time.Now(), usedResumeURL, kind)
 }
 
-// noteDialFailureAt is noteDialFailure with the clock injected, so the
-// no-response window can be tested without waiting out a real hour.
-func (s *Session) noteDialFailureAt(now time.Time, usedResumeURL, hostResponded bool) {
+// noteDialFailureAt is noteDialFailure with the clock injected, so the two
+// elapsed-time bounds can be tested without waiting out a real hour.
+func (s *Session) noteDialFailureAt(now time.Time, usedResumeURL bool, kind dialFailureKind) {
 	if !usedResumeURL {
 		return
 	}
 
-	if hostResponded {
+	switch kind {
+	case dialThrottled:
+		// Ignored, not forgiving: it neither spends a budget nor clears one.
+		return
+
+	case dialRefused:
 		s.resumeDialFailures++
-		if s.resumeDialFailures >= MaxResumeDialFailures {
-			// Warn, not Info: an edge refusing us three times running is worth
+		if s.resumeDialFailuresSince.IsZero() {
+			// Stamped on the first REFUSAL, not on the first failure of any
+			// kind: otherwise a shared outage that begins as unanswered dials
+			// pre-ages this clock, and the moment the far end starts answering
+			// 5xx the fleet discards inside the same few seconds the span is
+			// here to prevent.
+			s.resumeDialFailuresSince = now
+		}
+		refusedFor := now.Sub(s.resumeDialFailuresSince)
+		if s.resumeDialFailures >= MaxResumeDialFailures && refusedFor >= MinResumeDialFailureSpan {
+			// Warn, not Error: an edge refusing us for minutes on end is worth
 			// surfacing, but it is also what an ordinary edge retirement looks
-			// like, so it is not on its own an incident.
+			// like, so it must not cry wolf.
 			s.log.Warn(context.Background(), "resume gateway url unreachable, discarding resume state",
 				slog.F("resume_gateway_url", s.resumeURL),
-				slog.F("consecutive_dial_failures", s.resumeDialFailures))
+				slog.F("consecutive_dial_failures", s.resumeDialFailures),
+				slog.F("refused_for", refusedFor))
 			s.clearResumeState()
 		}
 		return
-	}
 
-	if s.resumeNoResponseSince.IsZero() {
-		s.resumeNoResponseSince = now
-		return
-	}
-	if unreachableFor := now.Sub(s.resumeNoResponseSince); unreachableFor >= MaxResumeNoResponseDuration {
-		// Error, and a distinct message from the answered case. Reaching here
-		// means this shard has failed every dial for MaxResumeNoResponseDuration
-		// with nothing on the other end — i.e. it has been down for about an
-		// hour. That is an incident, and the log level is the only thing that
-		// carries it anywhere: nothing pages on this class of outage today
-		// (TATSU-2516). During an incident it also matters whether the edge
-		// refused us or vanished, since the two have very different blast radii.
-		s.log.Error(context.Background(), "resume gateway url never answered, discarding resume state",
-			slog.F("resume_gateway_url", s.resumeURL),
-			slog.F("unreachable_for", unreachableFor))
-		s.clearResumeState()
+	default: // dialUnanswered
+		if s.resumeNoResponseSince.IsZero() {
+			s.resumeNoResponseSince = now
+			return
+		}
+		if unreachableFor := now.Sub(s.resumeNoResponseSince); unreachableFor >= MaxResumeNoResponseDuration {
+			// Error, and a distinct message from the answered case. Reaching
+			// here means this shard has failed every dial for
+			// MaxResumeNoResponseDuration with nothing on the other end — i.e.
+			// it has been down for about an hour. That is an incident, and the
+			// log level is the only thing that carries it anywhere: nothing
+			// pages on this class of outage today (TATSU-2516). During an
+			// incident it also matters whether the edge refused us or vanished,
+			// since the two have very different blast radii.
+			s.log.Error(context.Background(), "resume gateway url never answered, discarding resume state",
+				slog.F("resume_gateway_url", s.resumeURL),
+				slog.F("unreachable_for", unreachableFor))
+			s.clearResumeState()
+		}
 	}
 }
 
@@ -166,6 +295,7 @@ func (s *Session) noteDialFailureAt(now time.Time, usedResumeURL, hostResponded 
 // Read-loop goroutine only, same ownership as noteDialFailure.
 func (s *Session) clearResumeState() {
 	s.resumeDialFailures = 0
+	s.resumeDialFailuresSince = time.Time{}
 	s.resumeNoResponseSince = time.Time{}
 	atomic.StoreInt32(&s.resumeDiscarded, 1)
 	atomic.StoreInt64(&s.seq, 0)

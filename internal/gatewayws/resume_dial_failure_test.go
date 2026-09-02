@@ -34,6 +34,18 @@ const mainGatewayURL = "wss://gateway.discord.gg/"
 // consecutive dial failures against a resume URL discard the resume tuple, so
 // the next connect falls back to the main gateway URL.
 
+// refuse drives n answered refusals against the resume host, spaced far enough
+// apart that MinResumeDialFailureSpan is satisfied by the second one. Discarding
+// needs a count AND an elapsed span; the span is pinned on its own in
+// resume_shared_outage_test.go, so the tests below hold it satisfied and vary
+// only the count.
+func refuse(s *Session, n int) {
+	start := time.Now()
+	for i := 0; i < n; i++ {
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), true, dialRefused)
+	}
+}
+
 // Below the threshold the resume tuple is still the best guess (a single dial
 // failure is far more likely to be a transient blip than a retired edge), so it
 // must survive untouched and unpersisted.
@@ -41,9 +53,7 @@ func TestResumeDialFailuresBelowThresholdKeepResumeState(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
-	}
+	refuse(s, MaxResumeDialFailures-1)
 
 	if !s.shouldResume() {
 		t.Fatalf("resume state discarded after %d failures; threshold is %d",
@@ -64,9 +74,7 @@ func TestResumeDialFailuresAtThresholdDiscardResumeState(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, c := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeDialFailures; i++ {
-		s.noteDialFailure(true, true)
-	}
+	refuse(s, MaxResumeDialFailures)
 
 	if s.shouldResume() {
 		t.Fatal("session still resumable after the dial-failure threshold")
@@ -95,13 +103,9 @@ func TestDialSuccessResetsResumeDialFailures(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
-	}
+	refuse(s, MaxResumeDialFailures-1)
 	s.noteDialSuccess()
-	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
-	}
+	refuse(s, MaxResumeDialFailures-1)
 
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded; a successful dial must reset the failure counter")
@@ -118,8 +122,9 @@ func TestDialFailuresAgainstMainURLDoNotInvalidate(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures*3; i++ {
-		s.noteDialFailure(false, true)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), false, dialRefused)
 	}
 
 	if !s.shouldResume() {
@@ -136,17 +141,16 @@ func TestResumeDialFailuresResetAfterInvalidation(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	for i := 0; i < MaxResumeDialFailures; i++ {
-		s.noteDialFailure(true, true)
-	}
+	refuse(s, MaxResumeDialFailures)
 	if db.calls != 1 {
 		t.Fatalf("SetShardInfo calls = %d after invalidation, want 1", db.calls)
 	}
 
 	// The tuple is empty now, so subsequent dials use the main URL and report
 	// usedResumeURL=false; nothing further should be persisted.
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures*2; i++ {
-		s.noteDialFailure(false, true)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), false, dialRefused)
 	}
 	if db.calls != 1 {
 		t.Fatalf("SetShardInfo calls = %d, want 1 (no repeat persists of an empty tuple)", db.calls)
@@ -184,14 +188,15 @@ func TestInvalidationFlagsResumeDiscarded(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailure(true, true)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), true, dialRefused)
 	}
 	if s.TakeResumeDiscarded() {
 		t.Fatal("reported a discard below the failure threshold")
 	}
 
-	s.noteDialFailure(true, true)
+	s.noteDialFailureAt(start.Add(MaxResumeDialFailures*MinResumeDialFailureSpan), true, dialRefused)
 	if !s.TakeResumeDiscarded() {
 		t.Fatal("invalidation did not flag the resume tuple as discarded")
 	}
@@ -206,8 +211,9 @@ func TestNoResumeDiscardedWithoutInvalidation(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures*2; i++ {
-		s.noteDialFailure(false, true)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), false, dialRefused)
 	}
 	if s.TakeResumeDiscarded() {
 		t.Fatal("reported a discard for failures that did not use the resume URL")
@@ -246,7 +252,7 @@ func TestDialFailuresWithNoResponseDoNotInvalidate(t *testing.T) {
 	// is how long the host has been unreachable, not how many times we asked.
 	start := time.Now()
 	for i := 0; i < 200; i++ {
-		s.noteDialFailureAt(start.Add(time.Duration(i)*time.Second), true, false)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*time.Second), true, dialUnanswered)
 	}
 
 	if !s.shouldResume() {
@@ -286,8 +292,8 @@ func TestNoResponseInvalidatesOnlyAfterTheFullWindow(t *testing.T) {
 	s.log = slogtest.Make(t, &slogtest.Options{IgnoreErrors: true})
 
 	start := time.Now()
-	s.noteDialFailureAt(start, true, false)
-	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration-time.Second), true, false)
+	s.noteDialFailureAt(start, true, dialUnanswered)
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration-time.Second), true, dialUnanswered)
 
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded one second inside the no-response window")
@@ -296,7 +302,7 @@ func TestNoResponseInvalidatesOnlyAfterTheFullWindow(t *testing.T) {
 		t.Fatalf("persisted shard info inside the window (calls=%d), want 0", db.calls)
 	}
 
-	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, false)
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, dialUnanswered)
 	if s.shouldResume() {
 		t.Fatal("session still resumable after a full window of unanswered dials")
 	}
@@ -319,11 +325,11 @@ func TestSuccessfulDialRestartsTheNoResponseWindow(t *testing.T) {
 	s, _ := newResumableSession(t, db)
 
 	start := time.Now()
-	s.noteDialFailureAt(start, true, false)
+	s.noteDialFailureAt(start, true, dialUnanswered)
 	s.noteDialSuccess()
 
 	// Far past the original window, but the first failure of a fresh run.
-	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration+time.Hour), true, false)
+	s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration+time.Hour), true, dialUnanswered)
 
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded: a successful dial did not restart the no-response window")
@@ -340,16 +346,18 @@ func TestNoResponseFailuresDoNotResetEarnedStrikes(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	now := time.Now()
+	// Spaced so the refusal span is satisfied; the point under test is that the
+	// unanswered dial in the middle does not undo the strikes around it.
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailureAt(now, true, true)
+		s.noteDialFailureAt(start.Add(time.Duration(i)*MinResumeDialFailureSpan), true, dialRefused)
 	}
-	s.noteDialFailureAt(now, true, false)
+	s.noteDialFailureAt(start.Add(MaxResumeDialFailures*MinResumeDialFailureSpan), true, dialUnanswered)
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded early by an unanswered dial")
 	}
 
-	s.noteDialFailureAt(now, true, true)
+	s.noteDialFailureAt(start.Add((MaxResumeDialFailures+1)*MinResumeDialFailureSpan), true, dialRefused)
 	if s.shouldResume() {
 		t.Fatal("session still resumable: an unanswered dial reset the earned strikes")
 	}
@@ -365,17 +373,19 @@ func TestAnsweredAndUnansweredBudgetsAreIndependent(t *testing.T) {
 	db := &shardInfoRecorder{}
 	s, _ := newResumableSession(t, db)
 
-	now := time.Now()
+	start := time.Now()
 	for i := 0; i < MaxResumeDialFailures-1; i++ {
-		s.noteDialFailureAt(now, true, true)
-		s.noteDialFailureAt(now, true, false)
+		at := start.Add(time.Duration(i) * MinResumeDialFailureSpan)
+		s.noteDialFailureAt(at, true, dialRefused)
+		s.noteDialFailureAt(at, true, dialUnanswered)
 	}
 	if !s.shouldResume() {
 		t.Fatal("resume state discarded below both thresholds")
 	}
 
-	// The answered budget is the one that fills first here.
-	s.noteDialFailureAt(now, true, true)
+	// The answered budget is the one that fills first here: its span is minutes,
+	// the unanswered one's is an hour.
+	s.noteDialFailureAt(start.Add(MaxResumeDialFailures*MinResumeDialFailureSpan), true, dialRefused)
 	if s.shouldResume() {
 		t.Fatal("unanswered dials reset the answered strike count")
 	}
@@ -415,8 +425,8 @@ func TestDiscardLogLevelsCarryTheAlert(t *testing.T) {
 		s.log = slog.Make(sink)
 
 		start := time.Now()
-		s.noteDialFailureAt(start, true, false)
-		s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, false)
+		s.noteDialFailureAt(start, true, dialUnanswered)
+		s.noteDialFailureAt(start.Add(MaxResumeNoResponseDuration), true, dialUnanswered)
 
 		e, ok := sink.find("never answered")
 		if !ok {
@@ -433,9 +443,7 @@ func TestDiscardLogLevelsCarryTheAlert(t *testing.T) {
 		s, _ := newResumableSession(t, db)
 		s.log = slog.Make(sink)
 
-		for i := 0; i < MaxResumeDialFailures; i++ {
-			s.noteDialFailure(true, true)
-		}
+		refuse(s, MaxResumeDialFailures)
 
 		e, ok := sink.find("unreachable, discarding")
 		if !ok {

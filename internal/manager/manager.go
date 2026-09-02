@@ -199,6 +199,10 @@ func (m *Manager) startShard(shard int) {
 			}
 
 			m.log.Info(m.ctx, "attempting shard connect", slog.F("shard", shard))
+			// Discard any wake token buffered outside a wait: Cancel was a
+			// no-op for it too, and left in place it would skip an unrelated
+			// backoff later on. See drainWake.
+			drainWake(wake)
 			start := time.Now()
 			// connected is time spent authenticated, which is what the ladder
 			// scores health on. It is NOT the duration of the attempt: Open also

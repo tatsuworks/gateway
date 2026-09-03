@@ -13,7 +13,6 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/etcd-io/etcd/clientv3/concurrency"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
@@ -31,6 +30,11 @@ const (
 	IdentifyWaitTime      = 10 * time.Second
 	IdentifyStabilizeTime = 60 * time.Second
 	TimeoutAllowance      = 10 * time.Second
+
+	// IdentifyLeaseGrantTimeout bounds the etcd lease grant that precedes an
+	// IDENTIFY. Generous for one RPC to an in-cluster etcd, but finite: see
+	// initEtcd for why this deadline must not reach the session itself.
+	IdentifyLeaseGrantTimeout = 10 * time.Second
 )
 
 var skipMemberRequest = os.Getenv("SKIP_MEMBER_REQUEST") == "true"
@@ -219,10 +223,42 @@ func (s *Session) calcIdentifyWait() time.Duration {
 	return totalWaitTime
 }
 
+// initEtcd prepares this connection's hold on the cross-shard identify lock.
+// Only the IDENTIFY path calls it: RESUME is exempt from Discord's
+// max_concurrency, so a resuming connection needs neither the lock nor the etcd
+// session behind it — see conn.run.
+//
+// The lease grant is bounded and the session is not, and that split is
+// deliberate. concurrency.NewSession derives its lease-keepalive goroutine from
+// the context handed to WithContext, so giving it a deadline context would stop
+// the keepalive when that deadline expired and let the lease — and with it this
+// shard's hold on the identify lock — lapse mid-hold while the shard still
+// believed it held the lock, admitting a second identify into the bucket. So the
+// lease is granted here under its own deadline and handed to NewSession, which
+// skips its own Grant when given one, while the session keeps the
+// connection-scoped context that should actually end the keepalive.
+//
+// The bound matters because this Grant was the last unbounded blocking call on
+// the connect path: clientv3 retries against an unreachable cluster with
+// WaitForReady, so an etcd outage parked the shard here indefinitely — before
+// any Discord dial, with nothing logged between "attempting shard connect" and
+// silence. Bounded, it falls into the manager's reconnect ladder like any other
+// connect failure.
 func (c *conn) initEtcd() error {
 	timeoutDuration := c.s.calcIdentifyWait() + TimeoutAllowance
 
-	sess, err := concurrency.NewSession(c.s.etcd, concurrency.WithContext(c.ctx), concurrency.WithTTL(int(timeoutDuration.Seconds())))
+	grantCtx, cancel := context.WithTimeout(c.ctx, IdentifyLeaseGrantTimeout)
+	defer cancel()
+
+	lease, err := c.s.etcd.Grant(grantCtx, int64(timeoutDuration.Seconds()))
+	if err != nil {
+		return xerrors.Errorf("grant etcd lease: %w", err)
+	}
+
+	sess, err := concurrency.NewSession(c.s.etcd,
+		concurrency.WithContext(c.ctx),
+		concurrency.WithLease(clientv3.LeaseID(lease.ID)),
+	)
 	if err != nil {
 		return xerrors.Errorf("get etcd session: %w", err)
 	}
@@ -341,17 +377,28 @@ func (c *conn) run(parent context.Context) error {
 	// forced shard discards its resume tuple and IDENTIFYs this connect.
 	c.s.applyForceIdentify()
 
-	var err error
-	err = c.initEtcd()
-	if err != nil {
-		return err
-	}
-
-	// only acquire the identify lock if we know we won't send a resume
+	// Only the IDENTIFY path touches etcd — both the lock and the session behind
+	// it. Discord's max_concurrency gates IDENTIFY only; RESUME is exempt, so a
+	// resuming shard has never needed the lock, and creating its etcd session
+	// here rather than unconditionally is what stops it needing etcd at all.
+	//
+	// That is the difference between a degraded etcd costing a few reconnects and
+	// costing the fleet: the single-replica etcd-gateway pod is evicted by any
+	// node drain, and the gateway pods being drained alongside it are precisely
+	// the ones reconnecting at that moment. Every one of them holds a valid
+	// resume tuple and, before this, blocked on etcd anyway.
+	//
+	// Safe because a connection's resume-vs-identify decision is made once, here,
+	// and never changes within its lifetime: applyForceIdentify has already run
+	// just above, and a resume that Discord rejects returns op 9, which tears the
+	// connection down. The *next* Open re-decides with shouldResume() false and
+	// takes this branch itself.
 	if !c.s.shouldResume() {
 		c.s.log.Debug(c.ctx, "acquiring lock, no ability to resume")
-		err = c.acquireIdentifyLock()
-		if err != nil {
+		if err := c.initEtcd(); err != nil {
+			return err
+		}
+		if err := c.acquireIdentifyLock(); err != nil {
 			return xerrors.Errorf("grab identify lock: %w", err)
 		}
 		c.s.log.Debug(c.ctx, "lock acquired")
@@ -526,11 +573,12 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 		c.s.resumeURL = ""
 		c.s.persistShardInfo()
 
-		if c.identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL {
-			err := c.releaseIdentifyLock()
-			if err != nil {
-				c.s.log.Error(c.ctx, "release held identify lock after invalid session", slog.Error(err))
-			}
+		// Reached on a RESUMEing connection too — op 9 is how a resume whose
+		// session Discord has already expired fails — and such a connection holds
+		// no lock and no etcd session at all. releaseIdentifyLockIfHeld is what
+		// makes that safe; it is not merely defensive.
+		if err := c.releaseIdentifyLockIfHeld(); err != nil {
+			c.s.log.Error(c.ctx, "release held identify lock after invalid session", slog.Error(err))
 		}
 
 		return true, xerrors.New("invalid session")
@@ -590,7 +638,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 		go func() {
 			totalWaitTime := c.s.calcIdentifyWait()
 			time.Sleep(totalWaitTime)
-			if err := c.releaseIdentifyLock(); err != nil {
+			if err := c.releaseIdentifyLockIfHeld(); err != nil {
 				c.s.log.Error(c.ctx, "release identify lock after ready", slog.Error(err))
 			}
 		}()
@@ -620,22 +668,56 @@ func (c *conn) acquireIdentifyLock() error {
 	return nil
 }
 
-func (c *conn) releaseIdentifyLock() error {
-	c.s.log.Info(c.ctx, "release identify lock", slog.F("key", c.identifyMu.Key()))
-	if c.identifyMu.Key() != "" {
-		// Unlock on a fresh background context, NOT c.ctx. The post-READY release
-		// runs only after the rate-limit hold (calcIdentifyWait, up to ~70s), by
-		// which point a reconnecting shard's c.ctx is already cancelled; the
-		// INVALID_SESSION release runs mid-teardown for the same reason. The
-		// pre-refactor code unlocked with the durable Session context — c.ctx here
-		// fails the Unlock with "context canceled" and leaks the cross-shard
-		// identify lock until its lease TTL. The etcd client is Session-durable, so
-		// a background context completes the key delete regardless of conn state.
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := c.identifyMu.Unlock(ctx); err != nil {
-			return xerrors.Errorf("release identify lock: %w", err)
-		}
+// identifyLockHeld reports whether key names a lock the connection actually
+// holds. Both sentinels mean "nothing held": concurrency.NewMutex initialises
+// myKey to "", and Mutex.Unlock sets it to "\x00" once the lock has been
+// dropped — the state op 9 finds when it arrives after the post-READY release
+// goroutine has already run. Unlocking on either issues a pointless Delete
+// against etcd.
+func identifyLockHeld(key string) bool {
+	return key != "" && key != "\x00"
+}
+
+// releaseIdentifyLockIfHeld drops the cross-shard identify lock, if this
+// connection ever took it.
+//
+// The nil check is load-bearing, not defensive: a connection that RESUMEs never
+// calls initEtcd (see conn.run), so it has no etcd session and no mutex at all,
+// and INVALID_SESSION — the ordinary way a resume fails — is handled on exactly
+// such a connection.
+//
+// This replaced `identifyMu.IsOwner().Result == etcdserverpb.Compare_EQUAL`,
+// which reads like an ownership test and is not one: IsOwner builds a
+// clientv3.Cmp to be evaluated *inside* a Txn, and clientv3.Compare sets
+// .Result straight from the operator string, so `== Compare_EQUAL` was true for
+// every mutex, held or not. The key check was always the thing doing the work —
+// see TestIsOwnerIsNotAnOwnershipCheck.
+//
+// The log line moved inside the guard for the same reason: emitted before it,
+// every op 9 on a resuming shard logged a lock release that never happened,
+// which is precisely the wrong thing to read during an identify storm.
+func (c *conn) releaseIdentifyLockIfHeld() error {
+	if c.identifyMu == nil {
+		return nil
+	}
+	key := c.identifyMu.Key()
+	if !identifyLockHeld(key) {
+		return nil
+	}
+
+	c.s.log.Info(c.ctx, "release identify lock", slog.F("key", key))
+	// Unlock on a fresh background context, NOT c.ctx. The post-READY release
+	// runs only after the rate-limit hold (calcIdentifyWait, up to ~70s), by
+	// which point a reconnecting shard's c.ctx is already cancelled; the
+	// INVALID_SESSION release runs mid-teardown for the same reason. The
+	// pre-refactor code unlocked with the durable Session context — c.ctx here
+	// fails the Unlock with "context canceled" and leaks the cross-shard
+	// identify lock until its lease TTL. The etcd client is Session-durable, so
+	// a background context completes the key delete regardless of conn state.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := c.identifyMu.Unlock(ctx); err != nil {
+		return xerrors.Errorf("release identify lock: %w", err)
 	}
 	return nil
 }

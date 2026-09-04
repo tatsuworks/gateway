@@ -251,7 +251,7 @@ func (c *conn) requestGuildMembers(guild int64) {
 	// IDENTIFY (which replays GUILD_CREATE); a RESUME does not replay it, so a
 	// guild dropped here stays un-backfilled until the next full IDENTIFY or a
 	// manual RequestGuildMembers. (A background staleness sweep was designed to
-	// cover this gap but is currently deferred/unbuilt — see feature_list.json.)
+	// cover this gap but is currently deferred/unbuilt.)
 	if c.ctx.Err() != nil {
 		c.s.log.Info(c.ctx, "drop guild member backfill: connection closed", slog.F("guild", guild))
 		return

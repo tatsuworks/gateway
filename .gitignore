@@ -13,3 +13,9 @@ logs.txt
 build/bin
 docker-secret.yaml
 target/
+
+# Per-branch handoffs are ephemeral working state, not history.
+# Real handoffs stay local; the _template.md seed is committed so the
+# convention travels with the repo.
+handoffs/*
+!handoffs/_template.md

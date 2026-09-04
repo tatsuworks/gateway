@@ -7,8 +7,8 @@
 Before writing code in this repo:
 
 1. Run `pwd` and confirm you are inside the `gateway` clone (i.e. `<agent-workspace-root>/repos/gateway`).
-2. Read `agent-progress.md` here for the latest verified state and next step.
-3. Read `feature_list.json` here and choose the highest-priority unfinished feature.
+2. Read your branch handoff at `handoffs/<branch-slug>.md` for the latest verified state and next step (slug = `git branch --show-current | tr '/' '-'`, falling back to `detached-$(git rev-parse --short HEAD)` when that is empty on a detached checkout; copy `handoffs/_template.md` if it doesn't exist yet).
+3. Read the Linear ticket for the work you are picking up — it is the durable record of what is in flight, its done criteria, and its verification evidence.
 4. Review recent commits: `git log --oneline -5`.
 5. Run `./init.sh`.
 6. Run the required smoke or end-to-end verification before starting new work.
@@ -22,14 +22,15 @@ If baseline verification is already failing, fix that first. Do not stack new fe
 - Keep changes within the selected feature scope unless a blocker forces a narrow supporting fix.
 - Do not silently change verification rules during implementation.
 - Prefer durable repo artifacts over chat summaries.
+- Handoffs are working state, not history: `handoffs/*` is gitignored (only `_template.md` is committed), so nothing written there reaches a PR or `master`. Graduate anything durable before the branch ends — see Definition Of Done.
 - This repo is a plain clone inside the workspace — tracked in its `repos.txt` manifest, **not** a submodule. Commit harness changes here and push them through this repo's own PR route; the workspace records no commit SHA, so there is no parent pointer to bump.
 
 ## Required Harness Artifacts
 
-- `feature_list.json`
-- `agent-progress.md`
-- `init.sh`
-- `session-handoff.md` (optional)
+- `handoffs/<branch-slug>.md` — per-branch session log and current verified status; gitignored working state (copy from `handoffs/_template.md`)
+- `init.sh` — standard startup and verification path
+
+Durable status, done criteria, and verification evidence live on the **Linear ticket**, not in a committed file in this repo. See [the workspace decision log](../../docs/decision_log/retire-workspace-progress-trackers.md).
 
 ## Definition Of Done
 
@@ -37,16 +38,18 @@ A feature is done only when:
 
 - The target behavior is implemented.
 - The required verification actually ran.
-- Evidence is recorded in `feature_list.json` or `agent-progress.md`.
+- Verification evidence is recorded on the Linear ticket and in the PR body. A handoff is gitignored, so evidence left only there is lost with the branch.
+- Anything durable has graduated out of the handoff: decisions → a decision log, system knowledge → `docs/`, process knowledge → this file.
 - The repository remains restartable from `./init.sh`.
 
 ## End Of Session
 
-1. Update `agent-progress.md`.
-2. Update `feature_list.json`.
-3. Record any unresolved risk or blocker.
-4. Commit with a descriptive message once the work is in a safe state.
-5. Leave the repo clean enough for the next session to run `./init.sh` immediately.
+1. Update your branch handoff (`handoffs/<branch-slug>.md`).
+2. Update the Linear ticket with status and verification evidence.
+3. Record any unresolved risk or blocker in the handoff.
+4. Graduate anything durable out of the handoff — it is gitignored and dies with the branch.
+5. Commit with a descriptive message once the work is in a safe state.
+6. Leave the repo clean enough for the next session to run `./init.sh` immediately.
 
 ---
 

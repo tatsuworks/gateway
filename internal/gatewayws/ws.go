@@ -245,9 +245,15 @@ func (s *Session) calcIdentifyWait() time.Duration {
 // silence. Bounded, it falls into the manager's reconnect ladder like any other
 // connect failure.
 func (c *conn) initEtcd() error {
+	return c.initEtcdWithin(IdentifyLeaseGrantTimeout)
+}
+
+// initEtcdWithin is initEtcd with the lease-grant deadline injected, so the
+// bound can be tested without waiting out the production timeout.
+func (c *conn) initEtcdWithin(d time.Duration) error {
 	timeoutDuration := c.s.calcIdentifyWait() + TimeoutAllowance
 
-	grantCtx, cancel := context.WithTimeout(c.ctx, IdentifyLeaseGrantTimeout)
+	grantCtx, cancel := context.WithTimeout(c.ctx, d)
 	defer cancel()
 
 	lease, err := c.s.etcd.Grant(grantCtx, int64(timeoutDuration.Seconds()))

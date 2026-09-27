@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"path"
+	"strings"
 
 	"cdr.dev/slog"
 	"github.com/julienschmidt/httprouter"
@@ -72,20 +73,33 @@ func (s *Server) Init() {
 	s.router.GET(path.Join(base, "guilds", ":guild", "threads"), wrapHandler(s.log, s.getGuildThreads))
 	s.router.GET(path.Join(base, "channels", ":channel", "threads"), wrapHandler(s.log, s.getChannelThreads))
 	s.router.GET(path.Join(base, "threads", ":thread"), wrapHandler(s.log, s.getThread))
-	
+
 	// Added for beta server discord management feature on liveops dashboard
 	s.router.POST(path.Join(base, "guilds", ":guild", "roles"), wrapHandler(s.log, s.setGuildRoles))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","delete"), wrapHandler(s.log, s.deleteGuildRolesById))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles","wipe"), wrapHandler(s.log, s.deleteGuildRoles))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles", "delete"), wrapHandler(s.log, s.deleteGuildRolesById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "roles", "wipe"), wrapHandler(s.log, s.deleteGuildRoles))
 
 	s.router.POST(path.Join(base, "guilds", ":guild", "members"), wrapHandler(s.log, s.setGuildMembers))
 	s.router.POST(path.Join(base, "guilds", ":guild", "channels"), wrapHandler(s.log, s.setGuildChannels))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
-	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels","wipe"), wrapHandler(s.log, s.deleteGuildChannels))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels", "delete"), wrapHandler(s.log, s.deleteGuildChannelsById))
+	s.router.DELETE(path.Join(base, "guilds", ":guild", "channels", "wipe"), wrapHandler(s.log, s.deleteGuildChannels))
 
 	s.router.GET(path.Join(base, "users"), wrapHandler(s.log, s.getUsers))
-	s.router.GET(path.Join(base, "user_in_guilds_has_roles"), wrapHandler(s.log,s.existUserInGuildsHasRoles))
-	s.router.GET(path.Join(base, "user_in_guilds"), wrapHandler(s.log,s.existUserInGuilds))
+	s.router.GET(path.Join(base, "user_in_guilds_has_roles"), wrapHandler(s.log, s.existUserInGuildsHasRoles))
+	s.router.GET(path.Join(base, "user_in_guilds"), wrapHandler(s.log, s.existUserInGuilds))
+}
+
+// stateGETHandler accepts legacy slash-suffixed GETs without a redirect. Keep
+// other methods and unknown paths under httprouter's normal handling.
+func stateGETHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && len(r.URL.Path) > 1 && strings.HasSuffix(r.URL.Path, "/") {
+			r = r.Clone(r.Context())
+			r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+			r.URL.RawPath = ""
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Start(addr string) error {
@@ -99,6 +113,6 @@ func (s *Server) Start(addr string) error {
 		return err
 	}
 
-	h1s.Handler = h2c.NewHandler(s.router, h2s)
+	h1s.Handler = h2c.NewHandler(stateGETHandler(s.router), h2s)
 	return h1s.Serve(ln)
 }

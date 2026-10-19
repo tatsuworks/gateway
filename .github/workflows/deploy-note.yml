@@ -1,0 +1,186 @@
+name: deploy-note
+
+# Publishes a merged PR's `## Deploy note` block to the "Pending Deploy Actions"
+# doc in Linear. Capture happens in the PR body (reviewed with the diff);
+# publication happens here, at merge, so the doc only ever describes code that
+# has actually merged. Draining is manual, by whoever deploys.
+#
+# Ported from tatsuworks/atlas's `.github/workflows/deploy-note.yml`, which
+# publishes into the same doc. Differences:
+#   - one trunk branch, so there are no back-merge or promotion PRs to skip;
+#   - runs on GitHub-hosted runners: the self-hosted runners are registered to
+#     wander and atlas only, and this job is two HTTP calls;
+#   - a repo without its own `## <repo>` section in the doc goes under
+#     `## Other repos`, whose `None pending.` placeholder is dropped;
+#   - an existing entry is recognised only by what opens a top-level entry:
+#     this PR's label, or a first link to its exact URL (wander's and
+#     hand-added entries). `/pull/4` does not match `/pull/45`, and a mention
+#     of this PR anywhere else, even on another entry's first line, does not count.
+#
+# A fork PR's run gets no secrets and fails without writing, or does not run
+# at all; add such a note by hand.
+#
+# Known gap: `documentUpdate` replaces the whole doc with no version check. A
+# write from a stale read can erase an entry another publisher already
+# verified, or restore entries someone drained in the Linear UI meanwhile.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+concurrency:
+  # Serialize: the doc is read-modify-written, so concurrent merges would
+  # otherwise clobber each other's entries. Never cancel — a dropped run is a
+  # silently lost deploy note.
+  #
+  # `queue: max` is what makes that serialization actually safe to rely on. The
+  # default (`queue: single`) keeps at most ONE pending run per group and
+  # cancels it as soon as a newer one queues, so three merges in a row lose the
+  # middle note — and `cancel-in-progress: false` does not help, it protects the
+  # run that is already executing, not the pending one. `queue: max` lets up to
+  # 100 runs wait in FIFO order instead, so only a 100-deep backlog drops
+  # anything. `queue: max` requires cancel-in-progress to be false or unset.
+  # https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
+  #
+  # This only serialises this repository's own runs. Other repositories'
+  # publishers write the same doc and can land at the same moment, hence the
+  # verify-and-retry in the script below.
+  group: deploy-note
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      - name: Publish deploy note to Linear
+        uses: actions/github-script@v7
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_DOC_ID: bdeaff5f-fcb7-4d18-b0e6-fed43e2f2aeb
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+
+            // --- extract the block: `## Deploy note` up to the next h2 or EOF
+            const m = (pr.body || '').match(/^##[ \t]+Deploy note[ \t]*\r?$\n?([\s\S]*)/im);
+            if (!m) {
+              core.info('No `## Deploy note` section. Nothing to publish.');
+              return;
+            }
+            let block = m[1];
+            const next = block.search(/^##[ \t]/m);
+            if (next !== -1) block = block.slice(0, next);
+            // Strip HTML comments (the template's instructions) and normalise.
+            const note = block.replace(/<!--[\s\S]*?-->/g, '').trim();
+            if (!note) {
+              core.info('Deploy note section is empty (template comment only). Nothing to publish.');
+              return;
+            }
+
+            const { LINEAR_API_KEY, LINEAR_DOC_ID } = process.env;
+            if (!LINEAR_API_KEY) {
+              core.setFailed('LINEAR_API_KEY secret is not set — deploy note NOT published.');
+              return;
+            }
+
+            const linear = async (query, variables) => {
+              const res = await fetch('https://api.linear.app/graphql', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: LINEAR_API_KEY,
+                },
+                body: JSON.stringify({ query, variables }),
+                signal: AbortSignal.timeout(30000),
+              });
+              const json = await res.json();
+              if (!res.ok || json.errors) {
+                throw new Error(`Linear API error: ${JSON.stringify(json.errors || json)}`);
+              }
+              return json.data;
+            };
+
+            const readDoc = async () => {
+              const { document } = await linear(
+                'query($id: String!) { document(id: $id) { id content } }',
+                { id: LINEAR_DOC_ID },
+              );
+              return document.content || '';
+            };
+
+            const repo = context.repo.repo;
+            const label = `${repo}#${pr.number}`;
+            // Linear rewrites GitHub PR links into its own PR mentions (the URL and
+            // link text disappear) whenever the doc is next saved, so the URL alone
+            // cannot identify an entry later. The label in a code span can't be
+            // rewritten, so presence is checked against either, but only where an
+            // entry identifies itself: right after the checkbox of a top-level
+            // item (note lines are indented).
+            const key = '`' + label + '`';
+            const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const entryLine = new RegExp(
+              `^- \\[[ xX]\\] (?:${esc(key)}|(?:\\*\\*)?\\[[^\\]\\n]*\\]\\(<?${esc(pr.html_url)}>?\\))`,
+              'm',
+            );
+            const hasEntry = (content) => entryLine.test(content);
+
+            // PR title carries the ticket id by repo convention
+            // (e.g. "TATSU-1234 fix(scope): ...") so it needs no parsing.
+            const indented = note.split('\n').map((l) => (l.trim() ? `  ${l}` : '')).join('\n');
+            const entry = `- [ ] ${key} **[${pr.title}](${pr.html_url})**\n${indented}\n`;
+
+            // Route into this repo's own section, else `## Other repos`. Grouping
+            // by repo is what makes cross-service deploy ordering readable. With
+            // neither heading, append above the footer.
+            const insert = (content) => {
+              const heading = (name) => content.match(new RegExp(`^##[ \\t]+${name}[ \\t]*$`, 'im'));
+              const h = heading(repo) || heading('Other repos');
+              if (h) {
+                const start = content.indexOf(h[0]) + h[0].length;
+                const rest = content.slice(start);
+                // Section ends at the next h2 or the footer, whichever is first.
+                const bounds = [rest.search(/^##[ \t]/m), rest.indexOf('\n---\n')].filter((i) => i !== -1);
+                const end = bounds.length ? start + Math.min(...bounds) : content.length;
+                const section = content
+                  .slice(start, end)
+                  .replace(/^[ \t]*(_\(none\)_|None pending\.)[ \t]*$\n?/im, '') // drop the placeholder
+                  .replace(/\s*$/, '');
+                return `${content.slice(0, start)}${section}\n\n${entry}\n${content.slice(end)}`;
+              }
+              // Keep the `---` / `Last drained` footer last.
+              const footer = content.lastIndexOf('\n---\n');
+              return footer === -1
+                ? `${content.replace(/\s*$/, '')}\n\n${entry}`
+                : `${content.slice(0, footer)}\n${entry}${content.slice(footer)}`;
+            };
+
+            // --- write, then confirm the entry survived. Idempotency is keyed on
+            // the PR URL or the code-span label, so re-runs and retries never
+            // duplicate an entry.
+            const attempts = 3;
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              const content = await readDoc();
+              if (hasEntry(content)) {
+                core.notice(`Pending Deploy Actions has the entry for ${label}.`);
+                return;
+              }
+              await linear(
+                'mutation($id: String!, $content: String!) { documentUpdate(id: $id, input: { content: $content }) { success } }',
+                { id: LINEAR_DOC_ID, content: insert(content) },
+              );
+              // Give a concurrent writer (another repo's publisher) time to land,
+              // then re-read. If its write replaced ours, the next attempt re-inserts.
+              await new Promise((r) => setTimeout(r, 3000));
+              if (hasEntry(await readDoc())) {
+                core.notice(`Published deploy note for ${label} to Pending Deploy Actions.`);
+                return;
+              }
+              core.warning(`Entry for ${label} missing after write (attempt ${attempt}/${attempts}); retrying.`);
+            }
+            core.setFailed(`Deploy note for ${label} did NOT stick after ${attempts} attempts — add it to Pending Deploy Actions by hand.`);

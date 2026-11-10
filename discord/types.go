@@ -1,14 +1,34 @@
 package discord
 
+import "time"
+
 type Event struct {
 	D  []byte
 	Op int
 	S  int64
 	T  string
+
+	// Receipt describes when and on which connection the gateway received a
+	// dispatch. It is stamped right after decode, before state handling and
+	// Redis publication, and is never part of the published payload itself.
+	Receipt Receipt
+}
+
+// Receipt is the gateway's own record of receiving one dispatch. A zero value
+// means the event did not come off a live connection (tests, synthetic events).
+type Receipt struct {
+	ShardID int
+	// ConnectionID identifies the Discord session that delivered the event. A
+	// successful RESUME keeps it; a new IDENTIFY changes it.
+	ConnectionID string
+	ReceivedAt   time.Time
 }
 
 type GuildCreate struct {
-	ID          int64
+	ID int64
+	// Unavailable is Discord's outage marker. An unavailable guild carries no
+	// state, so it must never be read as an empty guild.
+	Unavailable bool
 	Raw         []byte
 	MemberCount int64
 	Channels    map[int64][]byte
@@ -18,6 +38,10 @@ type GuildCreate struct {
 	Presences   map[int64][]byte
 	Roles       map[int64][]byte
 	VoiceStates map[int64][]byte
+	// VoiceStatesPresent distinguishes a payload that listed voice states (an
+	// empty list means nobody is connected) from one that never carried the
+	// key, such as GUILD_UPDATE.
+	VoiceStatesPresent bool
 }
 
 type GuildBan struct {
@@ -43,7 +67,12 @@ type Thread struct {
 type VoiceState struct {
 	UserID  int64
 	GuildID int64
-	Raw     []byte
+	// ChannelID is 0 when the user left voice.
+	ChannelID int64
+	// IsBot is nil when the payload did not carry the member's user object, so
+	// the account cannot be classified from this event alone.
+	IsBot *bool
+	Raw   []byte
 }
 
 type MemberChunk struct {

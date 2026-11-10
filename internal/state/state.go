@@ -44,6 +44,16 @@ type DB interface {
 	SetVoiceState(ctx context.Context, guild, user int64, raw []byte) error
 	DeleteChannelsById(ctx context.Context, guild int64, channelIDs []int64) error
 
+	// Voice presence and readiness for voice attendance. See voice.go.
+	ApplyVoiceState(ctx context.Context, change VoiceStateChange) error
+	ReplaceGuildVoiceStates(ctx context.Context, baseline VoiceBaseline) error
+	ClearGuildVoiceStates(ctx context.Context, guild int64) error
+	DeleteChannelVoiceStates(ctx context.Context, guild, channel int64) error
+	HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready bool) (created bool, err error)
+	GetVoiceShardHeartbeat(ctx context.Context, shard int) (heartbeatAt time.Time, found bool, err error)
+	RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time) (*VoiceLoss, error)
+	GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossRevision int64, maxHeartbeatAge time.Duration) (*VoiceSnapshot, error)
+
 	SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error
 	DeleteGuildMembers(ctx context.Context, guild int64) error
 	SetGuildMember(ctx context.Context, guild, user int64, raw []byte, isNew bool) error

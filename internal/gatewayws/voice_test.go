@@ -23,9 +23,9 @@ const (
 func loungeShard() int { return int((lounge >> 22) % loungeShards) }
 
 func TestParseVoiceConfigScopesShardsAndDestinations(t *testing.T) {
-	cfg := parseVoiceConfig(" 173184118492889089, nope ,", "valkey-karavan:6379", "")
+	cfg := parseVoiceConfig(" 173184118492889089, nope ,42,", "valkey-karavan:6379", "")
 	if _, ok := cfg.guilds[lounge]; !ok || len(cfg.guilds) != 1 {
-		t.Fatalf("guilds: %v", cfg.guilds)
+		t.Fatalf("configuration must narrow, never widen, the approved guilds: %v", cfg.guilds)
 	}
 	if _, ok := cfg.metadataRedis["valkey-karavan:6379"]; !ok || !cfg.reidentify {
 		t.Fatalf("destinations/reidentify: %+v", cfg)

@@ -37,6 +37,14 @@ const (
 	receiptTimeLayout      = "2006-01-02T15:04:05.000000Z"
 )
 
+// attendanceGuilds is the hard bound for voice attendance: Wanderer Tech
+// (staging) and Tatsu's Lounge (production). VOICE_ATTENDANCE_GUILDS may
+// narrow this set but never widen it.
+var attendanceGuilds = map[int64]struct{}{
+	1347103391402164315: {},
+	173184118492889089:  {},
+}
+
 type voiceConfig struct {
 	guilds        map[int64]struct{}
 	metadataRedis map[string]struct{}
@@ -53,7 +61,8 @@ func parseVoiceConfig(guilds, metadataRedis, reidentify string) voiceConfig {
 		reidentify:    reidentify != "false",
 	}
 	for _, field := range strings.Split(guilds, ",") {
-		if id, err := strconv.ParseInt(strings.TrimSpace(field), 10, 64); err == nil && id > 0 {
+		id, err := strconv.ParseInt(strings.TrimSpace(field), 10, 64)
+		if _, allowed := attendanceGuilds[id]; err == nil && allowed {
 			cfg.guilds[id] = struct{}{}
 		}
 	}

@@ -10,6 +10,16 @@
 -- as "not ready" until a fresh GUILD_CREATE baseline. voice_shard_losses is
 -- LOGGED on purpose, so a recorded loss survives that same restart.
 
+-- Older State databases predate voice_states in init.sql (staging had no such
+-- table on 2026-11-10), so create the original shape first if it is missing.
+CREATE UNLOGGED TABLE IF NOT EXISTS voice_states
+(
+	"guild_id" int8 NOT NULL,
+	"user_id" int8 NOT NULL,
+	"data" jsonb NOT NULL,
+	PRIMARY KEY ("guild_id", "user_id")
+);
+
 ALTER TABLE voice_states ADD COLUMN IF NOT EXISTS channel_id int8 NOT NULL DEFAULT 0;
 -- NULL means the account could not be classified; consumers must not treat it
 -- as either a human or a bot.

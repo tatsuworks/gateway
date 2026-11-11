@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"cdr.dev/slog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -136,6 +137,13 @@ func (c *Client) guildCreate(ctx context.Context, e *discord.Event, baseline boo
 // it were real; so does a payload that somehow lacks voice_states.
 func (c *Client) replaceVoiceBaseline(ctx context.Context, e *discord.Event, gc *discord.GuildCreate) error {
 	if gc.Unavailable || !gc.VoiceStatesPresent || e.Receipt.ConnectionID == "" {
+		// Tracked guilds only, so this stays rare; it names why Start will
+		// report the guild unavailable.
+		c.log.Warn(ctx, "voice baseline not stored",
+			slog.F("guild", gc.ID),
+			slog.F("unavailable", gc.Unavailable),
+			slog.F("voice_states_present", gc.VoiceStatesPresent),
+			slog.F("has_connection_id", e.Receipt.ConnectionID != ""))
 		if err := c.db.ClearGuildVoiceStates(ctx, gc.ID); err != nil {
 			return xerrors.Errorf("clear voice baseline: %w", err)
 		}
@@ -177,6 +185,8 @@ func (c *Client) replaceVoiceBaseline(ctx context.Context, e *discord.Event, gc 
 	if err := c.db.ReplaceGuildVoiceStates(ctx, baseline); err != nil {
 		return xerrors.Errorf("replace voice baseline: %w", err)
 	}
+	c.log.Info(ctx, "voice baseline stored",
+		slog.F("guild", gc.ID), slog.F("shard", baseline.ShardID), slog.F("occupants", len(baseline.Occupants)))
 	return nil
 }
 

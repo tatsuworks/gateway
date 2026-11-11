@@ -23,6 +23,7 @@ import (
 	"github.com/tatsuworks/gateway/discord"
 	"github.com/tatsuworks/gateway/handler"
 	"github.com/tatsuworks/gateway/internal/state"
+	"github.com/tatsuworks/gateway/internal/state/db/statepsql"
 )
 
 const (
@@ -112,6 +113,9 @@ type Session struct {
 
 	hasGuildMembersIntent bool
 
+	// voice is voice attendance bookkeeping; see voice.go.
+	voice voiceState
+
 	// cur is the current connection, published by Open and cleared on return.
 	// nil before the first Open and briefly between reconnects.
 	cur atomic.Pointer[conn]
@@ -195,6 +199,16 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 		bufferPool:        cfg.BufferPool,
 		whitelistedEvents: cfg.WhitelistedEvents,
 		eventReadTimeout:  parseEventReadTimeout(os.Getenv("EVENT_READ_TIMEOUT")),
+	}
+
+	sess.voice.cfg = parseVoiceConfig(
+		os.Getenv("VOICE_ATTENDANCE_GUILDS"),
+		os.Getenv("RECEIPT_METADATA_REDIS"),
+		os.Getenv("VOICE_LOSS_REIDENTIFY"),
+	)
+	sess.voice.enabled = sess.voice.cfg.shardHasVoice(sess.shardID, sess.shardCount)
+	if sess.voice.enabled {
+		sess.state.SetVoiceGuilds(sess.voice.cfg.guilds)
 	}
 
 	// Set hasGuildMembersIntent
@@ -464,6 +478,9 @@ func (c *conn) run(parent context.Context) error {
 
 	go c.sendHeartbeats()
 	go c.logTotalEvents()
+	if c.s.voice.enabled {
+		go c.voiceHeartbeat()
+	}
 	// go c.rotateStatuses()
 
 	c.s.log.Info(c.ctx, "websocket connected, waiting for events")
@@ -477,6 +494,9 @@ func (c *conn) run(parent context.Context) error {
 		if err != nil {
 			c.s.log.Error(c.ctx, "read and decode event", slog.Error(err))
 			break
+		}
+		if ev.Op == 0 {
+			c.s.stampReceipt(ev, time.Now())
 		}
 		if ev.S != 0 {
 			atomic.StoreInt64(&c.s.seq, ev.S)
@@ -497,14 +517,31 @@ func (c *conn) run(parent context.Context) error {
 		c.s.log.Debug(c.ctx, "handling state event", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		// parent ctx: in-flight state/DB work must NOT be aborted by a disconnect.
 		evtPayload, err := c.s.state.HandleEvent(parent, ev)
-		if err != nil {
+		// A failed voice-presence write is a loss for attendance, but the
+		// event's other handling stands, so it is still published as before.
+		var voiceErr *handler.VoiceStateError
+		voiceCacheLost := xerrors.As(err, &voiceErr)
+		if err != nil && !voiceCacheLost {
 			c.s.log.Error(c.ctx, "handle state event", slog.Error(err))
 			continue
+		}
+		if voiceCacheLost {
+			c.s.log.Error(c.ctx, "store voice state", slog.Error(err), slog.F("guild", voiceErr.GuildID))
+			c.s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, ev.Receipt.ReceivedAt)
 		}
 
 		c.setState("push event to redis")
 		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
-		c.pushEventToRedis(ev)
+		if published := c.pushEventToRedis(ev); !published {
+			c.s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, ev.Receipt.ReceivedAt)
+		} else if !voiceCacheLost {
+			c.s.noteVoiceHandled(ev)
+		}
+		if voiceCacheLost && c.s.voice.cfg.reidentify {
+			// State's voice cache is now wrong; only a fresh GUILD_CREATE
+			// baseline can repair it, through the normal paced identify.
+			c.s.ForceIdentify()
+		}
 
 		// request guild members on GUILD_CREATE, gated by the backfill marker
 		if c.s.shouldProcessMembers() && ev.T == "GUILD_CREATE" && evtPayload != nil && evtPayload.GuildID != 0 {
@@ -527,10 +564,16 @@ func (c *conn) run(parent context.Context) error {
 	return err
 }
 
-func (c *conn) pushEventToRedis(ev *discord.Event) {
+// pushEventToRedis publishes a dispatch to every destination that takes it.
+// It returns false only when a voice attendance event failed to reach a
+// receipt-metadata destination, which is a real loss for attendance; other
+// failures are logged exactly as before.
+func (c *conn) pushEventToRedis(ev *discord.Event) bool {
 	if ev.T == "GUILD_MEMBER_CHUNK" {
-		return
+		return true
 	}
+	published := true
+	withMeta := c.s.voiceMetadataPayload(ev)
 	push := func(addr string, rc *redis.Client) {
 		if whitelist, exists := c.s.whitelistedEvents[addr]; exists {
 			c.s.log.Debug(c.ctx, "checking whitelist", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
@@ -540,15 +583,25 @@ func (c *conn) pushEventToRedis(ev *discord.Event) {
 			}
 		}
 
+		payload := ev.D
+		_, wantsMeta := c.s.voice.cfg.metadataRedis[addr]
+		if withMeta != nil && wantsMeta {
+			payload = withMeta
+		}
+
 		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("event_type", ev.T), slog.F("redis_addr", addr))
-		if err := rc.RPush(c.ctx, "gateway:events:"+ev.T, ev.D).Err(); err != nil {
+		if err := rc.RPush(c.ctx, "gateway:events:"+ev.T, payload).Err(); err != nil {
 			c.s.log.Error(c.ctx, "push event to redis", slog.Error(err), slog.F("event_type", ev.T), slog.F("redis_addr", addr))
+			if withMeta != nil && wantsMeta {
+				published = false
+			}
 		}
 	}
 
 	for _, rc := range c.s.rc {
 		push(rc.Options().Addr, rc)
 	}
+	return published
 }
 
 func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
@@ -635,6 +688,9 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 		c.s.sessID = sess
 		c.s.resumeURL = resumeURL
+		// READY follows only an IDENTIFY: anything since the previous
+		// connection was not replayed, which attendance must treat as a loss.
+		c.s.onVoiceIdentify(sess)
 		c.s.log.Info(c.ctx, "ready", slog.F("sess", sess), slog.F("resume_gateway_url", resumeURL),
 			slog.F("guild_count", len(c.s.guilds)))
 		c.s.persistShardInfo()
@@ -653,6 +709,9 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 
 	case "RESUMED":
 		c.s.log.Info(c.ctx, "resumed")
+		// A successful resume keeps the Discord session, and with it the
+		// connection identity attendance compares; Discord replays the gap.
+		c.s.onVoiceResume(c.s.sessID)
 		c.authed.Store(true)
 		c.markReady(time.Now())
 

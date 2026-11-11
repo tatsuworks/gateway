@@ -31,6 +31,10 @@ IF NOT EXISTS voice_states
 	"guild_id" int8 NOT NULL,
 	"user_id" int8 NOT NULL,
 	"data" jsonb NOT NULL,
+	"channel_id" int8 NOT NULL DEFAULT 0,
+	"is_bot" bool,
+	"changed_at" timestamptz NOT NULL DEFAULT now(),
+	"discord_seq" int8 NOT NULL DEFAULT 0,
 	PRIMARY KEY
 ("guild_id", "user_id")
 );
@@ -170,3 +174,35 @@ IF NOT EXISTS guild_backfills
 	PRIMARY KEY
 ("guild_id")
 );
+
+-- Voice attendance readiness and loss (TATSU-3540). Existing databases apply
+-- upgrades/0001_voice_attendance.sql instead; keep the two in step.
+CREATE UNLOGGED TABLE IF NOT EXISTS voice_guild_readiness
+(
+	"guild_id" int8 NOT NULL,
+	"shard_id" int4 NOT NULL,
+	"connection_id" text NOT NULL,
+	"baseline_at" timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY ("guild_id")
+);
+
+CREATE UNLOGGED TABLE IF NOT EXISTS voice_shard_status
+(
+	"shard_id" int4 NOT NULL,
+	"connection_id" text NOT NULL,
+	"ready" bool NOT NULL,
+	"heartbeat_at" timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY ("shard_id")
+);
+
+CREATE TABLE IF NOT EXISTS voice_shard_losses
+(
+	"revision" int8 GENERATED ALWAYS AS IDENTITY,
+	"shard_id" int4 NOT NULL,
+	"reason" text NOT NULL,
+	"known_through" timestamptz NOT NULL,
+	"detected_at" timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY ("revision")
+);
+
+CREATE INDEX IF NOT EXISTS voice_shard_losses_shard_revision ON voice_shard_losses ("shard_id", "revision");

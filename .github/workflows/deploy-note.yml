@@ -1,0 +1,79 @@
+name: deploy-note
+
+# This repo never writes Linear. Dispatch to the shared writer and wait for its
+# exact run, so a failed write is also red here. No PR code is checked out.
+# Setup and recovery: tatsuworks/agent-workspace docs/runbooks/deploy-note-publisher.md
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+# Keep every eligible merge, including bursts from the same repo.
+concurrency:
+  group: deploy-note
+  queue: max
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check PR source
+        uses: actions/github-script@v9
+        with:
+          script: |
+            if (context.payload.pull_request.head.repo?.full_name !== `tatsuworks/${context.repo.repo}`) {
+              throw new Error('Fork deploy notes require manual publication; no writer was dispatched.');
+            }
+      - name: Writer dispatch token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.DEPLOY_NOTE_APP_ID }}
+          private-key: ${{ secrets.DEPLOY_NOTE_APP_PRIVATE_KEY }}
+          owner: tatsuworks
+          repositories: agent-workspace
+          permission-actions: write
+      - name: Dispatch and wait
+        uses: actions/github-script@v9
+        env:
+          ANNOTATION: ''
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const pr = context.payload.pull_request;
+            const target = { owner: 'tatsuworks', repo: 'agent-workspace' };
+            const { data } = await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
+              ...target, workflow_id: 'deploy-note-writer.yml', ref: 'main',
+              return_run_details: true,
+              inputs: {
+                repo: context.repo.repo, pr_number: String(pr.number),
+                annotation: process.env.ANNOTATION,
+              },
+              request: { signal: AbortSignal.timeout(30000) },
+            });
+            const runId = data.workflow_run_id;
+            if (!Number.isSafeInteger(runId) || runId <= 0) throw new Error('Dispatch returned no workflow run ID; check the writer before retrying.');
+            core.notice(`Shared writer: https://github.com/tatsuworks/agent-workspace/actions/runs/${runId}`);
+            const deadline = Date.now() + 25 * 60 * 1000;
+            while (Date.now() < deadline) {
+              const { data: run } = await github.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}', {
+                ...target, run_id: runId, request: { signal: AbortSignal.timeout(30000) },
+              });
+              if (run.status === 'completed') {
+                if (run.conclusion !== 'success') throw new Error(`Shared writer finished: ${run.conclusion}.`);
+                return;
+              }
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+            throw new Error('Shared writer wait timed out; its run may still be queued or running.');
+      - name: Manual recovery guidance
+        if: ${{ failure() || cancelled() }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            core.setFailed('Deploy note hand-off failed. Check any shared writer run and Pending Deploy Actions. Add the entry by hand only if missing: https://linear.app/tatsu-works/document/pending-deploy-actions-ce0f20e4fc06');

@@ -238,21 +238,32 @@ func (s *Session) onVoiceIdentify(sessionID string) {
 	if !s.voice.enabled {
 		return
 	}
-	knownThrough, ok := s.lastVoiceGood()
-	if !ok {
-		// A fresh process vouches for nothing; the previous process's last
-		// heartbeat is the latest point anyone confirmed.
-		ctx, cancel := context.WithTimeout(context.Background(), voiceDBTimeout)
-		at, found, err := s.stateDB.GetVoiceShardHeartbeat(ctx, s.shardID)
-		cancel()
-		switch {
-		case err == nil && found:
-			knownThrough = at
-		default:
-			knownThrough = time.Now().UTC()
-		}
+	s.recordVoiceLoss(statepsql.VoiceLossIdentifyNoResume, s.voiceKnownThrough())
+}
+
+// voiceKnownThrough is the latest point this shard's voice data is vouched
+// for: the last handled dispatch, or for a fresh process the previous
+// process's last heartbeat.
+func (s *Session) voiceKnownThrough() time.Time {
+	if at, ok := s.lastVoiceGood(); ok {
+		return at
 	}
-	s.recordVoiceLoss(statepsql.VoiceLossIdentifyNoResume, knownThrough)
+	ctx, cancel := context.WithTimeout(context.Background(), voiceDBTimeout)
+	defer cancel()
+	if at, found, err := s.stateDB.GetVoiceShardHeartbeat(ctx, s.shardID); err == nil && found {
+		return at
+	}
+	return time.Now().UTC()
+}
+
+// adoptResumableConnection takes the stored Discord session as this process's
+// connection identity before it resumes: Discord replays missed dispatches
+// before RESUMED, and they belong to that same session.
+func (s *Session) adoptResumableConnection() {
+	if s.sessID != "" {
+		id := s.sessID
+		s.voice.connID.Store(&id)
+	}
 }
 
 // onVoiceResume keeps the connection identity across a successful RESUME.
@@ -317,50 +328,67 @@ func withReceiptMetadata(ev *discord.Event) []byte {
 }
 
 // voiceHeartbeat keeps this shard's readiness fresh while the connection is
-// authenticated. It reports not ready while a loss is still unrecorded, and
-// treats its own row vanishing mid-connection as a State cache reset.
+// authenticated. It reports not ready while a loss is still unrecorded.
 func (c *conn) voiceHeartbeat() {
-	s := c.s
 	t := time.NewTicker(voiceHeartbeatInterval)
 	defer t.Stop()
 
-	var (
-		wrote     bool
-		lastWrite time.Time
-	)
+	var hb voiceHeartbeatState
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
 		case <-t.C:
 		}
-		if !c.authed.Load() {
-			continue
+		if c.voiceHeartbeatTick(&hb) {
+			return
 		}
-		connID := s.connectionID()
-		if connID == "" {
-			continue
-		}
-
-		ready := s.flushVoiceLosses()
-		ctx, cancel := context.WithTimeout(c.ctx, voiceDBTimeout)
-		created, err := s.stateDB.HeartbeatVoiceShard(ctx, s.shardID, connID, ready)
-		cancel()
-		if err != nil {
-			s.log.Error(c.ctx, "voice readiness heartbeat", slog.Error(err))
-			continue
-		}
-		if created && wrote {
-			// The row this connection wrote is gone: the UNLOGGED cache was
-			// emptied underneath us, guild baselines included.
-			s.recordVoiceLoss(statepsql.VoiceLossStateCacheReset, lastWrite)
-			if s.voice.cfg.reidentify {
-				s.log.Warn(c.ctx, "voice cache reset; re-identifying for fresh baselines")
-				s.ForceIdentify()
-				return
-			}
-		}
-		wrote = true
-		lastWrite = time.Now().UTC()
 	}
+}
+
+// voiceHeartbeatState is one connection's own heartbeat history.
+type voiceHeartbeatState struct {
+	wrote     bool
+	lastWrite time.Time
+}
+
+// voiceHeartbeatTick writes one heartbeat and reports whether the connection
+// is being replaced. Finding the row gone is a State cache reset, guild
+// baselines included, when this connection wrote it before or when the
+// connection resumed: a resume replays events but never resends GUILD_CREATE,
+// so nothing would restore the baselines. That also covers a cache emptied
+// while the shard was disconnected, and a first deploy that resumes.
+func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
+	s := c.s
+	if !c.authed.Load() {
+		return false
+	}
+	connID := s.connectionID()
+	if connID == "" {
+		return false
+	}
+
+	ready := s.flushVoiceLosses()
+	ctx, cancel := context.WithTimeout(c.ctx, voiceDBTimeout)
+	created, err := s.stateDB.HeartbeatVoiceShard(ctx, s.shardID, connID, ready)
+	cancel()
+	if err != nil {
+		s.log.Error(c.ctx, "voice readiness heartbeat", slog.Error(err))
+		return false
+	}
+	if created && (hb.wrote || c.resumed.Load()) {
+		knownThrough := hb.lastWrite
+		if !hb.wrote {
+			knownThrough = s.voiceKnownThrough()
+		}
+		s.recordVoiceLoss(statepsql.VoiceLossStateCacheReset, knownThrough)
+		if s.voice.cfg.reidentify {
+			s.log.Warn(c.ctx, "voice cache reset; re-identifying for fresh baselines")
+			s.ForceIdentify()
+			return true
+		}
+	}
+	hb.wrote = true
+	hb.lastWrite = time.Now().UTC()
+	return false
 }

@@ -341,3 +341,52 @@ func TestVoiceHeartbeatReportsRecreatedRow(t *testing.T) {
 		t.Fatalf("heartbeat read: at=%v found=%v err=%v", at, found, err)
 	}
 }
+
+func TestVoiceLossCutoffCoversEveryUnseenLoss(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	var after int64
+	if start := mustSnapshot(t, d, guild, 0); start.Loss != nil {
+		after = start.Loss.Revision
+	}
+	early := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
+	if _, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	var last *state.VoiceLoss
+	for i := 0; i < 1001; i++ {
+		var err error
+		if last, err = d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, time.Now().UTC()); err != nil {
+			t.Fatalf("record: %v", err)
+		}
+	}
+	snap := mustSnapshot(t, d, guild, after)
+	if snap.Loss == nil || snap.Loss.Revision != last.Revision || !snap.Loss.KnownThrough.Equal(early) {
+		t.Fatalf("however many later losses, the earliest unseen cutoff must survive: %+v", snap.Loss)
+	}
+}
+
+func TestVoiceLossSurvivesMissingBaseline(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	cutoff := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
+	loss, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateCacheReset, cutoff)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	snap, err := d.GetGuildVoiceSnapshot(ctx, guild, loss.Revision-1, time.Minute)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	if snap.Ready || snap.NotReadyReason != voiceNotReadyNoBaseline {
+		t.Fatalf("no baseline is not ready: %+v", snap)
+	}
+	if snap.Loss == nil || snap.Loss.Revision < loss.Revision || snap.Loss.KnownThrough.After(cutoff) {
+		t.Fatalf("a recorded loss must still be reported without a baseline: %+v", snap.Loss)
+	}
+}

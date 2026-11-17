@@ -222,6 +222,7 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 	sess.loadSessID()
 	sess.loadSeq()
 	sess.loadResumeURL()
+	sess.adoptResumableConnection()
 
 	return sess, nil
 }
@@ -712,6 +713,7 @@ func (c *conn) handleInternalEvent(ev *discord.Event) (bool, error) {
 		// A successful resume keeps the Discord session, and with it the
 		// connection identity attendance compares; Discord replays the gap.
 		c.s.onVoiceResume(c.s.sessID)
+		c.resumed.Store(true)
 		c.authed.Store(true)
 		c.markReady(time.Now())
 

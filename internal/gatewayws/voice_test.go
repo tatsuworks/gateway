@@ -245,3 +245,80 @@ func TestIdentifyRecordsLossFromLastVouchedPoint(t *testing.T) {
 		t.Fatalf("a successful resume is not a loss")
 	}
 }
+
+func TestRestartedProcessStampsReplayWithStoredSession(t *testing.T) {
+	s := voiceSession(t, &lossFakeDB{})
+	s.sessID = "sess-1"
+	s.adoptResumableConnection()
+	ev := &discord.Event{}
+	s.stampReceipt(ev, time.Now())
+	if ev.Receipt.ConnectionID != "sess-1" {
+		t.Fatalf("dispatches replayed before RESUMED must carry the resumed session: %q", ev.Receipt.ConnectionID)
+	}
+	s.onVoiceResume("sess-1")
+	if s.connectionID() != "sess-1" {
+		t.Fatalf("resume keeps the identity")
+	}
+}
+
+// heartbeatFakeDB reports whether each heartbeat had to create the row.
+type heartbeatFakeDB struct {
+	lossFakeDB
+	created []bool
+}
+
+func (f *heartbeatFakeDB) HeartbeatVoiceShard(context.Context, int, string, bool) (bool, error) {
+	created := f.created[0]
+	f.created = f.created[1:]
+	return created, nil
+}
+
+func heartbeatConn(t *testing.T, db *heartbeatFakeDB, resumed bool) *conn {
+	s := voiceSession(t, db)
+	s.voice.cfg.reidentify = true
+	id := "sess-1"
+	s.voice.connID.Store(&id)
+	c := &conn{s: s, ctx: context.Background(), cancel: func() {}}
+	c.authed.Store(true)
+	c.resumed.Store(resumed)
+	return c
+}
+
+func TestHeartbeatTreatsRecreatedRowAsCacheReset(t *testing.T) {
+	last := time.Date(2026, 11, 10, 18, 20, 0, 0, time.UTC)
+	cases := []struct {
+		name    string
+		resumed bool
+		created []bool
+		reset   bool
+	}{
+		{"identified connection creates its first row", false, []bool{true, false}, false},
+		{"row vanishes under a connection", false, []bool{true, true}, true},
+		{"resumed connection finds no row (cache emptied while disconnected, or first deploy)", true, []bool{true}, true},
+		{"resumed connection finds its row", true, []bool{false, false}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := &heartbeatFakeDB{created: tc.created}
+			c := heartbeatConn(t, db, tc.resumed)
+			c.s.noteVoiceHandled(&discord.Event{Receipt: discord.Receipt{ReceivedAt: last}})
+			var hb voiceHeartbeatState
+			replaced := false
+			for range tc.created {
+				if c.voiceHeartbeatTick(&hb) {
+					replaced = true
+					break
+				}
+			}
+			if replaced != tc.reset || (len(db.stored) == 1) != tc.reset {
+				t.Fatalf("reset=%v replaced=%v losses=%+v", tc.reset, replaced, db.stored)
+			}
+			if tc.reset && db.stored[0].Reason != statepsql.VoiceLossStateCacheReset {
+				t.Fatalf("loss reason = %q", db.stored[0].Reason)
+			}
+			if tc.reset && tc.resumed && !db.stored[0].KnownThrough.Equal(last) {
+				t.Fatalf("a resumed connection vouches through the last handled dispatch: %v", db.stored[0].KnownThrough)
+			}
+		})
+	}
+}

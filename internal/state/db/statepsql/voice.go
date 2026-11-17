@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"golang.org/x/xerrors"
 
@@ -23,7 +24,6 @@ const (
 	VoiceLossPublishFailed     = "publish_failed"
 	VoiceLossIdentifyNoResume  = "identify_without_resume"
 	voiceLossRetention         = "8 days"
-	voiceLossLookupLimit       = 1000
 	voiceNotReadyNoBaseline    = "no_baseline"
 	voiceNotReadyNoHeartbeat   = "no_heartbeat"
 	voiceNotReadyStale         = "stale_heartbeat"
@@ -280,7 +280,11 @@ func (db *db) GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossR
 	err = tx.GetContext(ctx, &readiness, `SELECT shard_id, connection_id, baseline_at FROM voice_guild_readiness WHERE guild_id = $1`, guild)
 	if errors.Is(err, sql.ErrNoRows) {
 		snap.NotReadyReason = voiceNotReadyNoBaseline
-		return snap, nil
+		// Without a baseline the guild's shard is unknown, but recorded losses
+		// still say how far earlier observations hold. Only shards serving an
+		// attendance guild record losses, so reading them all is conservative.
+		snap.Loss, err = readVoiceLoss(ctx, tx, -1, afterLossRevision)
+		return snap, err
 	}
 	if err != nil {
 		return nil, xerrors.Errorf("read readiness: %w", err)
@@ -310,31 +314,9 @@ ORDER BY user_id
 		snap.Occupants = append(snap.Occupants, occupant)
 	}
 
-	var losses []voiceLossRow
-	if err := tx.SelectContext(ctx, &losses, `
-SELECT revision, reason, known_through, detected_at
-FROM voice_shard_losses
-WHERE shard_id = $1 AND revision > $2
-ORDER BY revision DESC
-LIMIT $3
-`, readiness.ShardID, afterLossRevision, voiceLossLookupLimit); err != nil {
-		return nil, xerrors.Errorf("read losses: %w", err)
-	}
-	if len(losses) > 0 {
-		latest := losses[0]
-		loss := &state.VoiceLoss{
-			Revision:     latest.Revision,
-			ShardID:      readiness.ShardID,
-			Reason:       latest.Reason,
-			KnownThrough: latest.KnownThrough,
-			DetectedAt:   latest.DetectedAt,
-		}
-		for _, l := range losses[1:] {
-			if l.KnownThrough.Before(loss.KnownThrough) {
-				loss.KnownThrough = l.KnownThrough
-			}
-		}
-		snap.Loss = loss
+	snap.Loss, err = readVoiceLoss(ctx, tx, readiness.ShardID, afterLossRevision)
+	if err != nil {
+		return nil, err
 	}
 
 	var lastCacheLoss sql.NullTime
@@ -365,6 +347,37 @@ SELECT max(detected_at) FROM voice_shard_losses WHERE shard_id = $1 AND reason =
 	}
 
 	return snap, nil
+}
+
+// readVoiceLoss returns the newest loss after the caller's revision, with the
+// earliest cutoff across every loss it has not seen, so a later loss never
+// hides an earlier one. shard < 0 reads every shard.
+func readVoiceLoss(ctx context.Context, tx *sqlx.Tx, shard int, afterRevision int64) (*state.VoiceLoss, error) {
+	var latest voiceLossRow
+	err := tx.GetContext(ctx, &latest, `
+SELECT revision, reason, known_through, detected_at
+FROM voice_shard_losses
+WHERE ($1 < 0 OR shard_id = $1) AND revision > $2
+ORDER BY revision DESC
+LIMIT 1
+`, shard, afterRevision)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, xerrors.Errorf("read latest loss: %w", err)
+	}
+	loss := &state.VoiceLoss{
+		Revision: latest.Revision, ShardID: shard, Reason: latest.Reason,
+		KnownThrough: latest.KnownThrough, DetectedAt: latest.DetectedAt,
+	}
+	if err := tx.GetContext(ctx, &loss.KnownThrough, `
+SELECT min(known_through) FROM voice_shard_losses
+WHERE ($1 < 0 OR shard_id = $1) AND revision > $2
+`, shard, afterRevision); err != nil {
+		return nil, xerrors.Errorf("read earliest loss cutoff: %w", err)
+	}
+	return loss, nil
 }
 
 func voiceRaw(raw []byte) []byte {

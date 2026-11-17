@@ -222,7 +222,6 @@ func NewSession(cfg *SessionConfig) (*Session, error) {
 	sess.loadSessID()
 	sess.loadSeq()
 	sess.loadResumeURL()
-	sess.adoptResumableConnection()
 
 	return sess, nil
 }

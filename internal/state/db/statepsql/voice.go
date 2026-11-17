@@ -146,6 +146,13 @@ DO UPDATE SET
 	if _, err := tx.ExecContext(ctx, readiness, baseline.GuildID, baseline.ShardID, baseline.ConnectionID); err != nil {
 		return xerrors.Errorf("mark guild ready: %w", err)
 	}
+	const guildShard = `
+INSERT INTO voice_guild_shards (guild_id, shard_id) VALUES ($1, $2)
+ON CONFLICT (guild_id) DO UPDATE SET shard_id = excluded.shard_id
+`
+	if _, err := tx.ExecContext(ctx, guildShard, baseline.GuildID, baseline.ShardID); err != nil {
+		return xerrors.Errorf("record guild shard: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return xerrors.Errorf("commit: %w", err)
@@ -175,26 +182,33 @@ func (db *db) DeleteChannelVoiceStates(ctx context.Context, guild, channel int64
 	return nil
 }
 
-func (db *db) HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready bool) (bool, error) {
-	// xmax = 0 only for a freshly inserted row. A connection that has already
-	// heartbeated and then sees an insert has lost its row to a cache reset.
+// HeartbeatVoiceShard refreshes the shard's readiness and reports whether its
+// guild baselines are still pending recovery. A connection that inserts the
+// row although it resumed, or had written the row before, has lost the row
+// to a cache reset that no GUILD_CREATE will repair, so the row is marked
+// pending. The mark survives later heartbeats and restarts (an insert whose
+// result was lost still leaves it set) and is cleared only by a heartbeat
+// from a different, freshly identified connection, whose GUILD_CREATEs
+// rebuild the baselines.
+func (db *db) HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready, resumed, wroteBefore bool) (bool, error) {
 	const q = `
 INSERT INTO
-	voice_shard_status (shard_id, connection_id, ready, heartbeat_at)
+	voice_shard_status AS cur (shard_id, connection_id, ready, heartbeat_at, baseline_pending)
 VALUES
-	($1, $2, $3, now())
+	($1, $2, $3, now(), $4 OR $5)
 ON CONFLICT (shard_id)
 DO UPDATE SET
 	connection_id = excluded.connection_id,
 	ready = excluded.ready,
-	heartbeat_at = excluded.heartbeat_at
-RETURNING (xmax = 0) AS created
+	heartbeat_at = excluded.heartbeat_at,
+	baseline_pending = cur.baseline_pending AND NOT (cur.connection_id <> excluded.connection_id AND NOT $4)
+RETURNING baseline_pending
 `
-	var created bool
-	if err := db.sql.GetContext(ctx, &created, q, shard, connectionID, ready); err != nil {
+	var pending bool
+	if err := db.sql.GetContext(ctx, &pending, q, shard, connectionID, ready, resumed, wroteBefore); err != nil {
 		return false, xerrors.Errorf("exec upsert: %w", err)
 	}
-	return created, nil
+	return pending, nil
 }
 
 func (db *db) GetVoiceShardHeartbeat(ctx context.Context, shard int) (time.Time, bool, error) {
@@ -280,10 +294,19 @@ func (db *db) GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossR
 	err = tx.GetContext(ctx, &readiness, `SELECT shard_id, connection_id, baseline_at FROM voice_guild_readiness WHERE guild_id = $1`, guild)
 	if errors.Is(err, sql.ErrNoRows) {
 		snap.NotReadyReason = voiceNotReadyNoBaseline
-		// Without a baseline the guild's shard is unknown, but recorded losses
-		// still say how far earlier observations hold. Only shards serving an
-		// attendance guild record losses, so reading them all is conservative.
-		snap.Loss, err = readVoiceLoss(ctx, tx, -1, afterLossRevision)
+		// Without a baseline, recorded losses still say how far earlier
+		// observations hold: read the shard that last stored this guild's
+		// baseline. A guild never baselined cannot have had a session.
+		var shard int
+		err = tx.GetContext(ctx, &shard, `SELECT shard_id FROM voice_guild_shards WHERE guild_id = $1`, guild)
+		if errors.Is(err, sql.ErrNoRows) {
+			return snap, nil
+		}
+		if err != nil {
+			return nil, xerrors.Errorf("read guild shard: %w", err)
+		}
+		snap.ShardID = shard
+		snap.Loss, err = readVoiceLoss(ctx, tx, shard, afterLossRevision)
 		return snap, err
 	}
 	if err != nil {
@@ -351,13 +374,13 @@ SELECT max(detected_at) FROM voice_shard_losses WHERE shard_id = $1 AND reason =
 
 // readVoiceLoss returns the newest loss after the caller's revision, with the
 // earliest cutoff across every loss it has not seen, so a later loss never
-// hides an earlier one. shard < 0 reads every shard.
+// hides an earlier one.
 func readVoiceLoss(ctx context.Context, tx *sqlx.Tx, shard int, afterRevision int64) (*state.VoiceLoss, error) {
 	var latest voiceLossRow
 	err := tx.GetContext(ctx, &latest, `
 SELECT revision, reason, known_through, detected_at
 FROM voice_shard_losses
-WHERE ($1 < 0 OR shard_id = $1) AND revision > $2
+WHERE shard_id = $1 AND revision > $2
 ORDER BY revision DESC
 LIMIT 1
 `, shard, afterRevision)
@@ -373,7 +396,7 @@ LIMIT 1
 	}
 	if err := tx.GetContext(ctx, &loss.KnownThrough, `
 SELECT min(known_through) FROM voice_shard_losses
-WHERE ($1 < 0 OR shard_id = $1) AND revision > $2
+WHERE shard_id = $1 AND revision > $2
 `, shard, afterRevision); err != nil {
 		return nil, xerrors.Errorf("read earliest loss cutoff: %w", err)
 	}

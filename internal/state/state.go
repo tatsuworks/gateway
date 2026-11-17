@@ -49,7 +49,7 @@ type DB interface {
 	ReplaceGuildVoiceStates(ctx context.Context, baseline VoiceBaseline) error
 	ClearGuildVoiceStates(ctx context.Context, guild int64) error
 	DeleteChannelVoiceStates(ctx context.Context, guild, channel int64) error
-	HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready bool) (created bool, err error)
+	HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready, resumed, wroteBefore bool) (baselinePending bool, err error)
 	GetVoiceShardHeartbeat(ctx context.Context, shard int) (heartbeatAt time.Time, found bool, err error)
 	RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time) (*VoiceLoss, error)
 	GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossRevision int64, maxHeartbeatAge time.Duration) (*VoiceSnapshot, error)

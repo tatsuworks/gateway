@@ -49,6 +49,22 @@ CREATE UNLOGGED TABLE IF NOT EXISTS voice_shard_status
 	PRIMARY KEY ("shard_id")
 );
 
+-- Set when a resumed connection finds the row gone (a cache reset that no
+-- GUILD_CREATE will repair); cleared only by a freshly identified connection.
+-- Kept in the row, not in memory, so an unconfirmed write or a restart does
+-- not lose it.
+ALTER TABLE voice_shard_status ADD COLUMN IF NOT EXISTS baseline_pending bool NOT NULL DEFAULT false;
+
+-- Which shard last stored each attendance guild's baseline. LOGGED, and never
+-- cleared with the baseline, so a guild whose baseline is gone still reads
+-- only its own shard's losses.
+CREATE TABLE IF NOT EXISTS voice_guild_shards
+(
+	"guild_id" int8 NOT NULL,
+	"shard_id" int4 NOT NULL,
+	PRIMARY KEY ("guild_id")
+);
+
 -- Real voice observation losses: failed state writes or publications, and
 -- identifies that could not resume. known_through is the last receipt time
 -- the shard can vouch for. Rows are pruned after eight days.

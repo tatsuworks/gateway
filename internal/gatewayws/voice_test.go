@@ -246,31 +246,62 @@ func TestIdentifyRecordsLossFromLastVouchedPoint(t *testing.T) {
 	}
 }
 
+// sessionFakeDB returns a stored Discord session, as after a process restart.
+type sessionFakeDB struct {
+	lossFakeDB
+	sessID string
+}
+
+func (f *sessionFakeDB) GetSessionID(context.Context, int, string) (string, error) {
+	return f.sessID, nil
+}
+
 func TestRestartedProcessStampsReplayWithStoredSession(t *testing.T) {
-	s := voiceSession(t, &lossFakeDB{})
-	s.sessID = "sess-1"
-	s.adoptResumableConnection()
-	ev := &discord.Event{}
-	s.stampReceipt(ev, time.Now())
-	if ev.Receipt.ConnectionID != "sess-1" {
-		t.Fatalf("dispatches replayed before RESUMED must carry the resumed session: %q", ev.Receipt.ConnectionID)
+	db := &sessionFakeDB{sessID: "sess-1"}
+	s := voiceSession(t, db)
+	s.loadSessID()
+	stamp := func() string {
+		ev := &discord.Event{}
+		s.stampReceipt(ev, time.Now())
+		return ev.Receipt.ConnectionID
+	}
+	if got := stamp(); got != "sess-1" {
+		t.Fatalf("dispatches replayed before RESUMED must carry the stored session: %q", got)
 	}
 	s.onVoiceResume("sess-1")
-	if s.connectionID() != "sess-1" {
-		t.Fatalf("resume keeps the identity")
+	if got := stamp(); got != "sess-1" || len(db.stored) != 0 {
+		t.Fatalf("a successful resume keeps the identity and is no loss: %q %+v", got, db.stored)
+	}
+
+	// INVALID_SESSION, then a fresh READY: a new identity and a loss.
+	s.onVoiceIdentify("sess-2")
+	if got := stamp(); got != "sess-2" || len(db.stored) != 1 || db.stored[0].Reason != statepsql.VoiceLossIdentifyNoResume {
+		t.Fatalf("a fresh identify replaces the identity and records a loss: %q %+v", got, db.stored)
 	}
 }
 
-// heartbeatFakeDB reports whether each heartbeat had to create the row.
+// heartbeatFakeDB keeps one shard status row with State's pending rule.
+// lostResults makes that many heartbeats apply but report an error, like a
+// write that committed but whose answer never arrived.
 type heartbeatFakeDB struct {
 	lossFakeDB
-	created []bool
+	exists, pending bool
+	connID          string
+	lostResults     int
 }
 
-func (f *heartbeatFakeDB) HeartbeatVoiceShard(context.Context, int, string, bool) (bool, error) {
-	created := f.created[0]
-	f.created = f.created[1:]
-	return created, nil
+func (f *heartbeatFakeDB) HeartbeatVoiceShard(_ context.Context, _ int, connID string, _, resumed, wroteBefore bool) (bool, error) {
+	if !f.exists {
+		f.exists, f.pending = true, resumed || wroteBefore
+	} else if f.connID != connID && !resumed {
+		f.pending = false
+	}
+	f.connID = connID
+	if f.lostResults > 0 {
+		f.lostResults--
+		return false, errors.New("timeout")
+	}
+	return f.pending, nil
 }
 
 func heartbeatConn(t *testing.T, db *heartbeatFakeDB, resumed bool) *conn {
@@ -289,25 +320,32 @@ func TestHeartbeatTreatsRecreatedRowAsCacheReset(t *testing.T) {
 	cases := []struct {
 		name    string
 		resumed bool
-		created []bool
+		ticks   int
+		vanish  bool // the row disappears after the first tick
 		reset   bool
 	}{
-		{"identified connection creates its first row", false, []bool{true, false}, false},
-		{"row vanishes under a connection", false, []bool{true, true}, true},
-		{"resumed connection finds no row (cache emptied while disconnected, or first deploy)", true, []bool{true}, true},
-		{"resumed connection finds its row", true, []bool{false, false}, false},
+		{"identified connection creates its first row", false, 2, false, false},
+		{"row vanishes under a connection", false, 2, true, true},
+		{"resumed connection finds no row (cache emptied while disconnected, or first deploy)", true, 1, false, true},
+		{"resumed connection finds its row", true, 2, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			db := &heartbeatFakeDB{created: tc.created}
+			db := &heartbeatFakeDB{}
+			if tc.name == "resumed connection finds its row" {
+				db.exists, db.connID = true, "sess-1"
+			}
 			c := heartbeatConn(t, db, tc.resumed)
 			c.s.noteVoiceHandled(&discord.Event{Receipt: discord.Receipt{ReceivedAt: last}})
 			var hb voiceHeartbeatState
 			replaced := false
-			for range tc.created {
+			for i := 0; i < tc.ticks; i++ {
 				if c.voiceHeartbeatTick(&hb) {
 					replaced = true
 					break
+				}
+				if tc.vanish && i == 0 {
+					db.exists = false
 				}
 			}
 			if replaced != tc.reset || (len(db.stored) == 1) != tc.reset {
@@ -320,5 +358,49 @@ func TestHeartbeatTreatsRecreatedRowAsCacheReset(t *testing.T) {
 				t.Fatalf("a resumed connection vouches through the last handled dispatch: %v", db.stored[0].KnownThrough)
 			}
 		})
+	}
+}
+
+func TestHeartbeatRecoveryOutlivesALostAnswerAndARestart(t *testing.T) {
+	// The resumed connection's insert commits but its answer is lost.
+	db := &heartbeatFakeDB{lostResults: 1}
+	c := heartbeatConn(t, db, true)
+	var hb voiceHeartbeatState
+	if c.voiceHeartbeatTick(&hb) || len(db.stored) != 0 {
+		t.Fatalf("nothing is known from a lost answer")
+	}
+
+	// The process restarts and resumes the same session before the next tick.
+	c = heartbeatConn(t, db, true)
+	hb = voiceHeartbeatState{}
+	if !c.voiceHeartbeatTick(&hb) || len(db.stored) != 1 || db.stored[0].Reason != statepsql.VoiceLossStateCacheReset {
+		t.Fatalf("the pending baselines must still be recovered: losses=%+v", db.stored)
+	}
+
+	// Until a fresh identify, every connection still sees them pending.
+	if !db.pending {
+		t.Fatalf("recovery is pending until a freshly identified connection heartbeats")
+	}
+	fresh := heartbeatConn(t, db, false)
+	id := "sess-2"
+	fresh.s.voice.connID.Store(&id)
+	hb = voiceHeartbeatState{}
+	if fresh.voiceHeartbeatTick(&hb) || db.pending {
+		t.Fatalf("a freshly identified connection clears the mark: pending=%v", db.pending)
+	}
+}
+
+func TestHeartbeatRecordsAPendingResetOncePerConnection(t *testing.T) {
+	db := &heartbeatFakeDB{}
+	c := heartbeatConn(t, db, true)
+	c.s.voice.cfg.reidentify = false
+	var hb voiceHeartbeatState
+	for i := 0; i < 3; i++ {
+		if c.voiceHeartbeatTick(&hb) {
+			t.Fatalf("no identify when re-identify is off")
+		}
+	}
+	if len(db.stored) != 1 || !db.pending {
+		t.Fatalf("one loss, and the baselines stay pending: losses=%d pending=%v", len(db.stored), db.pending)
 	}
 }

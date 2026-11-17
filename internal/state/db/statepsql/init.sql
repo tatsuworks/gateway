@@ -192,7 +192,18 @@ CREATE UNLOGGED TABLE IF NOT EXISTS voice_shard_status
 	"connection_id" text NOT NULL,
 	"ready" bool NOT NULL,
 	"heartbeat_at" timestamptz NOT NULL DEFAULT now(),
+	"baseline_pending" bool NOT NULL DEFAULT false,
 	PRIMARY KEY ("shard_id")
+);
+
+-- Which shard last stored each attendance guild's baseline. LOGGED, and never
+-- cleared with the baseline, so a guild whose baseline is gone still reads
+-- only its own shard's losses.
+CREATE TABLE IF NOT EXISTS voice_guild_shards
+(
+	"guild_id" int8 NOT NULL,
+	"shard_id" int4 NOT NULL,
+	PRIMARY KEY ("guild_id")
 );
 
 CREATE TABLE IF NOT EXISTS voice_shard_losses

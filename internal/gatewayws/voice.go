@@ -348,16 +348,19 @@ func (c *conn) voiceHeartbeat() {
 
 // voiceHeartbeatState is one connection's own heartbeat history.
 type voiceHeartbeatState struct {
-	wrote     bool
-	lastWrite time.Time
+	wrote      bool
+	lastWrite  time.Time
+	recovering bool
 }
 
 // voiceHeartbeatTick writes one heartbeat and reports whether the connection
-// is being replaced. Finding the row gone is a State cache reset, guild
-// baselines included, when this connection wrote it before or when the
-// connection resumed: a resume replays events but never resends GUILD_CREATE,
-// so nothing would restore the baselines. That also covers a cache emptied
-// while the shard was disconnected, and a first deploy that resumes.
+// is being replaced. State keeps the shard's baselines marked pending after a
+// cache reset that no GUILD_CREATE will repair: the row found gone by a
+// connection that wrote it before, or by one that resumed (a resume replays
+// events but never resends GUILD_CREATE). That covers a cache emptied while
+// the shard was disconnected and a first deploy that resumes. Because the mark
+// lives in State, a heartbeat whose result was lost, or a restart before the
+// identify, still finds it on the next heartbeat.
 func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
 	s := c.s
 	if !c.authed.Load() {
@@ -370,13 +373,16 @@ func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
 
 	ready := s.flushVoiceLosses()
 	ctx, cancel := context.WithTimeout(c.ctx, voiceDBTimeout)
-	created, err := s.stateDB.HeartbeatVoiceShard(ctx, s.shardID, connID, ready)
+	pending, err := s.stateDB.HeartbeatVoiceShard(ctx, s.shardID, connID, ready, c.resumed.Load(), hb.wrote)
 	cancel()
 	if err != nil {
 		s.log.Error(c.ctx, "voice readiness heartbeat", slog.Error(err))
 		return false
 	}
-	if created && (hb.wrote || c.resumed.Load()) {
+	if pending && !hb.recovering {
+		// Once per connection: with re-identify off, the loss is recorded
+		// once and the baselines stay missing until an identify.
+		hb.recovering = true
 		knownThrough := hb.lastWrite
 		if !hb.wrote {
 			knownThrough = s.voiceKnownThrough()

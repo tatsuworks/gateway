@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -439,5 +440,37 @@ func TestVoiceLossSurvivesMissingBaseline(t *testing.T) {
 	}
 	if never.Ready || never.Loss != nil {
 		t.Fatalf("a guild never baselined gets no other shard's loss: %+v", never)
+	}
+}
+
+// A database that ran an earlier version of the upgrade has baselines but no
+// guild-to-shard mapping; re-running the upgrade seeds it, and stays safe to
+// run again.
+func TestVoiceUpgradeSeedsGuildShardsFromBaselines(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	t.Cleanup(func() {
+		_, _ = d.sql.ExecContext(ctx, `DELETE FROM voice_guild_readiness WHERE guild_id = $1`, guild)
+		_, _ = d.sql.ExecContext(ctx, `DELETE FROM voice_guild_shards WHERE guild_id = $1`, guild)
+	})
+	if _, err := d.sql.ExecContext(ctx, `INSERT INTO voice_guild_readiness (guild_id, shard_id, connection_id) VALUES ($1, $2, 'old')`, guild, shard); err != nil {
+		t.Fatal(err)
+	}
+	upgrade, err := os.ReadFile(filepath.Join("upgrades", "0001_voice_attendance.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := d.sql.ExecContext(ctx, string(upgrade)); err != nil {
+			t.Fatalf("upgrade run %d: %v", i+1, err)
+		}
+	}
+	var got int
+	if err := d.sql.GetContext(ctx, &got, `SELECT shard_id FROM voice_guild_shards WHERE guild_id = $1`, guild); err != nil {
+		t.Fatalf("mapping: %v", err)
+	}
+	if got != shard {
+		t.Fatalf("mapped shard = %d, want %d", got, shard)
 	}
 }

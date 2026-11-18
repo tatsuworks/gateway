@@ -65,6 +65,13 @@ CREATE TABLE IF NOT EXISTS voice_guild_shards
 	PRIMARY KEY ("guild_id")
 );
 
+-- A database that ran an earlier version of this upgrade already has
+-- baselines but no mapping, and a resumed shard will not identify to write
+-- one. Seed it from the current baselines.
+INSERT INTO voice_guild_shards (guild_id, shard_id)
+SELECT guild_id, shard_id FROM voice_guild_readiness
+ON CONFLICT (guild_id) DO NOTHING;
+
 -- Real voice observation losses: failed state writes or publications, and
 -- identifies that could not resume. known_through is the last receipt time
 -- the shard can vouch for. Rows are pruned after eight days.

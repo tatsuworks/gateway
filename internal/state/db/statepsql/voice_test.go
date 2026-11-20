@@ -2,6 +2,7 @@ package statepsql
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -272,11 +273,11 @@ func TestVoiceLossesKeepEarliestCutoffAndBlockReadinessUntilRebaseline(t *testin
 
 	early := time.Now().UTC().Add(-2 * time.Minute).Truncate(time.Microsecond)
 	later := time.Now().UTC().Add(-1 * time.Minute).Truncate(time.Microsecond)
-	first, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early)
+	first, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early, "", 0)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
-	second, err := d.RecordVoiceLoss(ctx, shard, VoiceLossIdentifyNoResume, later)
+	second, err := d.RecordVoiceLoss(ctx, shard, VoiceLossIdentifyNoResume, later, "", 0)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -299,7 +300,7 @@ func TestVoiceLossesKeepEarliestCutoffAndBlockReadinessUntilRebaseline(t *testin
 	}
 
 	future := time.Now().Add(time.Hour)
-	capped, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateWriteFailed, future)
+	capped, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateWriteFailed, future, "", 0)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -314,6 +315,45 @@ func TestVoiceLossesKeepEarliestCutoffAndBlockReadinessUntilRebaseline(t *testin
 	}
 	if snap := mustSnapshot(t, d, guild, 0); !snap.Ready {
 		t.Fatalf("a newer baseline must restore readiness, got %+v", snap)
+	}
+}
+
+func TestDelayedVoiceLossDoesNotInvalidateARepairedBaseline(t *testing.T) {
+	for _, reason := range []string{VoiceLossStateWriteFailed, VoiceLossStateCacheReset} {
+		for _, previousConnection := range []bool{false, true} {
+			t.Run(reason+fmt.Sprint(previousConnection), func(t *testing.T) {
+				d := newVoiceTestDB(t)
+				ctx := context.Background()
+				guild, shard := rand.Int63(), testShard()
+				baseline := baselineFor(guild, shard, "fresh")
+				baseline.DiscordSeq = 20
+				if err := d.ReplaceGuildVoiceStates(ctx, baseline); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := d.HeartbeatVoiceShard(ctx, shard, "fresh", true, false, false); err != nil {
+					t.Fatal(err)
+				}
+				source, sequence := "fresh", int64(19)
+				if previousConnection {
+					source, sequence = "old", 1000 // sequences are not comparable across sessions
+				}
+				cutoff := baseline.ReceivedAt.Add(-time.Minute).Truncate(time.Microsecond)
+				loss, err := d.RecordVoiceLoss(ctx, shard, reason, cutoff, source, sequence)
+				if err != nil {
+					t.Fatal(err)
+				}
+				snap := mustSnapshot(t, d, guild, 0)
+				if !snap.Ready || snap.Loss == nil || snap.Loss.Revision != loss.Revision || !snap.Loss.KnownThrough.Equal(cutoff) {
+					t.Fatalf("old loss must still reach consumers, but must not poison the repair: %+v", snap)
+				}
+				if _, err := d.RecordVoiceLoss(ctx, shard, reason, cutoff, "fresh", 20); err != nil {
+					t.Fatal(err)
+				}
+				if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyCacheLoss {
+					t.Fatalf("a new cache loss must invalidate even with an old cutoff: %+v", snap)
+				}
+			})
+		}
 	}
 }
 
@@ -376,13 +416,13 @@ func TestVoiceLossCutoffCoversEveryUnseenLoss(t *testing.T) {
 		after = start.Loss.Revision
 	}
 	early := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
-	if _, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early); err != nil {
+	if _, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early, "", 0); err != nil {
 		t.Fatalf("record: %v", err)
 	}
 	var last *state.VoiceLoss
 	for i := 0; i < 1001; i++ {
 		var err error
-		if last, err = d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, time.Now().UTC()); err != nil {
+		if last, err = d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, time.Now().UTC(), "", 0); err != nil {
 			t.Fatalf("record: %v", err)
 		}
 	}
@@ -409,14 +449,14 @@ func TestVoiceLossSurvivesMissingBaseline(t *testing.T) {
 	}
 	own := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
 	foreign := own.Add(-time.Hour)
-	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign); err != nil {
+	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign, "", 0); err != nil {
 		t.Fatalf("record: %v", err)
 	}
-	loss, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateCacheReset, own)
+	loss, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateCacheReset, own, "", 0)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
-	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign); err != nil {
+	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign, "", 0); err != nil {
 		t.Fatalf("record: %v", err)
 	}
 	if err := d.ClearGuildVoiceStates(ctx, guild); err != nil {

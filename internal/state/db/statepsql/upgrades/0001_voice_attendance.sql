@@ -38,6 +38,10 @@ CREATE UNLOGGED TABLE IF NOT EXISTS voice_guild_readiness
 	PRIMARY KEY ("guild_id")
 );
 
+-- Source positions fence delayed loss writes against a later repair without
+-- comparing gateway and database clocks. Legacy losses retain the time rule.
+ALTER TABLE voice_guild_readiness ADD COLUMN IF NOT EXISTS discord_seq int8 NOT NULL DEFAULT 0;
+
 -- Per-shard heartbeat, refreshed every few seconds while the connection is
 -- authenticated. ready is false while a loss is waiting to be recorded.
 CREATE UNLOGGED TABLE IF NOT EXISTS voice_shard_status
@@ -84,5 +88,8 @@ CREATE TABLE IF NOT EXISTS voice_shard_losses
 	"detected_at" timestamptz NOT NULL DEFAULT now(),
 	PRIMARY KEY ("revision")
 );
+
+ALTER TABLE voice_shard_losses ADD COLUMN IF NOT EXISTS connection_id text NOT NULL DEFAULT '';
+ALTER TABLE voice_shard_losses ADD COLUMN IF NOT EXISTS discord_seq int8 NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS voice_shard_losses_shard_revision ON voice_shard_losses ("shard_id", "revision");

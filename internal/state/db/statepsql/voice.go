@@ -134,16 +134,17 @@ func (db *db) ReplaceGuildVoiceStates(ctx context.Context, baseline state.VoiceB
 
 	const readiness = `
 INSERT INTO
-	voice_guild_readiness (guild_id, shard_id, connection_id, baseline_at)
+	voice_guild_readiness (guild_id, shard_id, connection_id, baseline_at, discord_seq)
 VALUES
-	($1, $2, $3, now())
+	($1, $2, $3, now(), $4)
 ON CONFLICT (guild_id)
 DO UPDATE SET
 	shard_id = excluded.shard_id,
 	connection_id = excluded.connection_id,
-	baseline_at = excluded.baseline_at
+	baseline_at = excluded.baseline_at,
+	discord_seq = excluded.discord_seq
 `
-	if _, err := tx.ExecContext(ctx, readiness, baseline.GuildID, baseline.ShardID, baseline.ConnectionID); err != nil {
+	if _, err := tx.ExecContext(ctx, readiness, baseline.GuildID, baseline.ShardID, baseline.ConnectionID, baseline.DiscordSeq); err != nil {
 		return xerrors.Errorf("mark guild ready: %w", err)
 	}
 	const guildShard = `
@@ -224,20 +225,20 @@ func (db *db) GetVoiceShardHeartbeat(ctx context.Context, shard int) (time.Time,
 	return at, true, nil
 }
 
-func (db *db) RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time) (*state.VoiceLoss, error) {
+func (db *db) RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time, connectionID string, sequence int64) (*state.VoiceLoss, error) {
 	// known_through can never be later than the moment the loss is recorded.
 	const q = `
 WITH pruned AS (
 	DELETE FROM voice_shard_losses WHERE detected_at < now() - $4::interval
 )
 INSERT INTO
-	voice_shard_losses (shard_id, reason, known_through)
+	voice_shard_losses (shard_id, reason, known_through, connection_id, discord_seq)
 VALUES
-	($1, $2, LEAST($3::timestamptz, now()))
+	($1, $2, LEAST($3::timestamptz, now()), $5, $6)
 RETURNING revision, reason, known_through, detected_at
 `
 	var row voiceLossRow
-	if err := db.sql.GetContext(ctx, &row, q, shard, reason, knownThrough.UTC(), voiceLossRetention); err != nil {
+	if err := db.sql.GetContext(ctx, &row, q, shard, reason, knownThrough.UTC(), voiceLossRetention, connectionID, sequence); err != nil {
 		return nil, xerrors.Errorf("exec insert: %w", err)
 	}
 	return &state.VoiceLoss{
@@ -253,6 +254,7 @@ type voiceReadinessRow struct {
 	ShardID      int       `db:"shard_id"`
 	ConnectionID string    `db:"connection_id"`
 	BaselineAt   time.Time `db:"baseline_at"`
+	DiscordSeq   int64     `db:"discord_seq"`
 }
 
 type voiceShardRow struct {
@@ -291,7 +293,7 @@ func (db *db) GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossR
 	}
 
 	var readiness voiceReadinessRow
-	err = tx.GetContext(ctx, &readiness, `SELECT shard_id, connection_id, baseline_at FROM voice_guild_readiness WHERE guild_id = $1`, guild)
+	err = tx.GetContext(ctx, &readiness, `SELECT shard_id, connection_id, baseline_at, discord_seq FROM voice_guild_readiness WHERE guild_id = $1`, guild)
 	if errors.Is(err, sql.ErrNoRows) {
 		snap.NotReadyReason = voiceNotReadyNoBaseline
 		// Without a baseline, recorded losses still say how far earlier
@@ -342,10 +344,17 @@ ORDER BY user_id
 		return nil, err
 	}
 
-	var lastCacheLoss sql.NullTime
-	if err := tx.GetContext(ctx, &lastCacheLoss, `
-SELECT max(detected_at) FROM voice_shard_losses WHERE shard_id = $1 AND reason = ANY($2)
-`, readiness.ShardID, pq.Array(cacheCorruptingVoiceLosses)); err != nil {
+	// Retry time is not loss time: a queued write from before this baseline
+	// must still notify consumers without invalidating the repair. Older
+	// binaries have no source position, so retain their conservative time rule.
+	var cacheLost bool
+	if err := tx.GetContext(ctx, &cacheLost, `
+SELECT EXISTS (
+	SELECT 1 FROM voice_shard_losses WHERE shard_id = $1 AND reason = ANY($2)
+	AND ((connection_id = '' AND detected_at >= $3)
+		OR (connection_id = $4 AND discord_seq >= $5))
+)
+`, readiness.ShardID, pq.Array(cacheCorruptingVoiceLosses), readiness.BaselineAt, readiness.ConnectionID, readiness.DiscordSeq); err != nil {
 		return nil, xerrors.Errorf("read cache losses: %w", err)
 	}
 
@@ -362,7 +371,7 @@ SELECT max(detected_at) FROM voice_shard_losses WHERE shard_id = $1 AND reason =
 		snap.NotReadyReason = voiceNotReadyShardNotReady
 	case shard.ConnectionID != readiness.ConnectionID:
 		snap.NotReadyReason = voiceNotReadyConnection
-	case lastCacheLoss.Valid && !lastCacheLoss.Time.Before(readiness.BaselineAt):
+	case cacheLost:
 		snap.NotReadyReason = voiceNotReadyCacheLoss
 	default:
 		snap.Ready = true

@@ -51,7 +51,7 @@ type DB interface {
 	DeleteChannelVoiceStates(ctx context.Context, guild, channel int64) error
 	HeartbeatVoiceShard(ctx context.Context, shard int, connectionID string, ready, resumed, wroteBefore bool) (baselinePending bool, err error)
 	GetVoiceShardHeartbeat(ctx context.Context, shard int) (heartbeatAt time.Time, found bool, err error)
-	RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time) (*VoiceLoss, error)
+	RecordVoiceLoss(ctx context.Context, shard int, reason string, knownThrough time.Time, connectionID string, sequence int64) (*VoiceLoss, error)
 	GetGuildVoiceSnapshot(ctx context.Context, guild int64, afterLossRevision int64, maxHeartbeatAge time.Duration) (*VoiceSnapshot, error)
 
 	SetGuildMembers(ctx context.Context, guild int64, raws map[int64][]byte) error

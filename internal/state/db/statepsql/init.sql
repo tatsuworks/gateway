@@ -183,6 +183,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS voice_guild_readiness
 	"shard_id" int4 NOT NULL,
 	"connection_id" text NOT NULL,
 	"baseline_at" timestamptz NOT NULL DEFAULT now(),
+	"discord_seq" int8 NOT NULL DEFAULT 0,
 	PRIMARY KEY ("guild_id")
 );
 
@@ -211,6 +212,8 @@ CREATE TABLE IF NOT EXISTS voice_shard_losses
 	"revision" int8 GENERATED ALWAYS AS IDENTITY,
 	"shard_id" int4 NOT NULL,
 	"reason" text NOT NULL,
+	"connection_id" text NOT NULL DEFAULT '',
+	"discord_seq" int8 NOT NULL DEFAULT 0,
 	"known_through" timestamptz NOT NULL,
 	"detected_at" timestamptz NOT NULL DEFAULT now(),
 	PRIMARY KEY ("revision")

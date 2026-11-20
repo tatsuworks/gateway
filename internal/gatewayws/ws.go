@@ -527,20 +527,18 @@ func (c *conn) run(parent context.Context) error {
 		}
 		if voiceCacheLost {
 			c.s.log.Error(c.ctx, "store voice state", slog.Error(err), slog.F("guild", voiceErr.GuildID))
-			c.s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, ev.Receipt.ReceivedAt)
+			c.s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, ev.Receipt.ReceivedAt, ev.Receipt.ConnectionID, ev.S)
 		}
 
 		c.setState("push event to redis")
 		c.s.log.Debug(c.ctx, "pushing event to redis", slog.F("op", ev.Op), slog.F("type", ev.T), slog.F("seq", ev.S))
 		if published := c.pushEventToRedis(ev); !published {
-			c.s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, ev.Receipt.ReceivedAt)
+			c.s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, ev.Receipt.ReceivedAt, ev.Receipt.ConnectionID, ev.S)
 		} else if !voiceCacheLost {
 			c.s.noteVoiceHandled(ev)
 		}
-		if voiceCacheLost && c.s.voice.cfg.reidentify {
-			// State's voice cache is now wrong; only a fresh GUILD_CREATE
-			// baseline can repair it, through the normal paced identify.
-			c.s.ForceIdentify()
+		if voiceCacheLost {
+			c.s.requestVoiceIdentify(time.Now())
 		}
 
 		// request guild members on GUILD_CREATE, gated by the backfill marker

@@ -34,6 +34,7 @@ const (
 
 	voiceHeartbeatInterval = 5 * time.Second
 	voiceDBTimeout         = 2 * time.Second
+	voiceIdentifyWindow    = 10 * time.Minute
 	receiptTimeLayout      = "2006-01-02T15:04:05.000000Z"
 )
 
@@ -97,13 +98,38 @@ type voiceState struct {
 	connID   atomic.Pointer[string]
 	lastGood atomic.Int64
 
-	mu      sync.Mutex
-	pending []pendingVoiceLoss
+	mu             sync.Mutex
+	pending        []pendingVoiceLoss
+	lastReidentify time.Time // Session-owned: survives READY, RESUMED and reconnects.
 }
 
 type pendingVoiceLoss struct {
 	reason       string
 	knownThrough time.Time
+	connectionID string
+	sequence     int64
+}
+
+// requestVoiceIdentify spends the shard's recovery budget only on a fresh
+// failure. Expiry alone never schedules another identify. Management-requested
+// identifies remain independent of this attendance-only limit.
+func (s *Session) requestVoiceIdentify(now time.Time) bool {
+	if !s.voice.enabled || !s.voice.cfg.reidentify {
+		return false
+	}
+	s.voice.mu.Lock()
+	if !s.voice.lastReidentify.IsZero() && now.Sub(s.voice.lastReidentify) < voiceIdentifyWindow {
+		retryAfter := s.voice.lastReidentify.Add(voiceIdentifyWindow)
+		s.voice.mu.Unlock()
+		s.log.Error(context.Background(), "voice recovery re-identify suppressed; baseline may require operator recovery",
+			slog.F("retry_after", retryAfter))
+		return false
+	}
+	s.voice.lastReidentify = now
+	s.voice.mu.Unlock()
+	s.log.Warn(context.Background(), "voice cache lost; re-identifying for fresh baselines")
+	s.ForceIdentify()
+	return true
 }
 
 func (s *Session) connectionID() string {
@@ -145,7 +171,7 @@ func (s *Session) lastVoiceGood() (time.Time, bool) {
 // still queued (State is evidently failing) a new one is only queued, merged
 // into a same-reason entry keeping the earlier cutoff, so the read loop never
 // stalls on a dead database and the queue stays bounded.
-func (s *Session) recordVoiceLoss(reason string, knownThrough time.Time) {
+func (s *Session) recordVoiceLoss(reason string, knownThrough time.Time, connectionID string, sequence int64) {
 	if !s.voice.enabled {
 		return
 	}
@@ -157,12 +183,19 @@ func (s *Session) recordVoiceLoss(reason string, knownThrough time.Time) {
 			if knownThrough.Before(s.voice.pending[i].knownThrough) {
 				s.voice.pending[i].knownThrough = knownThrough
 			}
+			// Keep the newest source position on the current connection.
+			// An old connection's delayed heartbeat must not replace it;
+			// the earliest cutoff still covers losses on older connections.
+			p := &s.voice.pending[i]
+			if connectionID == s.connectionID() && (p.connectionID != connectionID || sequence > p.sequence) {
+				p.connectionID, p.sequence = connectionID, sequence
+			}
 			merged = true
 			break
 		}
 	}
 	if !merged {
-		s.voice.pending = append(s.voice.pending, pendingVoiceLoss{reason: reason, knownThrough: knownThrough})
+		s.voice.pending = append(s.voice.pending, pendingVoiceLoss{reason: reason, knownThrough: knownThrough, connectionID: connectionID, sequence: sequence})
 	}
 	s.voice.mu.Unlock()
 	if !backlog {
@@ -178,7 +211,7 @@ func (s *Session) flushVoiceLosses() bool {
 	for len(s.voice.pending) > 0 {
 		next := s.voice.pending[0]
 		ctx, cancel := context.WithTimeout(context.Background(), voiceDBTimeout)
-		loss, err := s.stateDB.RecordVoiceLoss(ctx, s.shardID, next.reason, next.knownThrough)
+		loss, err := s.stateDB.RecordVoiceLoss(ctx, s.shardID, next.reason, next.knownThrough, next.connectionID, next.sequence)
 		cancel()
 		if err != nil {
 			s.log.Error(context.Background(), "record voice loss", slog.Error(err), slog.F("reason", next.reason))
@@ -238,7 +271,7 @@ func (s *Session) onVoiceIdentify(sessionID string) {
 	if !s.voice.enabled {
 		return
 	}
-	s.recordVoiceLoss(statepsql.VoiceLossIdentifyNoResume, s.voiceKnownThrough())
+	s.recordVoiceLoss(statepsql.VoiceLossIdentifyNoResume, s.voiceKnownThrough(), sessionID, atomic.LoadInt64(&s.seq))
 }
 
 // voiceKnownThrough is the latest point this shard's voice data is vouched
@@ -363,10 +396,11 @@ type voiceHeartbeatState struct {
 // identify, still finds it on the next heartbeat.
 func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
 	s := c.s
-	if !c.authed.Load() {
+	if c.ctx.Err() != nil || !c.authed.Load() {
 		return false
 	}
 	connID := s.connectionID()
+	sequence := atomic.LoadInt64(&s.seq)
 	if connID == "" {
 		return false
 	}
@@ -379,6 +413,9 @@ func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
 		s.log.Error(c.ctx, "voice readiness heartbeat", slog.Error(err))
 		return false
 	}
+	if c.ctx.Err() != nil {
+		return false
+	}
 	if pending && !hb.recovering {
 		// Once per connection: with re-identify off, the loss is recorded
 		// once and the baselines stay missing until an identify.
@@ -387,10 +424,8 @@ func (c *conn) voiceHeartbeatTick(hb *voiceHeartbeatState) bool {
 		if !hb.wrote {
 			knownThrough = s.voiceKnownThrough()
 		}
-		s.recordVoiceLoss(statepsql.VoiceLossStateCacheReset, knownThrough)
-		if s.voice.cfg.reidentify {
-			s.log.Warn(c.ctx, "voice cache reset; re-identifying for fresh baselines")
-			s.ForceIdentify()
+		s.recordVoiceLoss(statepsql.VoiceLossStateCacheReset, knownThrough, connID, sequence)
+		if s.requestVoiceIdentify(time.Now()) {
 			return true
 		}
 	}

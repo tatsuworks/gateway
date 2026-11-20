@@ -156,15 +156,17 @@ type lossFakeDB struct {
 	attempts   int
 	heartbeat  time.Time
 	hasHeartbe bool
+	sources    []pendingVoiceLoss
 }
 
-func (f *lossFakeDB) RecordVoiceLoss(_ context.Context, shard int, reason string, knownThrough time.Time) (*state.VoiceLoss, error) {
+func (f *lossFakeDB) RecordVoiceLoss(_ context.Context, shard int, reason string, knownThrough time.Time, connectionID string, sequence int64) (*state.VoiceLoss, error) {
 	f.attempts++
 	if f.down {
 		return nil, errors.New("state down")
 	}
 	loss := state.VoiceLoss{Revision: int64(len(f.stored) + 1), ShardID: shard, Reason: reason, KnownThrough: knownThrough, DetectedAt: time.Now()}
 	f.stored = append(f.stored, loss)
+	f.sources = append(f.sources, pendingVoiceLoss{connectionID: connectionID, sequence: sequence})
 	return &loss, nil
 }
 
@@ -177,10 +179,10 @@ func TestVoiceLossesQueueWhileStateIsDownKeepingEarliestCutoff(t *testing.T) {
 	s := voiceSession(t, db)
 	t0 := time.Date(2026, 11, 10, 18, 0, 0, 0, time.UTC)
 
-	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(2*time.Second))
-	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(time.Second))
-	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(3*time.Second))
-	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, t0.Add(4*time.Second))
+	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(2*time.Second), "", 0)
+	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(time.Second), "", 0)
+	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, t0.Add(3*time.Second), "", 0)
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, t0.Add(4*time.Second), "", 0)
 	if db.attempts != 1 {
 		t.Fatalf("with a backlog the read loop must not retry State per event: %d attempts", db.attempts)
 	}
@@ -197,6 +199,25 @@ func TestVoiceLossesQueueWhileStateIsDownKeepingEarliestCutoff(t *testing.T) {
 	}
 }
 
+func TestQueuedVoiceLossKeepsCurrentSourceAndEarliestCutoff(t *testing.T) {
+	db := &lossFakeDB{down: true}
+	s := voiceSession(t, db)
+	now := time.Now()
+	s.onVoiceResume("old")
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, now, "old", 900)
+	s.onVoiceResume("new")
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, now.Add(time.Second), "new", 2)
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, now.Add(2*time.Second), "new", 4)
+	// A heartbeat finishing late on the old connection cannot hide current
+	// corruption, nor can an older position on this connection.
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, now.Add(-time.Second), "old", 1000)
+	s.recordVoiceLoss(statepsql.VoiceLossStateWriteFailed, now, "new", 3)
+	db.down = false
+	if !s.flushVoiceLosses() || len(db.stored) != 1 || db.sources[0].connectionID != "new" || db.sources[0].sequence != 4 || !db.stored[0].KnownThrough.Equal(now.Add(-time.Second)) {
+		t.Fatalf("source=%+v losses=%+v", db.sources, db.stored)
+	}
+}
+
 func TestVoiceLossNoticeGoesOnlyToDestinationsThatAskForIt(t *testing.T) {
 	eventer := localRedis(t, "localhost:6379", 14)
 	worker := localRedis(t, "127.0.0.1:6379", 15)
@@ -208,7 +229,7 @@ func TestVoiceLossNoticeGoesOnlyToDestinationsThatAskForIt(t *testing.T) {
 		"127.0.0.1:6379": {"VOICE_STATE_UPDATE": {}},
 	}
 
-	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, time.Date(2026, 11, 10, 18, 20, 0, 0, time.UTC))
+	s.recordVoiceLoss(statepsql.VoiceLossPublishFailed, time.Date(2026, 11, 10, 18, 20, 0, 0, time.UTC), "", 0)
 	raw, err := eventer.LPop(context.Background(), "gateway:events:"+VoiceLossEvent).Bytes()
 	if err != nil {
 		t.Fatalf("eventer must get the notice: %v", err)
@@ -387,6 +408,53 @@ func TestHeartbeatRecoveryOutlivesALostAnswerAndARestart(t *testing.T) {
 	hb = voiceHeartbeatState{}
 	if fresh.voiceHeartbeatTick(&hb) || db.pending {
 		t.Fatalf("a freshly identified connection clears the mark: pending=%v", db.pending)
+	}
+}
+
+func TestVoiceRecoveryRollingWindow(t *testing.T) {
+	s := voiceSession(t, &lossFakeDB{})
+	now := time.Now()
+	if !s.requestVoiceIdentify(now) {
+		t.Fatal("first qualifying failure must recover")
+	}
+	s.onVoiceIdentify("fresh-session")
+	s.onVoiceResume("fresh-session")
+	for _, offset := range []time.Duration{time.Second, 9 * time.Minute, 10*time.Minute - time.Nanosecond} {
+		if s.requestVoiceIdentify(now.Add(offset)) {
+			t.Fatalf("READY/RESUMED must not reset the rolling window: %v", offset)
+		}
+	}
+	if !s.requestVoiceIdentify(now.Add(10 * time.Minute)) {
+		t.Fatal("a fresh failure at expiry may recover again")
+	}
+	if s.requestVoiceIdentify(now.Add(11 * time.Minute)) {
+		t.Fatal("the new attempt starts another ten-minute window")
+	}
+	s.voice.cfg.reidentify = false
+	if s.requestVoiceIdentify(now.Add(time.Hour)) {
+		t.Fatal("the existing explicit disable must still work")
+	}
+}
+
+func TestVoiceRecoveryBudgetSurvivesReconnects(t *testing.T) {
+	db := &heartbeatFakeDB{}
+	c := heartbeatConn(t, db, true)
+	var hb voiceHeartbeatState
+	if !c.voiceHeartbeatTick(&hb) {
+		t.Fatal("first-rollout resumed connection must recover its missing baseline")
+	}
+
+	// A new connection, not a new Session: its own heartbeat history resets,
+	// but repeated cache failures must not keep re-identifying the shard.
+	c = &conn{s: c.s, ctx: context.Background(), cancel: func() {}}
+	c.authed.Store(true)
+	c.resumed.Store(true)
+	hb = voiceHeartbeatState{}
+	if c.voiceHeartbeatTick(&hb) {
+		t.Fatal("a reconnect must not replenish the shard's voice recovery budget")
+	}
+	if !db.pending {
+		t.Fatal("suppression must leave baseline recovery pending, not claim readiness")
 	}
 }
 

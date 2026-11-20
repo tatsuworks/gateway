@@ -165,9 +165,17 @@ func (_ *decoder) DecodeGuildCreate(buf []byte) (*discord.GuildCreate, error) {
 				return false
 			}
 
+		case "unavailable":
+			gc.Unavailable = iter.ReadBool()
+
+			writeComma()
+			gStream.WriteObjectField(key)
+			gStream.WriteBool(gc.Unavailable)
+
 		case "voice_states":
 			var voiceStates []jsoniter.RawMessage
 			iter.ReadVal(&voiceStates)
+			gc.VoiceStatesPresent = true
 			gc.VoiceStates, err = rawsToMapBySnowflake(voiceStates, "user_id")
 			if err != nil {
 				err = xerrors.Errorf("map voiceStates by id: %w", err)

@@ -38,6 +38,9 @@ func (s *Session) loadSessID() {
 	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		s.log.Error(context.Background(), "load session id", slog.Error(err))
 	}
+	// Discord replays missed dispatches before RESUMED; they belong to the
+	// stored session.
+	s.adoptResumableConnection()
 }
 
 func (s *Session) loadResumeURL() {

@@ -186,7 +186,3 @@ func (db *db) DeleteChannelsById(ctx context.Context, guild int64, channelIDs []
 
 	return nil
 }
-
-func (db *db) SetVoiceState(ctx context.Context, guild, user int64, raw []byte) error {
-	return nil
-}

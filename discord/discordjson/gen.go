@@ -1,8 +1,6 @@
 package discordjson
 
 import (
-	"unsafe"
-
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tatsuworks/gateway/discord"
 	"golang.org/x/xerrors"
@@ -25,5 +23,7 @@ func (_ decoder) DecodeT(buf []byte) (*discord.Event, error) {
 		return nil, xerrors.Errorf("unmarshal event: %w", err)
 	}
 
-	return (*discord.Event)(unsafe.Pointer(&e)), nil
+	// Copy rather than cast: discord.Event is larger (Receipt), and a cast
+	// would let the gateway's receipt stamp write past this allocation.
+	return &discord.Event{D: e.D, Op: e.Op, S: e.S, T: e.T}, nil
 }

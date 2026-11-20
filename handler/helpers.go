@@ -24,7 +24,7 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "PRESENCE_UPDATE":
 		return nil, c.PresenceCreate(ctx, e.D)
 	case "GUILD_CREATE":
-		return c.GuildCreate(ctx, e.D)
+		return c.guildCreate(ctx, e, true)
 	case "GUILD_UPDATE":
 		return c.GuildCreate(ctx, e.D)
 	case "GUILD_DELETE":
@@ -56,7 +56,7 @@ func (c *Client) HandleEvent(ctx context.Context, e *discord.Event) (*EventPaylo
 	case "CHANNEL_DELETE":
 		return nil, c.ChannelDelete(ctx, e.D)
 	case "VOICE_STATE_UPDATE":
-		return nil, c.VoiceStateUpdate(ctx, e.D)
+		return nil, c.voiceStateUpdate(ctx, e)
 	case "THREAD_CREATE":
 		return nil, c.ThreadCreate(ctx, e.D)
 	case "THREAD_UPDATE":

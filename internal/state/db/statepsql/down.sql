@@ -7,3 +7,7 @@ drop TABLE roles;
 drop TABLE threads;
 drop table presence;
 drop TABLE guild_backfills;
+drop TABLE voice_guild_readiness;
+drop TABLE voice_shard_status;
+drop TABLE voice_guild_shards;
+drop TABLE voice_shard_losses;

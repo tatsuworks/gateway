@@ -13,7 +13,7 @@ require (
 	github.com/json-iterator/go v1.1.10-0.20200206015604-7acbb404a45b
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/lib/pq v1.10.9
-	github.com/minio/simdjson-go v0.1.4
+	github.com/minio/simdjson-go v0.4.0
 	github.com/pkg/errors v0.8.1
 	github.com/redis/go-redis/v9 v9.14.0
 	github.com/tatsuworks/czlib v0.0.0-20190916143545-2fa68a6fc561
@@ -51,6 +51,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
 	github.com/klauspost/compress v1.15.0 // indirect
 	github.com/klauspost/cpuid v1.2.2 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect

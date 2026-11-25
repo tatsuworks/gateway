@@ -60,7 +60,7 @@ A feature is done only when:
 ## Project Overview
 
 Discord Gateway & State Cache service for Tatsu. Two components:
-- **Gateway** (`cmd/gateway/`) — Multiplexes many Discord WebSocket connections (720+ shards at peak, ~4 cores). Publishes events to Redis via RPUSH with ETF-encoded payloads.
+- **Gateway** (`cmd/gateway/`) — Multiplexes many Discord WebSocket connections (720+ shards at peak, ~4 cores). Publishes events to Redis via RPUSH with JSON-encoded payloads.
 - **State Cache** (`cmd/state/`) — HTTP/2 REST API for querying cached Discord state (guilds, channels, members, roles, messages, threads).
 
 ## Build & Run
@@ -104,8 +104,8 @@ Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Man
 - `internal/state/` — `state.DB` interface (~93 methods) abstracting the storage backend
 - `internal/state/db/statepsql/` — PostgreSQL implementation (the only backend; the deprecated FoundationDB path has been removed)
 - `internal/state/api/` — REST API handlers for state queries (fasthttp + httprouter)
-- `discord/discordetf/` — Custom ETF (Erlang Term Format) encoder/decoder built from scratch
-- `discord/discordjson/` — JSON encoding alternative
+- `discord/discordetf/` — Custom ETF (Erlang Term Format) encoder/decoder built from scratch (unused; the Postgres state backend selects JSON)
+- `discord/discordjson/` — JSON encoding (the one in use)
 - `gatewaypb/` — Protobuf definitions for gRPC management API (Version, RequestGuildMembers, RestartShard, Stats)
 
 ### Coordination
@@ -114,7 +114,7 @@ Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Man
 - **gRPC** — Management API for shard control
 
 ### Key Interfaces
-- `discord.Encoding` — Abstraction over ETF vs JSON encoding
+- `discord.Encoding` — Abstraction over ETF vs JSON encoding (`statepsql` returns JSON)
 - `state.DB` — Storage backend abstraction (PostgreSQL)
 
 ## Environment Variables

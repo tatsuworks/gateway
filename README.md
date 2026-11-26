@@ -6,11 +6,11 @@ Consists of 2 components: Gateway & State Cache
 NOTE: This currently only supports Tatsu's specific use case. More backends will be written in the future
 as time permits.
 
-A custom ETF parser was written from the ground up. During peak traffic, gateway uses ~4 cores for 720 shards.
+A custom ETF parser was written from the ground up; it is retained but unused, since the Postgres state backend selects JSON. During peak traffic, gateway uses ~4 cores for 720 shards.
 
 State is stored in [Postgres](https://www.postgresql.org/) and accessed via the State Cache (cmd/state). Pass the Postgres address with `-psqlAddr` (gateway) or `-psql` (state); it is required.
 
-Events are pushed to [redis](https://redis.io) using `RPUSH`. The content is the `d` key of the event encoded as ETF.
+Events are pushed to [redis](https://redis.io) using `RPUSH`. The content is the `d` key of the event, encoded as JSON.
 
 ## Common Dependencies
 

@@ -114,7 +114,7 @@ Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Man
 - **gRPC** — Management API for shard control
 
 ### Key Interfaces
-- `discord.Encoding` — Abstraction over ETF vs JSON encoding (`statepsql` returns JSON)
+- `discord.Encoding` — Encoding abstraction; an ETF implementation is retained, but the only backend (`statepsql`) returns JSON
 - `state.DB` — Storage backend abstraction (PostgreSQL)
 
 ## Environment Variables

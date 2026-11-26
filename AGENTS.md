@@ -94,8 +94,10 @@ Protobuf generation for gRPC management API:
 
 ### Event Flow
 ```
-Discord WS → gatewayws.Session → handler.Client → state.DB (store) → Manager → Redis RPUSH → consumers (BLPOP)
+Discord WS → gatewayws.Session → handler.Client → state.DB (store)
+             └→ Redis RPUSH (per-address event whitelist) → consumers (BLPOP)
 ```
+The session pushes to Redis (`internal/gatewayws/ws.go`, `pushEventToRedis`); `Manager` only creates the Redis clients and whitelists from `MULTI_REDIS` and passes them to each session.
 
 ### Key Packages
 - `internal/gatewayws/` — WebSocket session lifecycle per shard (connect, read, write, heartbeat, identify)

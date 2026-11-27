@@ -4,12 +4,23 @@ import (
 	"context"
 	"encoding/json"
 
+	"cdr.dev/slog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
+
+	"github.com/tatsuworks/gateway/discord"
+	"github.com/tatsuworks/gateway/discord/discordjson"
+	"github.com/tatsuworks/gateway/internal/state"
 )
 
 func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, error) {
-	gc, err := c.enc.DecodeGuildCreate(d)
+	return c.guildCreate(ctx, &discord.Event{T: "GUILD_UPDATE", D: d}, false)
+}
+
+// guildCreate stores a GUILD_CREATE or GUILD_UPDATE. Only a GUILD_CREATE is a
+// voice baseline: GUILD_UPDATE never carries voice states.
+func (c *Client) guildCreate(ctx context.Context, e *discord.Event, baseline bool) (*EventPayload, error) {
+	gc, err := c.enc.DecodeGuildCreate(e.D)
 	if err != nil {
 		return nil, xerrors.Errorf("parse guild create: %w", err)
 	}
@@ -104,12 +115,79 @@ func (c *Client) GuildCreate(ctx context.Context, d []byte) (*EventPayload, erro
 		memberIDs = append(memberIDs, id)
 	}
 
-	return &EventPayload{
+	payload := &EventPayload{
 		GuildID:         gc.ID,
 		MemberCount:     gc.MemberCount,
 		ReceivedMembers: len(gc.Members),
 		MemberIDs:       memberIDs,
-	}, nil
+	}
+
+	if baseline && c.TracksVoice(gc.ID) {
+		if err := c.replaceVoiceBaseline(ctx, e, gc); err != nil {
+			return payload, &VoiceStateError{GuildID: gc.ID, Err: err}
+		}
+	}
+
+	return payload, nil
+}
+
+// replaceVoiceBaseline makes a complete GUILD_CREATE the guild's voice
+// presence. An unavailable guild carries no state at all, so it clears the
+// presence and its readiness instead of storing an empty channel list as if
+// it were real; so does a payload that somehow lacks voice_states.
+func (c *Client) replaceVoiceBaseline(ctx context.Context, e *discord.Event, gc *discord.GuildCreate) error {
+	if gc.Unavailable || !gc.VoiceStatesPresent || e.Receipt.ConnectionID == "" {
+		// Tracked guilds only, so this stays rare; it names why Start will
+		// report the guild unavailable.
+		c.log.Warn(ctx, "voice baseline not stored",
+			slog.F("guild", gc.ID),
+			slog.F("unavailable", gc.Unavailable),
+			slog.F("voice_states_present", gc.VoiceStatesPresent),
+			slog.F("has_connection_id", e.Receipt.ConnectionID != ""))
+		if err := c.db.ClearGuildVoiceStates(ctx, gc.ID); err != nil {
+			return xerrors.Errorf("clear voice baseline: %w", err)
+		}
+		return nil
+	}
+
+	baseline := state.VoiceBaseline{
+		GuildID:      gc.ID,
+		ShardID:      e.Receipt.ShardID,
+		ConnectionID: e.Receipt.ConnectionID,
+		ReceivedAt:   e.Receipt.ReceivedAt,
+		DiscordSeq:   e.S,
+		Occupants:    make([]state.VoiceOccupant, 0, len(gc.VoiceStates)),
+		Raws:         gc.VoiceStates,
+	}
+	for userID, raw := range gc.VoiceStates {
+		channelID, err := discordjson.ChannelIDOf(raw)
+		if err != nil {
+			return xerrors.Errorf("read voice channel: %w", err)
+		}
+		if channelID == 0 {
+			continue
+		}
+		// GUILD_CREATE voice states may omit the member; without the presence
+		// intent Discord still lists every voice-connected member in members.
+		isBot := discordjson.VoiceStateIsBot(raw)
+		if isBot == nil {
+			if member, ok := gc.Members[userID]; ok {
+				isBot = discordjson.MemberIsBot(member)
+			}
+		}
+		baseline.Occupants = append(baseline.Occupants, state.VoiceOccupant{
+			UserID:    userID,
+			ChannelID: channelID,
+			IsBot:     isBot,
+		})
+	}
+
+	if err := c.db.ReplaceGuildVoiceStates(ctx, baseline); err != nil {
+		return xerrors.Errorf("replace voice baseline: %w", err)
+	}
+	c.log.Info(ctx, "voice baseline stored",
+		slog.F("guild", gc.ID), slog.F("shard", baseline.ShardID), slog.F("occupants", len(baseline.Occupants)))
+	return nil
 }
 
 func (c *Client) GuildDelete(ctx context.Context, d []byte) error {
@@ -128,6 +206,17 @@ func (c *Client) GuildDelete(ctx context.Context, d []byte) error {
 
 		return nil
 	})
+
+	// Removed or unavailable either way: nothing State holds about the guild's
+	// voice presence can be vouched for any more.
+	if c.TracksVoice(gc.ID) {
+		eg.Go(func() error {
+			if err := c.db.ClearGuildVoiceStates(ctx, gc.ID); err != nil {
+				return &VoiceStateError{GuildID: gc.ID, Err: xerrors.Errorf("clear voice states: %w", err)}
+			}
+			return nil
+		})
+	}
 
 	// eg.Go(func() error {
 	// 	err := c.db.DeleteGuildRoles(ctx, gc.ID)

@@ -1,0 +1,516 @@
+package statepsql
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"cdr.dev/slog/sloggers/sloghuman"
+
+	"github.com/tatsuworks/gateway/internal/state"
+)
+
+// newVoiceTestDB connects to STATE_TEST_PSQL (default: the same local database
+// the other statepsql tests use) and skips when it is unavailable. The
+// database needs init.sql and upgrades/0001_voice_attendance.sql applied.
+func newVoiceTestDB(t *testing.T) *db {
+	t.Helper()
+	addr := os.Getenv("STATE_TEST_PSQL")
+	if addr == "" {
+		addr = "postgresql://tatsu@localhost/state?sslmode=disable"
+	}
+	d, err := NewDB(context.Background(), addr, sloghuman.Make(os.Stderr))
+	if err != nil {
+		t.Skipf("skipping: postgres not available: %v", err)
+	}
+	return d.(*db)
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+// testShard picks a shard id unlikely to collide with concurrent test runs.
+func testShard() int { return 100000 + rand.Intn(1_000_000) }
+
+func mustSnapshot(t *testing.T, d *db, guild int64, after int64) *state.VoiceSnapshot {
+	t.Helper()
+	snap, err := d.GetGuildVoiceSnapshot(context.Background(), guild, after, 15*time.Second)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	return snap
+}
+
+func baselineFor(guild int64, shard int, conn string, occupants ...state.VoiceOccupant) state.VoiceBaseline {
+	return state.VoiceBaseline{
+		GuildID:      guild,
+		ShardID:      shard,
+		ConnectionID: conn,
+		ReceivedAt:   time.Now().UTC(),
+		DiscordSeq:   7,
+		Occupants:    occupants,
+		Raws:         map[int64][]byte{},
+	}
+}
+
+func TestVoiceSnapshotRequiresBaselineAndFreshHeartbeat(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyNoBaseline || snap.ShardID != -1 {
+		t.Fatalf("no baseline must be unready with no shard, got %+v", snap)
+	}
+
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn-a")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyNoHeartbeat {
+		t.Fatalf("a baseline without a heartbeat must be unready, got %+v", snap)
+	}
+
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn-a", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	snap := mustSnapshot(t, d, guild, 0)
+	if !snap.Ready || !snap.Complete || len(snap.Occupants) != 0 {
+		t.Fatalf("verified empty presence must be ready and complete with no occupants, got %+v", snap)
+	}
+
+	// A heartbeat older than the limit is stale, never ready.
+	if _, err := d.sql.Exec(`UPDATE voice_shard_status SET heartbeat_at = now() - interval '20 seconds' WHERE shard_id = $1`, shard); err != nil {
+		t.Fatalf("age heartbeat: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyStale {
+		t.Fatalf("stale heartbeat must be unready, got %+v", snap)
+	}
+
+	// A shard that reports itself not ready (an unrecorded loss) is unready.
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn-a", false, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyShardNotReady {
+		t.Fatalf("not-ready shard must be unready, got %+v", snap)
+	}
+
+	// A new connection invalidates the old connection's baseline until a fresh
+	// GUILD_CREATE arrives on it.
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn-b", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyConnection {
+		t.Fatalf("baseline from another connection must be unready, got %+v", snap)
+	}
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn-b")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); !snap.Ready {
+		t.Fatalf("fresh baseline on the current connection must be ready, got %+v", snap)
+	}
+}
+
+func TestVoiceBaselineReplacesPresenceAndClassifies(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	human, bot, gone := rand.Int63(), rand.Int63(), rand.Int63()
+	channel := rand.Int63()
+
+	if err := d.ApplyVoiceState(ctx, state.VoiceStateChange{GuildID: guild, UserID: gone, ChannelID: channel, IsBot: boolPtr(false), Raw: []byte(`{}`)}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn",
+		state.VoiceOccupant{UserID: human, ChannelID: channel, IsBot: boolPtr(false)},
+		state.VoiceOccupant{UserID: bot, ChannelID: channel, IsBot: boolPtr(true)},
+	)); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+
+	snap := mustSnapshot(t, d, guild, 0)
+	if !snap.Ready || !snap.Complete || len(snap.Occupants) != 2 {
+		t.Fatalf("baseline must replace earlier presence exactly, got %+v", snap)
+	}
+	byUser := map[int64]state.VoiceOccupant{}
+	for _, o := range snap.Occupants {
+		byUser[o.UserID] = o
+	}
+	if _, ok := byUser[gone]; ok {
+		t.Fatalf("baseline must drop users it does not list")
+	}
+	if o := byUser[bot]; o.IsBot == nil || !*o.IsBot {
+		t.Fatalf("bot must stay classified as bot, got %+v", o)
+	}
+	if o := byUser[human]; o.IsBot == nil || *o.IsBot || o.DiscordSeq != 7 {
+		t.Fatalf("human must be classified with the baseline sequence, got %+v", o)
+	}
+}
+
+func TestVoiceUnclassifiedOccupantIsIncompleteUntilMemberKnown(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	user, channel := rand.Int63(), rand.Int63()
+
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if err := d.ApplyVoiceState(ctx, state.VoiceStateChange{GuildID: guild, UserID: user, ChannelID: channel, Raw: []byte(`{}`)}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	snap := mustSnapshot(t, d, guild, 0)
+	if !snap.Ready || snap.Complete || snap.Occupants[0].IsBot != nil {
+		t.Fatalf("an unknown account must leave the snapshot incomplete, got %+v", snap)
+	}
+
+	// A cached member with a user object and no bot flag is a human.
+	if _, err := d.sql.Exec(`INSERT INTO members (guild_id, user_id, data) VALUES ($1, $2, '{"user":{"id":"1"}}')`, guild, user); err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+	if err := d.ApplyVoiceState(ctx, state.VoiceStateChange{GuildID: guild, UserID: user, ChannelID: channel, Raw: []byte(`{}`)}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	snap = mustSnapshot(t, d, guild, 0)
+	if !snap.Complete || snap.Occupants[0].IsBot == nil || *snap.Occupants[0].IsBot {
+		t.Fatalf("cached member must classify the occupant as human, got %+v", snap)
+	}
+}
+
+func TestVoiceApplyMovesLeavesAndKeepsArrivalOnMute(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	user, movie, game := rand.Int63(), rand.Int63(), rand.Int63()
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+
+	joined := time.Date(2026, 11, 10, 18, 0, 0, 0, time.UTC)
+	apply := func(channel int64, at time.Time, seq int64) {
+		t.Helper()
+		if err := d.ApplyVoiceState(ctx, state.VoiceStateChange{
+			GuildID: guild, UserID: user, ChannelID: channel, IsBot: boolPtr(false),
+			ChangedAt: at, DiscordSeq: seq, Raw: []byte(`{}`),
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	}
+	apply(movie, joined, 1)
+	apply(movie, joined.Add(5*time.Minute), 2) // mute: same channel
+	snap := mustSnapshot(t, d, guild, 0)
+	if got := snap.Occupants[0]; got.ChannelID != movie || !got.ChangedAt.Equal(joined) || got.DiscordSeq != 2 {
+		t.Fatalf("same-channel update must keep arrival time, got %+v", got)
+	}
+
+	moved := joined.Add(15 * time.Minute)
+	apply(game, moved, 3)
+	snap = mustSnapshot(t, d, guild, 0)
+	if got := snap.Occupants[0]; got.ChannelID != game || !got.ChangedAt.Equal(moved) {
+		t.Fatalf("move must change channel and time, got %+v", got)
+	}
+
+	apply(0, moved.Add(time.Minute), 4)
+	if snap := mustSnapshot(t, d, guild, 0); len(snap.Occupants) != 0 {
+		t.Fatalf("departure must remove the occupant, got %+v", snap.Occupants)
+	}
+}
+
+func TestVoiceChannelAndGuildClearing(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	a, b, keep, drop := rand.Int63(), rand.Int63(), rand.Int63(), rand.Int63()
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn",
+		state.VoiceOccupant{UserID: a, ChannelID: drop, IsBot: boolPtr(false)},
+		state.VoiceOccupant{UserID: b, ChannelID: keep, IsBot: boolPtr(false)},
+	)); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if err := d.DeleteChannelVoiceStates(ctx, guild, drop); err != nil {
+		t.Fatalf("delete channel: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); len(snap.Occupants) != 1 || snap.Occupants[0].UserID != b {
+		t.Fatalf("deleted channel must lose its occupants only, got %+v", snap.Occupants)
+	}
+
+	if err := d.ClearGuildVoiceStates(ctx, guild); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyNoBaseline {
+		t.Fatalf("cleared guild must be unready, never empty-and-ready, got %+v", snap)
+	}
+}
+
+func TestVoiceLossesKeepEarliestCutoffAndBlockReadinessUntilRebaseline(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	if _, err := d.HeartbeatVoiceShard(ctx, shard, "conn", true, false, false); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	start := mustSnapshot(t, d, guild, 0)
+	var startRevision int64
+	if start.Loss != nil {
+		startRevision = start.Loss.Revision
+	}
+
+	early := time.Now().UTC().Add(-2 * time.Minute).Truncate(time.Microsecond)
+	later := time.Now().UTC().Add(-1 * time.Minute).Truncate(time.Microsecond)
+	first, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early, "", 0)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	second, err := d.RecordVoiceLoss(ctx, shard, VoiceLossIdentifyNoResume, later, "", 0)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if second.Revision <= first.Revision {
+		t.Fatalf("revisions must increase: %d then %d", first.Revision, second.Revision)
+	}
+
+	snap := mustSnapshot(t, d, guild, startRevision)
+	if snap.Loss == nil || snap.Loss.Revision != second.Revision || !snap.Loss.KnownThrough.Equal(early) {
+		t.Fatalf("a later loss must not hide the earlier cutoff, got %+v", snap.Loss)
+	}
+	if !snap.Ready {
+		t.Fatalf("publication and identify losses leave State's own cache usable, got %+v", snap)
+	}
+	if snap := mustSnapshot(t, d, guild, first.Revision); !snap.Loss.KnownThrough.Equal(later) {
+		t.Fatalf("losses the caller has seen must not lower the cutoff, got %+v", snap.Loss)
+	}
+	if snap := mustSnapshot(t, d, guild, second.Revision); snap.Loss != nil {
+		t.Fatalf("no loss after the latest revision, got %+v", snap.Loss)
+	}
+
+	future := time.Now().Add(time.Hour)
+	capped, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateWriteFailed, future, "", 0)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if capped.KnownThrough.After(capped.DetectedAt) {
+		t.Fatalf("known-through must never pass detection, got %+v", capped)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyCacheLoss {
+		t.Fatalf("a failed State write must make the guild unready, got %+v", snap)
+	}
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("rebaseline: %v", err)
+	}
+	if snap := mustSnapshot(t, d, guild, 0); !snap.Ready {
+		t.Fatalf("a newer baseline must restore readiness, got %+v", snap)
+	}
+}
+
+func TestDelayedVoiceLossDoesNotInvalidateARepairedBaseline(t *testing.T) {
+	for _, reason := range []string{VoiceLossStateWriteFailed, VoiceLossStateCacheReset} {
+		for _, previousConnection := range []bool{false, true} {
+			t.Run(reason+fmt.Sprint(previousConnection), func(t *testing.T) {
+				d := newVoiceTestDB(t)
+				ctx := context.Background()
+				guild, shard := rand.Int63(), testShard()
+				baseline := baselineFor(guild, shard, "fresh")
+				baseline.DiscordSeq = 20
+				if err := d.ReplaceGuildVoiceStates(ctx, baseline); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := d.HeartbeatVoiceShard(ctx, shard, "fresh", true, false, false); err != nil {
+					t.Fatal(err)
+				}
+				source, sequence := "fresh", int64(19)
+				if previousConnection {
+					source, sequence = "old", 1000 // sequences are not comparable across sessions
+				}
+				cutoff := baseline.ReceivedAt.Add(-time.Minute).Truncate(time.Microsecond)
+				loss, err := d.RecordVoiceLoss(ctx, shard, reason, cutoff, source, sequence)
+				if err != nil {
+					t.Fatal(err)
+				}
+				snap := mustSnapshot(t, d, guild, 0)
+				if !snap.Ready || snap.Loss == nil || snap.Loss.Revision != loss.Revision || !snap.Loss.KnownThrough.Equal(cutoff) {
+					t.Fatalf("old loss must still reach consumers, but must not poison the repair: %+v", snap)
+				}
+				if _, err := d.RecordVoiceLoss(ctx, shard, reason, cutoff, "fresh", 20); err != nil {
+					t.Fatal(err)
+				}
+				if snap := mustSnapshot(t, d, guild, 0); snap.Ready || snap.NotReadyReason != voiceNotReadyCacheLoss {
+					t.Fatalf("a new cache loss must invalidate even with an old cutoff: %+v", snap)
+				}
+			})
+		}
+	}
+}
+
+func TestVoiceHeartbeatKeepsPendingBaselinesUntilAFreshIdentify(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	shard := testShard()
+	beat := func(conn string, resumed, wroteBefore bool) bool {
+		t.Helper()
+		pending, err := d.HeartbeatVoiceShard(ctx, shard, conn, true, resumed, wroteBefore)
+		if err != nil {
+			t.Fatalf("heartbeat: %v", err)
+		}
+		return pending
+	}
+
+	if beat("sess-1", false, false) || beat("sess-1", false, true) {
+		t.Fatalf("an identified connection writing its row has nothing pending")
+	}
+	if beat("sess-1", true, false) {
+		t.Fatalf("a resume that finds its row has nothing pending")
+	}
+
+	// The row is lost to a cache reset; the resumed connection recreates it.
+	if _, err := d.sql.Exec(`DELETE FROM voice_shard_status WHERE shard_id = $1`, shard); err != nil {
+		t.Fatalf("simulate reset: %v", err)
+	}
+	if !beat("sess-1", true, false) {
+		t.Fatalf("a resumed connection recreating the row leaves baselines pending")
+	}
+	if !beat("sess-1", true, false) || !beat("sess-1", false, true) {
+		t.Fatalf("later heartbeats of the same session still see it pending, even if the first answer was lost")
+	}
+	if beat("sess-2", false, false) {
+		t.Fatalf("a freshly identified connection rebuilds the baselines and clears it")
+	}
+
+	// A row vanishing under a connection that wrote it is also pending.
+	if _, err := d.sql.Exec(`DELETE FROM voice_shard_status WHERE shard_id = $1`, shard); err != nil {
+		t.Fatalf("simulate reset: %v", err)
+	}
+	if !beat("sess-2", false, true) {
+		t.Fatalf("a row recreated by a connection that wrote it before is pending")
+	}
+	at, found, err := d.GetVoiceShardHeartbeat(ctx, shard)
+	if err != nil || !found || time.Since(at) > time.Minute {
+		t.Fatalf("heartbeat read: at=%v found=%v err=%v", at, found, err)
+	}
+}
+
+func TestVoiceLossCutoffCoversEveryUnseenLoss(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(guild, shard, "conn")); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+	var after int64
+	if start := mustSnapshot(t, d, guild, 0); start.Loss != nil {
+		after = start.Loss.Revision
+	}
+	early := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
+	if _, err := d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, early, "", 0); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	var last *state.VoiceLoss
+	for i := 0; i < 1001; i++ {
+		var err error
+		if last, err = d.RecordVoiceLoss(ctx, shard, VoiceLossPublishFailed, time.Now().UTC(), "", 0); err != nil {
+			t.Fatalf("record: %v", err)
+		}
+	}
+	snap := mustSnapshot(t, d, guild, after)
+	if snap.Loss == nil || snap.Loss.Revision != last.Revision || !snap.Loss.KnownThrough.Equal(early) {
+		t.Fatalf("however many later losses, the earliest unseen cutoff must survive: %+v", snap.Loss)
+	}
+}
+
+func TestVoiceLossSurvivesMissingBaseline(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, other := rand.Int63(), rand.Int63()
+	shard := testShard()
+	otherShard := shard + 1
+	for g, sh := range map[int64]int{guild: shard, other: otherShard} {
+		if err := d.ReplaceGuildVoiceStates(ctx, baselineFor(g, sh, "conn")); err != nil {
+			t.Fatalf("baseline: %v", err)
+		}
+	}
+	var after int64
+	if start := mustSnapshot(t, d, guild, 0); start.Loss != nil {
+		after = start.Loss.Revision
+	}
+	own := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
+	foreign := own.Add(-time.Hour)
+	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign, "", 0); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	loss, err := d.RecordVoiceLoss(ctx, shard, VoiceLossStateCacheReset, own, "", 0)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if _, err := d.RecordVoiceLoss(ctx, otherShard, VoiceLossStateCacheReset, foreign, "", 0); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if err := d.ClearGuildVoiceStates(ctx, guild); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	snap, err := d.GetGuildVoiceSnapshot(ctx, guild, after, time.Minute)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	if snap.Ready || snap.NotReadyReason != voiceNotReadyNoBaseline || snap.ShardID != shard {
+		t.Fatalf("no baseline is not ready, and still names its shard: %+v", snap)
+	}
+	if snap.Loss == nil || snap.Loss.Revision != loss.Revision || !snap.Loss.KnownThrough.Equal(own) {
+		t.Fatalf("only the guild's own shard's loss is reported without a baseline: %+v", snap.Loss)
+	}
+
+	never, err := d.GetGuildVoiceSnapshot(ctx, rand.Int63(), 0, time.Minute)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	if never.Ready || never.Loss != nil {
+		t.Fatalf("a guild never baselined gets no other shard's loss: %+v", never)
+	}
+}
+
+// A database that ran an earlier version of the upgrade has baselines but no
+// guild-to-shard mapping; re-running the upgrade seeds it, and stays safe to
+// run again.
+func TestVoiceUpgradeSeedsGuildShardsFromBaselines(t *testing.T) {
+	d := newVoiceTestDB(t)
+	ctx := context.Background()
+	guild, shard := rand.Int63(), testShard()
+	t.Cleanup(func() {
+		_, _ = d.sql.ExecContext(ctx, `DELETE FROM voice_guild_readiness WHERE guild_id = $1`, guild)
+		_, _ = d.sql.ExecContext(ctx, `DELETE FROM voice_guild_shards WHERE guild_id = $1`, guild)
+	})
+	if _, err := d.sql.ExecContext(ctx, `INSERT INTO voice_guild_readiness (guild_id, shard_id, connection_id) VALUES ($1, $2, 'old')`, guild, shard); err != nil {
+		t.Fatal(err)
+	}
+	upgrade, err := os.ReadFile(filepath.Join("upgrades", "0001_voice_attendance.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := d.sql.ExecContext(ctx, string(upgrade)); err != nil {
+			t.Fatalf("upgrade run %d: %v", i+1, err)
+		}
+	}
+	var got int
+	if err := d.sql.GetContext(ctx, &got, `SELECT shard_id FROM voice_guild_shards WHERE guild_id = $1`, guild); err != nil {
+		t.Fatalf("mapping: %v", err)
+	}
+	if got != shard {
+		t.Fatalf("mapped shard = %d, want %d", got, shard)
+	}
+}

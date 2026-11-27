@@ -36,6 +36,8 @@ type conn struct {
 	identifyMu *concurrency.Mutex
 
 	authed atomic.Bool
+	// resumed is set when this connection authenticated with RESUMED.
+	resumed atomic.Bool
 
 	// mu guards the timing/state fields below, which are read by management
 	// calls (Status/LongLastAck) on the manager goroutine while the read-loop

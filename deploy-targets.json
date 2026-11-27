@@ -1,0 +1,57 @@
+{
+  "schema": "tatsu-deploy-targets/v1",
+  "productionBranch": "master",
+  "indirect": [
+    "*.go",
+    "go.mod",
+    "go.sum",
+    ".dockerignore"
+  ],
+  "nonBuild": [
+    "*.md",
+    "handoffs/",
+    "docs/",
+    ".claude/",
+    ".github/",
+    ".gitignore",
+    "deploy-targets.json",
+    "feature_list.json",
+    "*_test.go"
+  ],
+  "targets": {
+    "gateway": {
+      "image": "tatsu/gateway",
+      "dockerfile": "Dockerfile.gateway",
+      "paths": [
+        "cmd/gateway/",
+        "Dockerfile.gateway",
+        "entrypoint-gateway.sh",
+        "build-gateway.sh",
+        "build.sh"
+      ],
+      "build": {
+        "script": {
+          "staging": "build-gateway.sh",
+          "production": "build.sh"
+        },
+        "pushes": true
+      },
+      "note": "build.sh also builds and pushes state; build-gateway.sh builds gateway only"
+    },
+    "state": {
+      "image": "tatsu/state",
+      "dockerfile": "Dockerfile.state",
+      "paths": [
+        "cmd/state/",
+        "Dockerfile.state",
+        "entrypoint-state.sh",
+        "build.sh"
+      ],
+      "build": {
+        "script": "build.sh",
+        "pushes": true
+      },
+      "note": "No state-only script: build.sh also builds and pushes gateway, with -release tags"
+    }
+  }
+}

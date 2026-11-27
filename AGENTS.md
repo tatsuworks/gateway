@@ -29,6 +29,10 @@ If baseline verification is already failing, fix that first. Do not stack new fe
 
 - `handoffs/<branch-slug>.md` — per-branch session log and current verified status; gitignored working state (copy from `handoffs/_template.md`)
 - `init.sh` — standard startup and verification path
+- `deploy-targets.json` — this repo's deploy-target contract for the shared Pi deployment
+  planner (TATSU-2773): each image's Dockerfile, paths, build script and whether it pushes.
+  Update it in the same PR when you add or rename an image, Dockerfile, entrypoint or build
+  script, or change what a build script pushes.
 
 Durable status, done criteria, and verification evidence live on the **Linear ticket**, not in a committed file in this repo. See [the workspace decision log](../../docs/decision_log/retire-workspace-progress-trackers.md).
 
